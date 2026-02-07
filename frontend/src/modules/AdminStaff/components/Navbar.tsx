@@ -161,7 +161,7 @@ export default function Navbar({ }: NavbarProps) {
 
                     {/* User Profile & Mobile Toggle - Right */}
                     <div className="flex items-center gap-2 ml-auto">
-                        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+                        <DropdownMenu modal={false} open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
                             <DropdownMenuTrigger asChild>
                                 <Button
                                     variant="ghost"
