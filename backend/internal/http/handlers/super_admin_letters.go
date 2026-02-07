@@ -116,7 +116,8 @@ func SuperAdminLettersIndex(c *gin.Context) {
 			"priorities":  map[string]string{"high": "Tinggi", "medium": "Sedang", "low": "Rendah"},
 			"divisions":   hrDivisionOptions(db),
 		},
-		"nextLetterNumber": nextNumber,
+		"nextLetterNumber":     nextNumber,
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
 	})
 }
 

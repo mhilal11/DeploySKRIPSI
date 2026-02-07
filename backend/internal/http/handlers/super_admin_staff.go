@@ -81,8 +81,9 @@ func SuperAdminStaffIndex(c *gin.Context) {
 			"active":  transformTerminations(active),
 			"archive": transformTerminations(archive),
 		},
-		"inactiveEmployees": inactiveEmployees,
-		"checklistTemplate": checklistTemplate,
+		"inactiveEmployees":    inactiveEmployees,
+		"checklistTemplate":    checklistTemplate,
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
 	})
 }
 

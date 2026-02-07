@@ -126,11 +126,12 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 			"data":  data,
 			"links": []any{},
 		},
-		"statusOptions":   statusOptions,
-		"priorityOptions": priorityOptions,
-		"categoryOptions": categories,
-		"regulations":     []any{},
-		"announcements":   []any{},
+		"statusOptions":        statusOptions,
+		"priorityOptions":      priorityOptions,
+		"categoryOptions":      categories,
+		"regulations":          []any{},
+		"announcements":        []any{},
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
 	})
 }
 

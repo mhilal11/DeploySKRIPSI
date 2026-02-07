@@ -90,9 +90,10 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"divisions": divisions,
-		"stats":     stats,
-		"flash":     gin.H{"success": "", "error": ""},
+		"divisions":            divisions,
+		"stats":                stats,
+		"flash":                gin.H{"success": "", "error": ""},
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
 	})
 }
 

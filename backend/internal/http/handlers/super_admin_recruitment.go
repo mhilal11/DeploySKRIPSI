@@ -181,10 +181,11 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"applications":  applications,
-		"statusOptions": models.ApplicationStatuses,
-		"interviews":    interviews,
-		"onboarding":    onboarding,
+		"applications":         applications,
+		"statusOptions":        models.ApplicationStatuses,
+		"interviews":           interviews,
+		"onboarding":           onboarding,
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
 	})
 }
 

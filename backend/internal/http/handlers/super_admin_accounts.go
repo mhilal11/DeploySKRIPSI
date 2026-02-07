@@ -141,12 +141,13 @@ func SuperAdminAccountsIndex(c *gin.Context) {
 			"per_page":     perPage,
 			"total":        total,
 		},
-		"filters":         filters,
-		"stats":           stats,
-		"roleOptions":     models.UserRoles,
-		"statusOptions":   models.UserStatuses,
-		"divisionOptions": models.UserDivisions,
-		"flash":           gin.H{"success": ""},
+		"filters":              filters,
+		"stats":                stats,
+		"roleOptions":          models.UserRoles,
+		"statusOptions":        models.UserStatuses,
+		"divisionOptions":      models.UserDivisions,
+		"flash":                gin.H{"success": ""},
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
 	})
 }
 
@@ -157,6 +158,8 @@ func SuperAdminAccountsCreate(c *gin.Context) {
 		return
 	}
 
+	db := middleware.GetDB(c)
+
 	c.JSON(http.StatusOK, gin.H{
 		"roleOptions":           models.UserRoles,
 		"statusOptions":         models.UserStatuses,
@@ -164,6 +167,7 @@ func SuperAdminAccountsCreate(c *gin.Context) {
 		"religionOptions":       models.StaffReligions,
 		"genderOptions":         models.StaffGenders,
 		"educationLevelOptions": models.StaffEducationLevels,
+		"sidebarNotifications":  computeSuperAdminSidebarNotifications(db),
 	})
 }
 
@@ -207,6 +211,7 @@ func SuperAdminAccountsEdit(c *gin.Context) {
 		"religionOptions":       models.StaffReligions,
 		"genderOptions":         models.StaffGenders,
 		"educationLevelOptions": models.StaffEducationLevels,
+		"sidebarNotifications":  computeSuperAdminSidebarNotifications(db),
 	})
 }
 
@@ -232,6 +237,13 @@ func SuperAdminAccountsStore(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+
+	var exists int
+	_ = db.Get(&exists, "SELECT COUNT(*) FROM users WHERE email = ?", email)
+	if exists > 0 {
+		ValidationErrors(c, FieldErrors{"email": "Email sudah digunakan."})
+		return
+	}
 
 	employeeCode, _ := services.GenerateEmployeeCode(db, role)
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -283,6 +295,13 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 	password := c.PostForm("password")
 
 	db := middleware.GetDB(c)
+
+	var exists int
+	_ = db.Get(&exists, "SELECT COUNT(*) FROM users WHERE email = ? AND id != ?", email, id)
+	if exists > 0 {
+		ValidationErrors(c, FieldErrors{"email": "Email sudah digunakan."})
+		return
+	}
 
 	if status == "Inactive" && inactiveAt == "" {
 		inactiveAt = time.Now().Format("2006-01-02")

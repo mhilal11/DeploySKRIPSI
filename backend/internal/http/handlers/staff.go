@@ -408,7 +408,9 @@ func attachmentURL(c *gin.Context, path *string) *string {
 	if path == nil || *path == "" {
 		return nil
 	}
-	url := "/storage/" + strings.TrimPrefix(*path, "/")
+	cfg := middleware.GetConfig(c)
+	// Generate full URL using backend base URL
+	url := cfg.BaseURL + "/storage/" + strings.TrimPrefix(*path, "/")
 	return &url
 }
 

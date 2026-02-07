@@ -103,3 +103,52 @@ func diffForHumans(t *time.Time) string {
 func itoa(value int) string {
 	return fmt.Sprintf("%d", value)
 }
+
+// computeSuperAdminSidebarNotifications calculates badge counts for SuperAdmin sidebar
+func computeSuperAdminSidebarNotifications(db any) map[string]int {
+	type Querier interface {
+		Get(dest interface{}, query string, args ...interface{}) error
+	}
+	
+	q, ok := db.(Querier)
+	if !ok {
+		return map[string]int{}
+	}
+
+	notifications := map[string]int{}
+
+	// Letters: status in ['Menunggu HR', 'Diajukan', 'Diproses'] AND current_recipient = 'hr'
+	var lettersCount int
+	_ = q.Get(&lettersCount, `
+		SELECT COUNT(*) FROM surat 
+		WHERE status_persetujuan IN ('Menunggu HR', 'Diajukan', 'Diproses') 
+		AND current_recipient = 'hr'
+	`)
+	notifications["super-admin.letters.index"] = lettersCount
+
+	// Recruitment: status in ['Applied', 'Screening']
+	var recruitmentCount int
+	_ = q.Get(&recruitmentCount, `
+		SELECT COUNT(*) FROM applications 
+		WHERE status IN ('Applied', 'Screening')
+	`)
+	notifications["super-admin.recruitment"] = recruitmentCount
+
+	// Staff terminations: status in ['Diajukan', 'Proses']
+	var staffCount int
+	_ = q.Get(&staffCount, `
+		SELECT COUNT(*) FROM staff_terminations 
+		WHERE status IN ('Diajukan', 'Proses')
+	`)
+	notifications["super-admin.staff.index"] = staffCount
+
+	// Complaints: status = 'Baru'
+	var complaintsCount int
+	_ = q.Get(&complaintsCount, `
+		SELECT COUNT(*) FROM complaints 
+		WHERE status = 'Baru'
+	`)
+	notifications["super-admin.complaints.index"] = complaintsCount
+
+	return notifications
+}
