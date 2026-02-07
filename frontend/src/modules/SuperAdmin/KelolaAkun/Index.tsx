@@ -35,6 +35,9 @@ type IndexPageProps = PageProps<{
 	};
 }>;
 
+const ACCOUNT_TOAST_ID = 'super-admin.accounts.feedback';
+const ACCOUNT_TOAST_STORAGE_KEY = 'super-admin.accounts.toast';
+
 const EMPTY_USERS: PaginatedAccounts = {
 	data: [],
 	links: [],
@@ -105,23 +108,34 @@ export default function Index(props: IndexPageProps) {
     );
     const [detailOpen, setDetailOpen] = useState(false);
 
-    useEffect(() => {
-        if (flash?.success) {
-            toast.success(flash.success);
-        }
-    }, [flash?.success]);
-
+    // Show queued toast from sessionStorage after page transition settles
     useEffect(() => {
         if (typeof window === 'undefined') {
             return;
         }
-        const queuedToast = sessionStorage.getItem('super-admin.accounts.toast');
-        if (!queuedToast) {
-            return;
+
+        const queuedToast = sessionStorage.getItem(ACCOUNT_TOAST_STORAGE_KEY);
+        if (queuedToast) {
+            sessionStorage.removeItem(ACCOUNT_TOAST_STORAGE_KEY);
+            // Delay to ensure the page transition (DOM reconciliation) is
+            // fully complete so the toast is not dismissed mid-transition.
+            const timer = window.setTimeout(() => {
+                toast.success(queuedToast, {
+                    id: ACCOUNT_TOAST_ID,
+                    duration: 10000,
+                });
+            }, 300);
+            return () => window.clearTimeout(timer);
         }
-        toast.success(queuedToast);
-        sessionStorage.removeItem('super-admin.accounts.toast');
-    }, []);
+
+        // Handle flash message from server response
+        if (flash?.success) {
+            toast.success(flash.success, {
+                id: ACCOUNT_TOAST_ID,
+                duration: 10000,
+            });
+        }
+    }, [flash?.success]);
 
     // Client-side filtering - no server request, no URL change
     const accountRows = useMemo(() => {

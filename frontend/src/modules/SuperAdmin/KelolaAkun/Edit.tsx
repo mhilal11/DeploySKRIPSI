@@ -5,6 +5,8 @@ import AccountForm from '@/modules/SuperAdmin/components/accounts/AccountForm';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
 import { Head, Link, router, useForm } from '@/shared/lib/inertia';
 
+const ACCOUNT_TOAST_STORAGE_KEY = 'super-admin.accounts.toast';
+const DEFAULT_SUCCESS_MESSAGE = 'Akun berhasil diperbarui.';
 
 interface EditProps {
     user: {
@@ -85,22 +87,34 @@ export default function Edit({
 
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+
         form.put(route('super-admin.accounts.update', user.id), {
             forceFormData: true,
             onSuccess: (responseData) => {
                 const message =
                     typeof responseData?.status === 'string' && responseData.status.length > 0
                         ? responseData.status
-                        : 'Akun berhasil diperbarui.';
+                        : DEFAULT_SUCCESS_MESSAGE;
+
+                // Save to sessionStorage – Index will display the toast
+                // after the page transition is complete.
                 if (typeof window !== 'undefined') {
-                    sessionStorage.setItem('super-admin.accounts.toast', message);
+                    sessionStorage.setItem(ACCOUNT_TOAST_STORAGE_KEY, message);
                 }
-                router.visit(route('super-admin.accounts.index'), { replace: true });
+
+                router.visit(route('super-admin.accounts.index'));
             },
             onError: (errors) => {
-                if (!errors || Object.keys(errors).length === 0) {
-                    toast.error('Gagal memperbarui akun. Coba lagi.');
-                }
+                const firstError = errors
+                    ? Object.values(errors).find(
+                        (value) => typeof value === 'string' && value.trim().length > 0,
+                    )
+                    : null;
+                toast.error(
+                    typeof firstError === 'string'
+                        ? firstError
+                        : 'Gagal memperbarui akun. Coba lagi.',
+                );
             },
         });
     };
