@@ -60,7 +60,7 @@ export default function DispositionDialog({
         <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4">
           <DialogTitle>Disposisi Surat</DialogTitle>
           <DialogDescription>
-            Tambahkan catatan singkat sebelum meneruskan surat ke divisi tujuan.
+            Catatan opsional untuk disposisi, tetapi wajib saat menolak surat.
           </DialogDescription>
         </DialogHeader>
 
@@ -158,7 +158,7 @@ export default function DispositionDialog({
 
             {/* CATATAN */}
             <div className="space-y-2">
-              <Label htmlFor="disposition-note">Catatan (opsional)</Label>
+              <Label htmlFor="disposition-note">Catatan (opsional, wajib untuk tolak surat)</Label>
               <Textarea
                 id="disposition-note"
                 rows={4}

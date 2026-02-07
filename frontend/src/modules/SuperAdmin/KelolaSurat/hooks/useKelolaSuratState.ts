@@ -2,7 +2,7 @@
 import { toast } from 'sonner';
 
 import { LetterRecord } from '@/modules/SuperAdmin/KelolaSurat/components/LettersTable';
-import { useForm } from '@/shared/lib/inertia';
+import { router, useForm } from '@/shared/lib/inertia';
 
 interface LettersCollection {
     inbox: LetterRecord[];
@@ -237,6 +237,7 @@ export function useKelolaSuratState({
 
         dispositionForm.post(route(routeName), {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: () => {
                 let message: string;
                 if (mode === 'reject') {
@@ -251,6 +252,10 @@ export function useKelolaSuratState({
                 setDispositionTargets([]);
                 clearPendingSelection();
                 dispositionForm.reset();
+                router.reload({
+                    preserveScroll: true,
+                    only: ['stats', 'letters', 'pendingDisposition', 'sidebarNotifications'],
+                });
             },
             onError: () => toast.error('Gagal mendisposisi surat, coba lagi.'),
         });
@@ -280,6 +285,10 @@ export function useKelolaSuratState({
                     setDetailOpen(false);
                     setSelectedLetter(null);
                 }
+                router.reload({
+                    preserveScroll: true,
+                    only: ['stats', 'letters', 'pendingDisposition', 'sidebarNotifications'],
+                });
             },
             onError: () => toast.error('Gagal mengarsipkan surat, coba lagi.'),
             onFinish: () => setArchivingLetterId(null),
@@ -302,6 +311,10 @@ export function useKelolaSuratState({
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Surat dikembalikan ke daftar aktif.');
+                router.reload({
+                    preserveScroll: true,
+                    only: ['stats', 'letters', 'pendingDisposition', 'sidebarNotifications'],
+                });
             },
             onError: () => toast.error('Gagal membatalkan arsip surat, coba lagi.'),
             onFinish: () => setUnarchivingLetterId(null),
