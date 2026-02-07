@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react';
 
 import { Link, usePage, router } from '@/shared/lib/inertia';
+import { route } from '@/shared/lib/route';
 import { cn } from '@/shared/lib/utils';
 import { PageProps } from '@/shared/types';
 
