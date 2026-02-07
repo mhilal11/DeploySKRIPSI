@@ -225,13 +225,10 @@ export default function AdminStaffLetters() {
     }, [selectedLetter, resetReplyForm, clearReplyFormErrors]);
 
     useEffect(() => {
-        if (!detailOpen) {
-            setReplyOpen(false);
-            resetReplyForm();
-            clearReplyFormErrors();
+        if (!detailOpen && !replyOpen) {
             setDetailTab('detail');
         }
-    }, [detailOpen, resetReplyForm, clearReplyFormErrors]);
+    }, [detailOpen, replyOpen]);
 
     const filteredLetters = useMemo(() => {
         const filterList = (items: LetterRecord[]) => {
@@ -339,6 +336,7 @@ export default function AdminStaffLetters() {
         }
         replyForm.reset();
         replyForm.clearErrors();
+        setDetailOpen(false);
         setReplyOpen(true);
     };
 
@@ -347,6 +345,9 @@ export default function AdminStaffLetters() {
             setReplyOpen(false);
             replyForm.reset();
             replyForm.clearErrors();
+            if (selectedLetter) {
+                setDetailOpen(true);
+            }
             return;
         }
 
@@ -371,10 +372,13 @@ export default function AdminStaffLetters() {
 
         replyForm.post(replyEndpoint, {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: () => {
                 toast.success('Balasan surat dikirim ke HR.');
                 replyForm.reset();
                 setReplyOpen(false);
+                setSelectedLetter(null);
+                setDetailOpen(false);
                 // Reload data to update letter status and history
                 router.reload({ preserveScroll: true });
             },
@@ -904,7 +908,7 @@ export default function AdminStaffLetters() {
                 </DialogContent>
             </Dialog >
 
-            <Dialog modal={false} open={replyOpen} onOpenChange={handleReplyDialogChange}>
+            <Dialog open={replyOpen} onOpenChange={handleReplyDialogChange}>
                 <DialogContent className="max-w-2xl border-0 bg-white p-0 overflow-hidden">
                     <DialogHeader className="bg-gradient-to-r from-blue-50 to-slate-50 px-6 py-4 border-b border-slate-200">
                         <div className="flex items-center gap-3">

@@ -1,16 +1,13 @@
 ﻿import { Archive, Eye, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import {
     AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from '@/shared/components/ui/alert-dialog';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -127,8 +124,14 @@ export default function LettersTable({
 }: LettersTableProps) {
     const isInbox = variant === 'inbox';
     const [currentPage, setCurrentPage] = useState(1);
+    const [archiveTarget, setArchiveTarget] = useState<LetterRecord | null>(null);
+    const lastArchiveConfirmAtRef = useRef(0);
     const itemsPerPage = 10;
     const totalPages = Math.ceil(letters.length / itemsPerPage);
+    const closeArchiveDialog = () => setArchiveTarget(null);
+    const canArchiveTarget = archiveTarget?.status === 'Didisposisi';
+    const isTargetProcessing =
+        Boolean(archiveProcessing) && archiveTarget !== null && archivingId === archiveTarget.id;
 
     if (letters.length === 0) {
         return (
@@ -247,12 +250,33 @@ export default function LettersTable({
                                             </TooltipProvider>
 
                                             {onArchive && (
-                                                <ArchiveActionButton
-                                                    letter={letter}
-                                                    onConfirm={onArchive}
-                                                    disabled={archiveProcessing}
-                                                    isProcessing={archiveProcessing && archivingId === letter.id}
-                                                />
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                                                disabled={archiveProcessing || letter.status === 'Diarsipkan'}
+                                                                onClick={() => {
+                                                                    if (Date.now() - lastArchiveConfirmAtRef.current < 450) {
+                                                                        return;
+                                                                    }
+                                                                    setArchiveTarget(letter);
+                                                                }}
+                                                            >
+                                                                {archiveProcessing && archivingId === letter.id ? (
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                ) : (
+                                                                    <Archive className="h-4 w-4" />
+                                                                )}
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Arsipkan</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
                                             )}
                                         </div>
                                     </TableCell>
@@ -301,80 +325,62 @@ export default function LettersTable({
                     </div>
                 </div>
             )}
-        </div>
-    );
-}
 
-function ArchiveActionButton({
-    letter,
-    onConfirm,
-    disabled,
-    isProcessing,
-}: {
-    letter: LetterRecord;
-    onConfirm: (letter: LetterRecord) => void;
-    disabled?: boolean;
-    isProcessing?: boolean;
-}) {
-    const [open, setOpen] = useState(false);
-    const canArchive = letter.status === 'Didisposisi';
-
-    return (
-        <AlertDialog open={open} onOpenChange={setOpen}>
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
-                            disabled={disabled || letter.status === 'Diarsipkan'}
-                            onClick={() => setOpen(true)}
-                        >
-                            {isProcessing ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Archive className="h-4 w-4" />
-                            )}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Arsipkan</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-
-            <AlertDialogContent className="bg-white">
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Arsipkan surat ini?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        {canArchive
-                            ? 'Surat akan dipindahkan ke tab Arsip dan tidak muncul di daftar aktif.'
-                            : 'Surat belum didisposisi oleh HR sehingga belum dapat diarsipkan.'}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Batal</AlertDialogCancel>
-                    <AlertDialogAction
-                        className="bg-rose-600 hover:bg-rose-700"
-                        disabled={!canArchive || disabled || isProcessing}
-                        onClick={() => {
-                            if (!canArchive || disabled || isProcessing) {
-                                return;
-                            }
-                            onConfirm(letter);
-                            setOpen(false);
-                        }}
+            {onArchive && (
+                <AlertDialog
+                    open={Boolean(archiveTarget)}
+                    onOpenChange={(nextOpen) => {
+                        if (!nextOpen) {
+                            closeArchiveDialog();
+                        }
+                    }}
+                >
+                    <AlertDialogContent
+                        className="bg-white"
+                        onCloseAutoFocus={(event) => event.preventDefault()}
                     >
-                        {isProcessing ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            'Ya, Arsipkan'
-                        )}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Arsipkan surat ini?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {canArchiveTarget
+                                    ? 'Surat akan dipindahkan ke tab Arsip dan tidak muncul di daftar aktif.'
+                                    : 'Surat belum didisposisi oleh HR sehingga belum dapat diarsipkan.'}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={closeArchiveDialog}
+                                disabled={isTargetProcessing}
+                            >
+                                Batal
+                            </Button>
+                            <Button
+                                type="button"
+                                className="bg-rose-600 hover:bg-rose-700"
+                                disabled={!canArchiveTarget || archiveProcessing || isTargetProcessing}
+                                onClick={() => {
+                                    if (!archiveTarget || !canArchiveTarget || archiveProcessing || isTargetProcessing) {
+                                        return;
+                                    }
+                                    const selectedLetter = archiveTarget;
+                                    lastArchiveConfirmAtRef.current = Date.now();
+                                    closeArchiveDialog();
+                                    onArchive(selectedLetter);
+                                }}
+                            >
+                                {isTargetProcessing ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    'Ya, Arsipkan'
+                                )}
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
+        </div>
     );
 }
 

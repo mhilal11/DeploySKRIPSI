@@ -530,6 +530,7 @@ func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 			"senderName":     senderName,
 			"senderDivision": senderDivision,
 			"recipientName":  recipientName,
+			"letterType":     surat.JenisSurat,
 			"subject":        surat.Perihal,
 			"category":       surat.Kategori,
 			"date":           formatDate(surat.TanggalSurat),

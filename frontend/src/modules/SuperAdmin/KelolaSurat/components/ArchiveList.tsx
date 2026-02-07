@@ -1,16 +1,13 @@
 ﻿import { FileText, Loader2, RotateCcw } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import {
     AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
 } from '@/shared/components/ui/alert-dialog';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -33,6 +30,13 @@ export default function ArchiveList({
     unarchivingId,
     unarchiveProcessing,
 }: ArchiveListProps) {
+    const [unarchiveTarget, setUnarchiveTarget] = useState<LetterRecord | null>(null);
+    const lastUnarchiveConfirmAtRef = useRef(0);
+    const closeUnarchiveDialog = () => setUnarchiveTarget(null);
+    const canUnarchiveTarget = unarchiveTarget?.status === 'Diarsipkan';
+    const isTargetProcessing =
+        Boolean(unarchiveProcessing) && unarchiveTarget !== null && unarchivingId === unarchiveTarget.id;
+
     if (letters.length === 0) {
         return (
             <div className="py-10 text-center text-slate-500">
@@ -70,83 +74,87 @@ export default function ArchiveList({
                                 Detail
                             </Button>
                             {onUnarchive && (
-                                <UnarchiveActionButton
-                                    letter={letter}
-                                    onConfirm={onUnarchive}
-                                    disabled={unarchiveProcessing}
-                                    isProcessing={unarchiveProcessing && unarchivingId === letter.id}
-                                />
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-amber-700 hover:text-amber-800"
+                                    disabled={unarchiveProcessing || letter.status !== 'Diarsipkan'}
+                                    onClick={() => {
+                                        if (Date.now() - lastUnarchiveConfirmAtRef.current < 450) {
+                                            return;
+                                        }
+                                        setUnarchiveTarget(letter);
+                                    }}
+                                >
+                                    {unarchiveProcessing && unarchivingId === letter.id ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <RotateCcw className="mr-2 h-4 w-4" />
+                                    )}
+                                    Batalkan Arsip
+                                </Button>
                             )}
                         </div>
                     </div>
                 </Card>
             ))}
+
+            {onUnarchive && (
+                <AlertDialog
+                    open={Boolean(unarchiveTarget)}
+                    onOpenChange={(nextOpen) => {
+                        if (!nextOpen) {
+                            closeUnarchiveDialog();
+                        }
+                    }}
+                >
+                    <AlertDialogContent
+                        className="bg-white"
+                        onCloseAutoFocus={(event) => event.preventDefault()}
+                    >
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Batalkan arsip surat?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Surat akan dikembalikan ke daftar aktif untuk ditindaklanjuti kembali.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={closeUnarchiveDialog}
+                                disabled={isTargetProcessing}
+                            >
+                                Batal
+                            </Button>
+                            <Button
+                                type="button"
+                                className="bg-amber-600 hover:bg-amber-700"
+                                disabled={!canUnarchiveTarget || unarchiveProcessing || isTargetProcessing}
+                                onClick={() => {
+                                    if (!unarchiveTarget || !canUnarchiveTarget || unarchiveProcessing || isTargetProcessing) {
+                                        return;
+                                    }
+                                    const selectedLetter = unarchiveTarget;
+                                    lastUnarchiveConfirmAtRef.current = Date.now();
+                                    closeUnarchiveDialog();
+                                    onUnarchive(selectedLetter);
+                                }}
+                            >
+                                {isTargetProcessing ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    'Ya, Batalkan Arsip'
+                                )}
+                            </Button>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
         </div>
     );
 }
 
-function UnarchiveActionButton({
-    letter,
-    onConfirm,
-    disabled,
-    isProcessing,
-}: {
-    letter: LetterRecord;
-    onConfirm: (letter: LetterRecord) => void;
-    disabled?: boolean;
-    isProcessing?: boolean;
-}) {
-    const [open, setOpen] = useState(false);
-    const canUnarchive = letter.status === 'Diarsipkan';
-
-    return (
-        <AlertDialog open={open} onOpenChange={setOpen}>
-            <AlertDialogTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-amber-700 hover:text-amber-800"
-                    disabled={disabled || !canUnarchive}
-                >
-                    {isProcessing ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                        <RotateCcw className="mr-2 h-4 w-4" />
-                    )}
-                    Batalkan Arsip
-                </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="bg-white">
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Batalkan arsip surat?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Surat akan dikembalikan ke daftar aktif untuk ditindaklanjuti kembali.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Batal</AlertDialogCancel>
-                    <AlertDialogAction
-                        className="bg-amber-600 hover:bg-amber-700"
-                        disabled={!canUnarchive || disabled || isProcessing}
-                        onClick={() => {
-                            if (!canUnarchive || disabled || isProcessing) {
-                                return;
-                            }
-                            onConfirm(letter);
-                            setOpen(false);
-                        }}
-                    >
-                        {isProcessing ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            'Ya, Batalkan Arsip'
-                        )}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    );
-}
 
 
 
