@@ -277,12 +277,11 @@ export default function PendingDispositionPanel({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 w-8 p-0"
+                                    className="h-8 px-3"
                                     onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
                                     disabled={currentPage === 1}
                                 >
-                                    <span className="sr-only">Sebelumnya</span>
-                                    <span aria-hidden="true"></span>
+                                    Sebelumnya
                                 </Button>
                                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                                     <Button
@@ -298,12 +297,11 @@ export default function PendingDispositionPanel({
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 w-8 p-0"
+                                    className="h-8 px-3"
                                     onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
                                     disabled={currentPage === totalPages}
                                 >
-                                    <span className="sr-only">Selanjutnya</span>
-                                    <span aria-hidden="true"></span>
+                                    Selanjutnya
                                 </Button>
                             </div>
                         </div>
