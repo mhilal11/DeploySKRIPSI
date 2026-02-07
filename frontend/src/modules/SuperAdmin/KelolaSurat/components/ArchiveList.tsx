@@ -53,7 +53,7 @@ export default function ArchiveList({
                             {letter.subject}
                         </p>
                         <p className="text-xs text-slate-500">
-                            {letter.letterNumber} â€¢ {letter.category} â€¢ {letter.date}
+                            {letter.letterNumber} â¢ {letter.category} â€¢ {letter.date}
                         </p>
                         <p className="text-xs text-slate-500">
                             Pengirim: {letter.senderName} â€¢ Penerima: {letter.recipientName}

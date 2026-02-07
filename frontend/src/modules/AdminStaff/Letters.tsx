@@ -85,7 +85,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/shared/components/ui/tooltip';
-import { Head, useForm, usePage } from '@/shared/lib/inertia';
+import { Head, router, useForm, usePage } from '@/shared/lib/inertia';
 import type { PageProps } from '@/shared/types';
 
 type ReplyHistoryEntry = {
@@ -264,6 +264,8 @@ export default function AdminStaffLetters() {
                 toast.success('Surat berhasil dikirim ke Admin HR.');
                 form.reset();
                 setComposerOpen(false);
+                // Reload data to show the newly created letter
+                router.reload({ preserveScroll: true });
             },
             onError: () => toast.error('Gagal mengirim surat, periksa kembali data.'),
         });
@@ -299,6 +301,8 @@ export default function AdminStaffLetters() {
                     setDetailOpen(false);
                     setSelectedLetter(null);
                 }
+                // Reload data to update letter list
+                router.reload({ preserveScroll: true });
             },
             onError: () => toast.error('Gagal mengarsipkan surat, coba lagi.'),
             onFinish: () => setArchivingLetterId(null),
@@ -321,6 +325,8 @@ export default function AdminStaffLetters() {
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Arsip surat dibatalkan.');
+                // Reload data to update letter list
+                router.reload({ preserveScroll: true });
             },
             onError: () => toast.error('Gagal membatalkan arsip surat, coba lagi.'),
             onFinish: () => setUnarchivingLetterId(null),
@@ -369,6 +375,8 @@ export default function AdminStaffLetters() {
                 toast.success('Balasan surat dikirim ke HR.');
                 replyForm.reset();
                 setReplyOpen(false);
+                // Reload data to update letter status and history
+                router.reload({ preserveScroll: true });
             },
             onError: () => toast.error('Gagal mengirim balasan, periksa catatan Anda.'),
         });
@@ -542,8 +550,13 @@ export default function AdminStaffLetters() {
                 )}
             </Card> */}
 
-            < Dialog open={detailOpen} onOpenChange={setDetailOpen} >
-                <DialogContent className="max-h-[85vh] max-w-3xl overflow-hidden border-0 bg-white p-0">
+            <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+                <DialogContent
+                    className="max-h-[85vh] max-w-3xl overflow-hidden border-0 bg-white p-0"
+                    onEscapeKeyDown={(event) => event.preventDefault()}
+                    onPointerDownOutside={(event) => event.preventDefault()}
+                    onInteractOutside={(event) => event.preventDefault()}
+                >
                     <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4">
                         <DialogTitle>Detail Surat</DialogTitle>
                         <DialogDescription>
@@ -891,7 +904,7 @@ export default function AdminStaffLetters() {
                 </DialogContent>
             </Dialog >
 
-            <Dialog open={replyOpen} onOpenChange={handleReplyDialogChange}>
+            <Dialog modal={false} open={replyOpen} onOpenChange={handleReplyDialogChange}>
                 <DialogContent className="max-w-2xl border-0 bg-white p-0 overflow-hidden">
                     <DialogHeader className="bg-gradient-to-r from-blue-50 to-slate-50 px-6 py-4 border-b border-slate-200">
                         <div className="flex items-center gap-3">
@@ -1710,7 +1723,5 @@ function InfoTile({
         </div>
     );
 }
-
-
 
 

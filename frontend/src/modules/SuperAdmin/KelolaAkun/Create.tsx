@@ -86,9 +86,16 @@ export default function Create({
                 router.visit(route('super-admin.accounts.index'), { replace: true });
             },
             onError: (errors) => {
-                if (!errors || Object.keys(errors).length === 0) {
-                    toast.error('Gagal membuat akun. Coba lagi.');
-                }
+                const firstError = errors
+                    ? Object.values(errors).find(
+                        (value) => typeof value === 'string' && value.trim().length > 0,
+                    )
+                    : null;
+                toast.error(
+                    typeof firstError === 'string'
+                        ? firstError
+                        : 'Gagal membuat akun. Coba lagi.',
+                );
             },
         });
     };
