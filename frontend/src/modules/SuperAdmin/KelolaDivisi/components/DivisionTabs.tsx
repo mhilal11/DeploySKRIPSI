@@ -341,14 +341,16 @@ function DivisionVacancySection({
                     <div>
                         <h4 className="text-base md:text-lg font-semibold text-green-900">{division.job_title}</h4>
                         <p className="text-xs md:text-sm text-slate-700">{division.job_description}</p>
-                        {division.job_requirements.length > 0 && (
+                        {division.job_requirements && division.job_requirements.length > 0 && (
                             <ul className="mt-2 md:mt-3 space-y-1 text-xs md:text-sm text-slate-700">
-                                {division.job_requirements.map((requirement, index) => (
-                                    <li key={index} className="flex items-start gap-2">
-                                        <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-600" />
-                                        <span>{requirement}</span>
-                                    </li>
-                                ))}
+                                {division.job_requirements
+                                    .filter(req => req && req.trim() !== '')
+                                    .map((requirement, index) => (
+                                        <li key={index} className="flex items-start gap-2">
+                                            <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-600" />
+                                            <span>{requirement}</span>
+                                        </li>
+                                    ))}
                             </ul>
                         )}
                     </div>

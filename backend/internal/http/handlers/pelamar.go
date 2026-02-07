@@ -611,6 +611,33 @@ func decodeJSONMap(raw models.JSON) map[string]any {
 	return data
 }
 
+func decodeJSONStringArray(raw models.JSON) []string {
+	if len(raw) == 0 {
+		return []string{}
+	}
+
+	var data []string
+	if err := json.Unmarshal([]byte(raw), &data); err == nil {
+		if data == nil {
+			return []string{}
+		}
+		return data
+	}
+
+	// Backward-compatible fallback when JSON array contains non-string values.
+	var anyData []any
+	if err := json.Unmarshal([]byte(raw), &anyData); err != nil {
+		return []string{}
+	}
+	out := make([]string, 0, len(anyData))
+	for _, item := range anyData {
+		if str, ok := item.(string); ok && strings.TrimSpace(str) != "" {
+			out = append(out, str)
+		}
+	}
+	return out
+}
+
 func formatCertifications(c *gin.Context, certs []map[string]any) []map[string]any {
 	out := make([]map[string]any, 0, len(certs))
 	for _, cert := range certs {
@@ -803,7 +830,7 @@ func divisionSummaries(db *sqlx.DB) []map[string]any {
 				"is_hiring":                isHiring,
 				"job_title":                profile.JobTitle,
 				"job_description":          profile.JobDescription,
-				"job_requirements":         decodeJSONArray(profile.JobRequirements),
+				"job_requirements":         decodeJSONStringArray(profile.JobRequirements),
 				"job_eligibility_criteria": decodeJSONMap(profile.JobEligibility),
 			})
 		}

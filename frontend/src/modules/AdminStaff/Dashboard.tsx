@@ -38,11 +38,19 @@ interface DashboardPageProps extends Record<string, unknown> {
   }>;
 }
 
+const EMPTY_STATS: DashboardPageProps['stats'] = {
+    inbox: 0,
+    outbox: 0,
+    pending: 0,
+};
+
 
 export default function AdminStaffDashboard() {
-    const {
-        props: { stats, incomingMails, outgoingMails, announcements },
-    } = usePage<PageProps<DashboardPageProps>>();
+    const { props } = usePage<PageProps<Partial<DashboardPageProps>>>();
+    const stats = props.stats ?? EMPTY_STATS;
+    const incomingMails = props.incomingMails ?? [];
+    const outgoingMails = props.outgoingMails ?? [];
+    const announcements = props.announcements ?? [];
 
     return (
         <AdminStaffLayout

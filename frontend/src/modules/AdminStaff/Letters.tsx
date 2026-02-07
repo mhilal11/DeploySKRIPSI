@@ -159,10 +159,34 @@ interface LettersPageProps extends Record<string, unknown> {
 
 type TabValue = 'inbox' | 'outbox' | 'archive';
 
+const EMPTY_STATS: LettersPageProps['stats'] = {
+    inbox: 0,
+    outbox: 0,
+    pending: 0,
+    archived: 0,
+};
+
+const EMPTY_LETTERS: LettersPageProps['letters'] = {
+    inbox: [],
+    outbox: [],
+    archive: [],
+};
+
+const EMPTY_OPTIONS: LettersPageProps['options'] = {
+    letterTypes: [],
+    categories: [],
+    priorities: {},
+    divisions: [],
+};
+
 export default function AdminStaffLetters() {
-    const {
-        props: { auth, stats, letters, recruitments, options, nextLetterNumber },
-    } = usePage<PageProps<LettersPageProps>>();
+    const { props } = usePage<PageProps<Partial<LettersPageProps>>>();
+    const { auth } = props;
+    const stats = props.stats ?? EMPTY_STATS;
+    const letters = props.letters ?? EMPTY_LETTERS;
+    const recruitments = props.recruitments ?? [];
+    const options = props.options ?? EMPTY_OPTIONS;
+    const nextLetterNumber = props.nextLetterNumber ?? '-';
 
     const [composerOpen, setComposerOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<TabValue>('inbox');
@@ -364,6 +388,12 @@ export default function AdminStaffLetters() {
         ),
     ];
 
+    const userInfo = {
+        name: auth?.user?.name ?? 'Tidak diketahui',
+        division: auth?.user?.division ?? null,
+        role: auth?.user?.role ?? null,
+    };
+
     return (
         <AdminStaffLayout
             title="Correspondence & Filing"
@@ -415,11 +445,7 @@ export default function AdminStaffLetters() {
                             errors={form.errors}
                             processing={form.processing}
                             onSubmit={handleSubmit}
-                            userInfo={{
-                                name: auth.user.name,
-                                division: auth.user.division,
-                                role: auth.user.role,
-                            }}
+                            userInfo={userInfo}
                             options={options}
                             letterNumberPreview={nextLetterNumber}
                         />

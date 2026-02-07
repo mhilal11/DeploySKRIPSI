@@ -1,5 +1,5 @@
 import { Menu, Bell } from 'lucide-react';
-import { PropsWithChildren, useState, useEffect } from 'react';
+import { PropsWithChildren, useState, useEffect, useCallback, useMemo } from 'react';
 import { Toaster } from 'sonner';
 
 import NotificationDropdown from '@/modules/SuperAdmin/components/NotificationDropdown';
@@ -20,6 +20,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
     const {
         props: { auth, sidebarNotifications = {} },
     } = usePage<PageProps<{ sidebarNotifications?: Record<string, number> }>>();
+    
     const user = auth?.user;
 
     // ── Sidebar state ────────────────────────────────────────────────
@@ -45,7 +46,14 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
 
     // Sync when server props change (e.g. after a fresh page‑data load)
     useEffect(() => {
-        setLiveNotifications(sidebarNotifications);
+        setLiveNotifications((prev) => {
+            // Only update if values actually changed
+            const hasChanges = Object.keys(sidebarNotifications).some(
+                (key) => prev[key] !== sidebarNotifications[key]
+            ) || Object.keys(prev).length !== Object.keys(sidebarNotifications).length;
+            
+            return hasChanges ? sidebarNotifications : prev;
+        });
     }, [sidebarNotifications]);
 
     // ── Responsive helper ────────────────────────────────────────────
@@ -168,20 +176,22 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
         };
     }, []);
 
-    // ── Handlers ─────────────────────────────────────────────────────
-    const toggleSidebar = () => {
-        const newState = !isSidebarOpen;
-        setIsSidebarOpen(newState);
-        localStorage.setItem('sidebarOpen', JSON.stringify(newState));
-    };
+    // ── Handlers (stabilized with useCallback) ──────────────────────
+    const toggleSidebar = useCallback(() => {
+        setIsSidebarOpen((prev: boolean) => {
+            const newState = !prev;
+            localStorage.setItem('sidebarOpen', JSON.stringify(newState));
+            return newState;
+        });
+    }, []);
 
-    const toggleMobileMenu = () => {
-        setIsMobileMenuOpen(!isMobileMenuOpen);
-    };
+    const toggleMobileMenu = useCallback(() => {
+        setIsMobileMenuOpen((prev: boolean) => !prev);
+    }, []);
 
-    const closeMobileMenu = () => {
+    const closeMobileMenu = useCallback(() => {
         setIsMobileMenuOpen(false);
-    };
+    }, []);
 
     // ── Render ───────────────────────────────────────────────────────
     return (
@@ -200,6 +210,8 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
                 isMobileOpen={isMobileMenuOpen}
                 onMobileClose={closeMobileMenu}
                 notifications={liveNotifications}
+                user={user}
+                initialNotifications={sidebarNotifications}
             />
 
             <div

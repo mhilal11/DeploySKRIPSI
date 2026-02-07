@@ -30,9 +30,9 @@ const statusColor: Record<string, string> = {
 };
 
 export default function AdminStaffRecruitment() {
-    const {
-        props: { applications, statusBreakdown },
-    } = usePage<PageProps<RecruitmentPageProps>>();
+    const { props } = usePage<PageProps<Partial<RecruitmentPageProps>>>();
+    const applications = props.applications ?? [];
+    const statusBreakdown = props.statusBreakdown ?? [];
 
     return (
         <AdminStaffLayout

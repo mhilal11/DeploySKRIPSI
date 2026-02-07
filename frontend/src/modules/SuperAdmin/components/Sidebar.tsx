@@ -11,12 +11,12 @@
     LogOut,
     X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 
-import { Link, usePage, router } from '@/shared/lib/inertia';
+import { Link, router } from '@/shared/lib/inertia';
 import { route } from '@/shared/lib/route';
 import { cn } from '@/shared/lib/utils';
-import { PageProps } from '@/shared/types';
+import { User } from '@/shared/types';
 
 import type { ComponentType, SVGProps } from 'react';
 
@@ -87,29 +87,44 @@ interface SidebarProps {
     /** When provided by the persistent shell, the sidebar uses these directly
      *  instead of maintaining its own Echo-driven state. */
     notifications?: Record<string, number>;
+    /** User object from auth context */
+    user?: User;
+    /** Initial sidebar notifications from server (fallback) */
+    initialNotifications?: Record<string, number>;
 }
 
 const pendingStatuses = ['Menunggu HR', 'Diajukan', 'Diproses'];
 const lettersBadgeKey = 'super-admin.letters.index';
 
-export default function Sidebar({ isOpen, onToggle, isMobileOpen = false, onMobileClose, notifications }: SidebarProps) {
-    const {
-        props: { auth, sidebarNotifications = {} },
-    } = usePage<PageProps<{ sidebarNotifications?: Record<string, number> }>>();
-
+function Sidebar({ 
+    isOpen, 
+    onToggle, 
+    isMobileOpen = false, 
+    onMobileClose, 
+    notifications,
+    user,
+    initialNotifications = {}
+}: SidebarProps) {
     // If the shell provides live notifications, use them directly.
     // Otherwise fall back to local Echo-driven state (standalone usage).
     const hasExternalNotifications = notifications !== undefined;
 
     const [localBadges, setLocalBadges] = useState<Record<string, number>>(
-        sidebarNotifications,
+        initialNotifications,
     );
 
     useEffect(() => {
         if (!hasExternalNotifications) {
-            setLocalBadges(sidebarNotifications);
+            setLocalBadges((prev) => {
+                // Only update if values actually changed
+                const hasChanges = Object.keys(initialNotifications).some(
+                    (key) => prev[key] !== initialNotifications[key]
+                ) || Object.keys(prev).length !== Object.keys(initialNotifications).length;
+                
+                return hasChanges ? initialNotifications : prev;
+            });
         }
-    }, [sidebarNotifications, hasExternalNotifications]);
+    }, [initialNotifications, hasExternalNotifications]);
 
     useEffect(() => {
         // Skip Echo listener when shell already handles notifications
@@ -149,7 +164,6 @@ export default function Sidebar({ isOpen, onToggle, isMobileOpen = false, onMobi
     // Resolved badge counts – external (from shell) or local (self-managed)
     const liveBadges = hasExternalNotifications ? notifications : localBadges;
 
-    const user = auth?.user;
     const isSuperAdmin = user?.role === 'Super Admin';
     const isHumanCapitalAdmin =
         user?.role === 'Admin' &&
@@ -336,5 +350,77 @@ export default function Sidebar({ isOpen, onToggle, isMobileOpen = false, onMobi
     );
 }
 
+// Custom comparison function for memo - compare props deeply
+function arePropsEqual(prevProps: SidebarProps, nextProps: SidebarProps): boolean {
+    // Compare primitives
+    if (
+        prevProps.isOpen !== nextProps.isOpen ||
+        prevProps.isMobileOpen !== nextProps.isMobileOpen
+    ) {
+        return false;
+    }
 
+    // Compare functions (stable with useCallback, so reference comparison is fine)
+    if (
+        prevProps.onToggle !== nextProps.onToggle ||
+        prevProps.onMobileClose !== nextProps.onMobileClose
+    ) {
+        return false;
+    }
 
+    // Compare user object by values
+    if (prevProps.user?.id !== nextProps.user?.id ||
+        prevProps.user?.name !== nextProps.user?.name ||
+        prevProps.user?.role !== nextProps.user?.role ||
+        prevProps.user?.division !== nextProps.user?.division
+    ) {
+        return false;
+    }
+
+    // Compare notifications object
+    if (prevProps.notifications !== nextProps.notifications) {
+        // If both are objects, compare deeply
+        if (prevProps.notifications && nextProps.notifications) {
+            const prevKeys = Object.keys(prevProps.notifications);
+            const nextKeys = Object.keys(nextProps.notifications);
+            
+            if (prevKeys.length !== nextKeys.length) {
+                return false;
+            }
+            
+            for (const key of prevKeys) {
+                if (prevProps.notifications[key] !== nextProps.notifications[key]) {
+                    return false;
+                }
+            }
+        } else {
+            // One is undefined, the other is not
+            return false;
+        }
+    }
+
+    // Compare initialNotifications
+    if (prevProps.initialNotifications !== nextProps.initialNotifications) {
+        if (prevProps.initialNotifications && nextProps.initialNotifications) {
+            const prevKeys = Object.keys(prevProps.initialNotifications);
+            const nextKeys = Object.keys(nextProps.initialNotifications);
+            
+            if (prevKeys.length !== nextKeys.length) {
+                return false;
+            }
+            
+            for (const key of prevKeys) {
+                if (prevProps.initialNotifications[key] !== nextProps.initialNotifications[key]) {
+                    return false;
+                }
+            }
+        } else if (prevProps.initialNotifications !== nextProps.initialNotifications) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Wrap with memo and custom comparison to prevent re-renders
+export default memo(Sidebar, arePropsEqual);

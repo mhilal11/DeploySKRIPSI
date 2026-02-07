@@ -35,7 +35,7 @@ const EDUCATION_LEVELS = [
 ];
 
 const GENDER_OPTIONS = [
-    { value: '', label: 'Semua (Tidak Dibatasi)' },
+    { value: 'none', label: 'Semua (Tidak Dibatasi)' },
     { value: 'Laki-laki', label: 'Laki-laki' },
     { value: 'Perempuan', label: 'Perempuan' },
 ];
@@ -58,33 +58,44 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
     const addRequirement = () => {
         if (form.data.job_requirements.length >= MAX_REQUIREMENTS) return;
 
-        form.setData('job_requirements', [...form.data.job_requirements, '']);
+        form.setData((prev) => ({
+            ...prev,
+            job_requirements: [...prev.job_requirements, ''],
+        }));
     };
 
     const updateRequirement = (index: number, value: string) => {
-        const requirements = [...form.data.job_requirements];
-        requirements[index] = value;
-        form.setData('job_requirements', requirements);
+        form.setData((prev) => {
+            const requirements = [...prev.job_requirements];
+            requirements[index] = value;
+            return {
+                ...prev,
+                job_requirements: requirements,
+            };
+        });
         form.clearErrors('job_requirements');
     };
 
     const removeRequirement = (index: number) => {
         if (form.data.job_requirements.length === 1) return;
 
-        form.setData(
-            'job_requirements',
-            form.data.job_requirements.filter((_, idx) => idx !== index),
-        );
+        form.setData((prev) => ({
+            ...prev,
+            job_requirements: prev.job_requirements.filter((_, idx) => idx !== index),
+        }));
     };
 
     const updateCriteria = <K extends keyof EligibilityCriteria>(
         key: K,
         value: EligibilityCriteria[K]
     ) => {
-        form.setData('job_eligibility_criteria', {
-            ...form.data.job_eligibility_criteria,
-            [key]: value,
-        });
+        form.setData((prev) => ({
+            ...prev,
+            job_eligibility_criteria: {
+                ...prev.job_eligibility_criteria,
+                [key]: value,
+            },
+        }));
 
         // Validate max_age when it changes
         if (key === 'max_age' && value) {
@@ -108,13 +119,14 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
     };
 
     const validateRequirements = () => {
-        const hasEmptyRequirement = form.data.job_requirements.some(
-            (requirement) => !requirement.trim(),
+        // Filter out empty requirements
+        const nonEmptyRequirements = form.data.job_requirements.filter(
+            (requirement) => requirement && requirement.trim() !== ''
         );
 
-        if (hasEmptyRequirement) {
-            form.setError('job_requirements', 'Semua persyaratan wajib diisi.');
-            window.alert('Semua persyaratan wajib diisi sebelum menyimpan.');
+        if (nonEmptyRequirements.length === 0) {
+            form.setError('job_requirements', 'Mohon tambahkan minimal satu persyaratan.');
+            window.alert('Mohon tambahkan minimal satu persyaratan sebelum menyimpan.');
             return false;
         }
 
@@ -168,7 +180,7 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                 <Label htmlFor="job-title">Judul Lowongan</Label>
                                 <Input
                                     id="job-title"
-                                    value={form.data.job_title}
+                                    value={form.data.job_title ?? ''}
                                     onChange={(e) => form.setData('job_title', e.target.value)}
                                     placeholder="Contoh: Marketing Specialist"
                                 />
@@ -182,7 +194,7 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                 <Textarea
                                     id="job-description"
                                     rows={4}
-                                    value={form.data.job_description}
+                                    value={form.data.job_description ?? ''}
                                     onChange={(e) => form.setData('job_description', e.target.value)}
                                     placeholder="Ceritakan tanggung jawab utama, ekspektasi, dan ruang lingkup pekerjaan."
                                 />
@@ -210,9 +222,9 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
 
                                 <div className="space-y-3">
                                     {form.data.job_requirements.map((requirement, index) => (
-                                        <div key={index} className="flex items-center gap-2">
+                                        <div key={`req-${index}-${form.data.job_requirements.length}`} className="flex items-center gap-2">
                                             <Input
-                                                value={requirement}
+                                                value={requirement ?? ''}
                                                 onChange={(e) => updateRequirement(index, e.target.value)}
                                                 placeholder={`Persyaratan ${index + 1}`}
                                                 required
@@ -283,15 +295,15 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                     <div className="space-y-2">
                                         <Label htmlFor="gender" className="text-sm">Jenis Kelamin</Label>
                                         <Select
-                                            value={form.data.job_eligibility_criteria?.gender ?? ''}
-                                            onValueChange={(value) => updateCriteria('gender', value || null)}
+                                            value={form.data.job_eligibility_criteria?.gender ?? 'none'}
+                                            onValueChange={(value) => updateCriteria('gender', value === 'none' ? null : value)}
                                         >
                                             <SelectTrigger id="gender">
                                                 <SelectValue placeholder="Pilih jenis kelamin" />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {GENDER_OPTIONS.map((option) => (
-                                                    <SelectItem key={option.value} value={option.value || 'any'}>
+                                                    <SelectItem key={option.value} value={option.value}>
                                                         {option.label}
                                                     </SelectItem>
                                                 ))}
@@ -303,13 +315,14 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                     <div className="space-y-2">
                                         <Label htmlFor="min-education" className="text-sm">Pendidikan Minimal</Label>
                                         <Select
-                                            value={form.data.job_eligibility_criteria?.min_education ?? ''}
-                                            onValueChange={(value) => updateCriteria('min_education', value || null)}
+                                            value={form.data.job_eligibility_criteria?.min_education ?? 'none'}
+                                            onValueChange={(value) => updateCriteria('min_education', value === 'none' ? null : value)}
                                         >
                                             <SelectTrigger id="min-education">
                                                 <SelectValue placeholder="Pilih tingkat pendidikan" />
                                             </SelectTrigger>
                                             <SelectContent>
+                                                <SelectItem value="none">Semua (Tidak Dibatasi)</SelectItem>
                                                 {EDUCATION_LEVELS.map((level) => (
                                                     <SelectItem key={level.value} value={level.value}>
                                                         {level.label}
