@@ -359,7 +359,7 @@ export function ApplicantProfileView({
                             {education.institution || 'Institusi tidak tersedia'}
                           </p>
                           <p className="text-sm text-gray-600">
-                            {[education.degree, education.field_of_study].filter(Boolean).join(' â€¢ ') || 'Program tidak tersedia'}
+                            {[education.degree, education.field_of_study].filter(Boolean).join('  ') || 'Program tidak tersedia'}
                           </p>
                           <p className="text-xs text-gray-500">
                             {[education.start_year, education.end_year].filter(Boolean).join(' - ') || 'Tahun tidak tersedia'}
@@ -482,7 +482,7 @@ export function ApplicantProfileView({
                             {certification.issue_date
                               ? `Diterbitkan: ${certification.issue_date}`
                               : 'Tanggal tidak tersedia'}
-                            {certification.expiry_date && ` â€¢ Berlaku hingga: ${certification.expiry_date}`}
+                            {certification.expiry_date && `  Berlaku hingga: ${certification.expiry_date}`}
                           </p>
                           {certification.credential_id && (
                             <p className="text-xs text-gray-500">
@@ -550,5 +550,6 @@ export function ApplicantProfileView({
     </div>
   );
 }
+
 
 

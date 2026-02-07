@@ -287,7 +287,7 @@ export default function ChecklistDialog({
                                     </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-                                    âœ“ Semua {totalItems} tugas checklist telah diselesaikan. Proses offboarding siap ditandai selesai.
+                                     Semua {totalItems} tugas checklist telah diselesaikan. Proses offboarding siap ditandai selesai.
                                 </div>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel disabled={form.processing}>
@@ -306,7 +306,7 @@ export default function ChecklistDialog({
 
                         {!allChecklistCompleted && (
                             <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
-                                âš ï¸ Checklist belum lengkap ({completedItems}/{totalItems})
+                                 Checklist belum lengkap ({completedItems}/{totalItems})
                             </Badge>
                         )}
                         <Badge variant="outline" className="border-slate-300 text-slate-600">
@@ -327,6 +327,7 @@ function DetailItem({ label, value }: { label: string; value?: string | null }) 
         </div>
     );
 }
+
 
 
 

@@ -16,7 +16,7 @@ type BlurTextProps = {
   onAnimationComplete?: () => void;
   stepDuration?: number;
   as?: React.ElementType;
-  // â¬‡ï¸ class untuk setiap span huruf/kata
+  //  class untuk setiap span huruf/kata
   spanClassName?: string;
 };
 
@@ -108,7 +108,7 @@ const BlurText: React.FC<BlurTextProps> = ({
 
   const Wrapper: React.ElementType = as;
 
-  // âœ… ref callback dengan tipe eksplisit
+  //  ref callback dengan tipe eksplisit
   const setWrapperRef: React.RefCallback<HTMLElement | SVGElement> = (
     node
   ) => {
@@ -156,4 +156,5 @@ const BlurText: React.FC<BlurTextProps> = ({
 };
 
 export default BlurText;
+
 

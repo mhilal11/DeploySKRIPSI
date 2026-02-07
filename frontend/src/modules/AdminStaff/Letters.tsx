@@ -861,7 +861,7 @@ export default function AdminStaffLetters() {
                                                                                             <p className="text-xs text-slate-500 truncate">
                                                                                                 {entry.division ?? '-'}
                                                                                                 {entry.toDivision
-                                                                                                    ? ` â†’ ${entry.toDivision}`
+                                                                                                    ? `  ${entry.toDivision}`
                                                                                                     : ''}
                                                                                             </p>
                                                                                         </div>
@@ -1037,7 +1037,7 @@ function LetterTrackingView({ letter }: { letter: LetterRecord }) {
                 <div>
                     <p className="text-sm font-semibold text-blue-900">Tracking Surat</p>
                     <p className="text-xs text-slate-500">
-                        ID {letter.letterNumber ?? letter.id} â€¢ Tujuan{' '}
+                        ID {letter.letterNumber ?? letter.id}  Tujuan{' '}
                         {letter.targetDivision ?? letter.recipient ?? 'Tidak ditentukan'}
                     </p>
                 </div>
@@ -1723,5 +1723,6 @@ function InfoTile({
         </div>
     );
 }
+
 
 

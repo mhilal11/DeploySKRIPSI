@@ -45,7 +45,7 @@ export default function FeedbackDialog({ feedback, onClose }: FeedbackDialogProp
                         
                         {/* Title */}
                         <DialogTitle className="text-2xl font-bold text-white animate-in fade-in-50 slide-in-from-bottom-3 duration-500">
-                            {isSuccess ? 'âœ¨ Berhasil Tersimpan!' : 'âš ï¸ Gagal Menyimpan'}
+                            {isSuccess ? ' Berhasil Tersimpan!' : ' Gagal Menyimpan'}
                         </DialogTitle>
                     </DialogHeader>
                 </div>
@@ -75,7 +75,7 @@ export default function FeedbackDialog({ feedback, onClose }: FeedbackDialogProp
                             <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                             
                             <span className="relative flex items-center justify-center gap-2">
-                                {isSuccess ? 'âœ“ Mengerti' : 'Coba Lagi'}
+                                {isSuccess ? ' Mengerti' : 'Coba Lagi'}
                             </span>
                         </Button>
                     </DialogFooter>
@@ -84,5 +84,6 @@ export default function FeedbackDialog({ feedback, onClose }: FeedbackDialogProp
         </Dialog>
     );
 }
+
 
 

@@ -1,4 +1,4 @@
-import { Plus, Save, Trash2, Upload, FileText, ImageIcon, Download, Eye, X } from 'lucide-react';
+﻿import { Plus, Save, Trash2, Upload, FileText, ImageIcon, Download, Eye, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { Badge } from '@/shared/components/ui/badge';
@@ -188,12 +188,12 @@ export default function CertificationForm({
                                                     </p>
                                                     {certification.file && (
                                                         <p className="text-xs text-slate-500">
-                                                            Baru • {(certification.file.size / 1024).toFixed(1)} KB
+                                                            Baru  {(certification.file.size / 1024).toFixed(1)} KB
                                                         </p>
                                                     )}
                                                     {certification.file_url && !certification.file && (
                                                         <p className="text-xs text-green-600">
-                                                            ✓ Sudah tersimpan
+                                                             Sudah tersimpan
                                                         </p>
                                                     )}
                                                 </div>
@@ -289,6 +289,7 @@ export default function CertificationForm({
         </Card>
     );
 }
+
 
 
 

@@ -81,13 +81,13 @@ export default function DispositionDialog({
                   {/* PETUNJUK SCROLL */}
                   {targets.length > 2 && (
                     <p className="text-[11px] mt-1 text-red-600">
-                      Scroll ke bawah untuk melihat semua suratâ€¦
+                      Scroll ke bawah untuk melihat semua surat
                     </p>
                   )}
                 </div>
 
                 <Badge className="bg-blue-600 text-white">
-                  HR â†’ Divisi Tujuan
+                  HR  Divisi Tujuan
                 </Badge>
               </div>
 
@@ -229,6 +229,7 @@ export default function DispositionDialog({
     </Dialog>
   );
 }
+
 
 
 

@@ -107,7 +107,7 @@ export default function SplashScreen() {
                   style={{ originX: 0 }}
                   initial={{ scaleX: 0, opacity: 1 }}
                   animate={{
-                    scaleX: [0, 1, 1, 0],  // muncul â†’ penuh â†’ shrink kiriâ†’kanan
+                    scaleX: [0, 1, 1, 0],  // muncul  penuh  shrink kirikanan
                     opacity: [1, 1, 1, 0], // fade saat shrink
                   }}
                   transition={{
@@ -118,7 +118,7 @@ export default function SplashScreen() {
                   }}
                 />
 
-                {/* TEKS â€” masuk setelah blok penuh */}
+                {/* TEKS  masuk setelah blok penuh */}
                 <motion.span
                   className="relative z-10 text-white text-xl md:text-3xl font-mulish font-extralight tracking-widest text-center"
                   initial={{ x: "-100%", opacity: 0 }}
@@ -149,4 +149,5 @@ export default function SplashScreen() {
     </AnimatePresence>
   );
 }
+
 

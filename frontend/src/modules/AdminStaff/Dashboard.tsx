@@ -110,7 +110,7 @@ export default function AdminStaffDashboard() {
                                         <div className="min-w-0">
                                             <p className="font-semibold text-slate-900 break-words">{mail.subject}</p>
                                             <p className="text-sm text-slate-500 break-words">
-                                                {mail.from} â€¢ {mail.sender}
+                                                {mail.from}  {mail.sender}
                                             </p>
                                         </div>
                                         {mail.hasAttachment && (
@@ -224,6 +224,7 @@ function EmptyState({ message }: { message: string }) {
         </div>
     );
 }
+
 
 
 

@@ -245,7 +245,7 @@ export default function Applications({
                             Daftar Divisi
                         </h3>
                         <p className="text-sm text-slate-600">
-                            Klik â€œLamar Sekarangâ€ pada divisi yang membuka lowongan untuk mengisi
+                            Klik Lamar Sekarang pada divisi yang membuka lowongan untuk mengisi
                             formulir.
                         </p>
                     </div>
@@ -541,6 +541,7 @@ function DivisionCard({
         </button>
     );
 }
+
 
 
 

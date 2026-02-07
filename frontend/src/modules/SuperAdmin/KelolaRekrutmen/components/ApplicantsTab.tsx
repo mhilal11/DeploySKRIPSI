@@ -414,7 +414,7 @@ export default function ApplicantsTab({
                                 className="h-8 w-8 p-0"
                             >
                                 <span className="sr-only">Previous</span>
-                                <span aria-hidden="true">Â«</span>
+                                <span aria-hidden="true"></span>
                             </Button>
                             <div className="flex items-center gap-1">
                                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -437,7 +437,7 @@ export default function ApplicantsTab({
                                 className="h-8 w-8 p-0"
                             >
                                 <span className="sr-only">Next</span>
-                                <span aria-hidden="true">Â»</span>
+                                <span aria-hidden="true"></span>
                             </Button>
                         </div>
                     </div>
@@ -462,5 +462,6 @@ export default function ApplicantsTab({
         </>
     );
 }
+
 
 

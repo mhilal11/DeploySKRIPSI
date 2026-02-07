@@ -1,4 +1,4 @@
-import { Menu, Bell } from 'lucide-react';
+﻿import { Menu, Bell } from 'lucide-react';
 import { PropsWithChildren, useState, useEffect, useCallback, useMemo } from 'react';
 import { Toaster } from 'sonner';
 
@@ -14,7 +14,7 @@ import { PageProps } from '@/shared/types';
 /**
  * Persistent shell for all Super Admin pages.
  * Rendered once at the router level so the sidebar, navbar, and chrome
- * stay mounted across page navigations — no re-render / white flash.
+ * stay mounted across page navigations  no re-render / white flash.
  */
 export default function SuperAdminShell({ children }: PropsWithChildren) {
     const {
@@ -23,7 +23,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
     
     const user = auth?.user;
 
-    // ── Sidebar state ────────────────────────────────────────────────
+    //  Sidebar state 
     const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('sidebarOpen');
@@ -35,7 +35,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
 
-    // ── Live notification badges ─────────────────────────────────────
+    //  Live notification badges 
     const [liveNotifications, setLiveNotifications] =
         useState<Record<string, number>>(sidebarNotifications);
 
@@ -44,7 +44,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
         0,
     );
 
-    // Sync when server props change (e.g. after a fresh page‑data load)
+    // Sync when server props change (e.g. after a fresh pagedata load)
     useEffect(() => {
         setLiveNotifications((prev) => {
             // Only update if values actually changed
@@ -56,7 +56,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
         });
     }, [sidebarNotifications]);
 
-    // ── Responsive helper ────────────────────────────────────────────
+    //  Responsive helper 
     useEffect(() => {
         const checkMobile = () => {
             setIsMobile(window.innerWidth < 768);
@@ -69,7 +69,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    // ── Real‑time Echo listeners ─────────────────────────────────────
+    //  Realtime Echo listeners 
     useEffect(() => {
         if (!window.Echo) {
             return;
@@ -176,7 +176,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
         };
     }, []);
 
-    // ── Handlers (stabilized with useCallback) ──────────────────────
+    //  Handlers (stabilized with useCallback) 
     const toggleSidebar = useCallback(() => {
         setIsSidebarOpen((prev: boolean) => {
             const newState = !prev;
@@ -193,7 +193,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
         setIsMobileMenuOpen(false);
     }, []);
 
-    // ── Render ───────────────────────────────────────────────────────
+    //  Render 
     return (
         <div className="flex min-h-screen bg-slate-50 text-slate-900">
             {/* Mobile overlay */}
@@ -223,7 +223,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
             >
                 {/* Navbar */}
                 <div className="sticky top-0 z-30 flex items-center justify-between gap-4 bg-white border-b border-slate-200 px-4 py-3 w-full max-w-full">
-                    {/* Left side – mobile menu + logo */}
+                    {/* Left side  mobile menu + logo */}
                     <div className="flex items-center gap-4">
                         <button
                             onClick={toggleMobileMenu}
@@ -241,7 +241,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
                         </div>
                     </div>
 
-                    {/* Right side – notifications & user (desktop) */}
+                    {/* Right side  notifications & user (desktop) */}
                     <div className="hidden md:flex items-center gap-3">
                         <NotificationDropdown totalCount={totalNotifications}>
                             <Button
@@ -280,7 +280,7 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
                 {/* Page content (rendered by each page via SuperAdminLayout) */}
                 {children}
 
-                {/* Quick actions – desktop only, when sidebar collapsed */}
+                {/* Quick actions  desktop only, when sidebar collapsed */}
                 {!isSidebarOpen && !isMobile && (
                     <div className="sticky bottom-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] hidden md:block">
                         <QuickActions />
@@ -292,3 +292,4 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
         </div>
     );
 }
+

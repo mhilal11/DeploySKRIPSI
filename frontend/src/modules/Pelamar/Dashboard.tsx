@@ -224,9 +224,9 @@ export default function Dashboard({
                                     Data yang perlu dilengkapi:
                                 </span>
                                 <ul className="mt-2 text-left text-sm space-y-1">
-                                    <li>• Data Pribadi (nama, kontak, alamat)</li>
-                                    <li>• Pendidikan (minimal 1 data pendidikan)</li>
-                                    <li>• Pengalaman Kerja (opsional)</li>
+                                    <li> Data Pribadi (nama, kontak, alamat)</li>
+                                    <li> Pendidikan (minimal 1 data pendidikan)</li>
+                                    <li> Pengalaman Kerja (opsional)</li>
                                 </ul>
                             </AlertDialogDescription>
                         </AlertDialogHeader>
@@ -248,6 +248,7 @@ export default function Dashboard({
         </>
     );
 }
+
 
 
 

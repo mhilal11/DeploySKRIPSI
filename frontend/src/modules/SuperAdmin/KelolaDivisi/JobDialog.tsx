@@ -157,7 +157,7 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                     <form onSubmit={handleSubmit} className="space-y-6 mt-4">
                         <div className="max-h-[65vh] space-y-6 overflow-y-auto pr-1">
                             <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
-                                Kapasitas {division.current_staff}/{division.capacity} â€¢ Slot tersedia {division.available_slots}
+                                Kapasitas {division.current_staff}/{division.capacity}  Slot tersedia {division.available_slots}
                                 {division.available_slots === 0 && (
                                     <span className="mt-1 block text-xs text-red-600">
                                         Tidak ada slot kosong. Tingkatkan kapasitas sebelum membuka lowongan.
@@ -352,6 +352,7 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
         </Dialog>
     );
 }
+
 
 
 

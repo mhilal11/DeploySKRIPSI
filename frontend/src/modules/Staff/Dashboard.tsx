@@ -66,7 +66,7 @@ export default function StaffDashboard() {
                 title="Dashboard Staff"
                 description="Pantau status keluhan, dokumen terbaru, dan proses resign Anda."
             >
-                {/* GRID TIDAK DIUBAH DI MOBILE â€” HANYA SCROLL */}
+                {/* GRID TIDAK DIUBAH DI MOBILE  HANYA SCROLL */}
                 <section className="w-full">
                     <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {filteredStats.map((item) => (
@@ -204,6 +204,7 @@ function PriorityBadge({ priority }: { priority: string }) {
         return <Badge className="bg-orange-500 text-white">Prioritas Sedang</Badge>;
     return <Badge className="bg-blue-500 text-white">Prioritas Rendah</Badge>;
 }
+
 
 
 

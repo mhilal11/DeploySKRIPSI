@@ -282,7 +282,7 @@ export default function PendingDispositionPanel({
                                     disabled={currentPage === 1}
                                 >
                                     <span className="sr-only">Sebelumnya</span>
-                                    <span aria-hidden="true">â€¹</span>
+                                    <span aria-hidden="true"></span>
                                 </Button>
                                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                                     <Button
@@ -303,7 +303,7 @@ export default function PendingDispositionPanel({
                                     disabled={currentPage === totalPages}
                                 >
                                     <span className="sr-only">Selanjutnya</span>
-                                    <span aria-hidden="true">â€º</span>
+                                    <span aria-hidden="true"></span>
                                 </Button>
                             </div>
                         </div>
@@ -352,6 +352,7 @@ function BadgeCount({ count }: { count: number }) {
         </span>
     );
 }
+
 
 
 

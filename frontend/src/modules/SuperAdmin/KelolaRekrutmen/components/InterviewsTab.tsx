@@ -76,7 +76,7 @@ export default function InterviewsTab({ interviews, onViewDetails }: InterviewsT
                                         <span className="inline-flex items-center gap-2">
                                             <CalendarIcon className="h-4 w-4" />
                                             <span>
-                                                {interview.date} â€¢ {interview.time}
+                                                {interview.date}  {interview.time}
                                                 {interview.end_time ? ` - ${interview.end_time}` : ''}
                                             </span>
                                         </span>
@@ -124,7 +124,7 @@ export default function InterviewsTab({ interviews, onViewDetails }: InterviewsT
                             className="h-8 w-8 p-0"
                         >
                             <span className="sr-only">Previous</span>
-                            <span aria-hidden="true">Â«</span>
+                            <span aria-hidden="true"></span>
                         </Button>
                         <div className="flex items-center gap-1">
                             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -147,7 +147,7 @@ export default function InterviewsTab({ interviews, onViewDetails }: InterviewsT
                             className="h-8 w-8 p-0"
                         >
                             <span className="sr-only">Next</span>
-                            <span aria-hidden="true">Â»</span>
+                            <span aria-hidden="true"></span>
                         </Button>
                     </div>
                 </div>
@@ -161,5 +161,6 @@ export default function InterviewsTab({ interviews, onViewDetails }: InterviewsT
         </Card>
     );
 }
+
 
 

@@ -39,7 +39,7 @@ export default function RegulationList({ regulations }: RegulationListProps) {
                                     {regulation.title}
                                 </p>
                                 <p className="text-xs text-slate-500">
-                                    {regulation.category} â€¢ Upload: {regulation.uploadDate}
+                                    {regulation.category}  Upload: {regulation.uploadDate}
                                 </p>
                             </div>
                         </div>
@@ -80,6 +80,7 @@ export default function RegulationList({ regulations }: RegulationListProps) {
         </Card>
     );
 }
+
 
 
 

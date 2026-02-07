@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+﻿import { ReactNode, useEffect } from 'react';
 import { toast } from 'sonner';
 
 import AccountForm from '@/modules/SuperAdmin/components/accounts/AccountForm';
@@ -96,7 +96,7 @@ export default function Edit({
                         ? responseData.status
                         : DEFAULT_SUCCESS_MESSAGE;
 
-                // Save to sessionStorage – Index will display the toast
+                // Save to sessionStorage  Index will display the toast
                 // after the page transition is complete.
                 if (typeof window !== 'undefined') {
                     sessionStorage.setItem(ACCOUNT_TOAST_STORAGE_KEY, message);
@@ -166,6 +166,7 @@ function ButtonLink({ href, children }: { href: string; children: ReactNode }) {
         </Link>
     );
 }
+
 
 
 

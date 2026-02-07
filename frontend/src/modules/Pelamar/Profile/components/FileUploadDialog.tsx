@@ -1,4 +1,4 @@
-import { Upload, FileText, ImageIcon, X, Check, CloudUpload } from 'lucide-react';
+﻿import { Upload, FileText, ImageIcon, X, Check, CloudUpload } from 'lucide-react';
 import { useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 
@@ -192,7 +192,7 @@ export default function FileUploadDialog({
                                         {previewFile.name}
                                     </h4>
                                     <p className="text-xs text-slate-500 mt-1">
-                                        {(previewFile.size / 1024).toFixed(1)} KB • {isPdf ? 'PDF Document' : 'Image'}
+                                        {(previewFile.size / 1024).toFixed(1)} KB  {isPdf ? 'PDF Document' : 'Image'}
                                     </p>
                                     <div className="mt-2 flex items-center text-xs text-green-600 font-medium">
                                         <Check className="mr-1 h-3 w-3" />
@@ -279,6 +279,7 @@ export default function FileUploadDialog({
         </Dialog>
     );
 }
+
 
 
 

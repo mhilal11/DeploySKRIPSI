@@ -161,7 +161,7 @@ function Sidebar({
         };
     }, [hasExternalNotifications]);
 
-    // Resolved badge counts – external (from shell) or local (self-managed)
+    // Resolved badge counts  external (from shell) or local (self-managed)
     const liveBadges = hasExternalNotifications ? notifications : localBadges;
 
     const isSuperAdmin = user?.role === 'Super Admin';
@@ -424,3 +424,4 @@ function arePropsEqual(prevProps: SidebarProps, nextProps: SidebarProps): boolea
 
 // Wrap with memo and custom comparison to prevent re-renders
 export default memo(Sidebar, arePropsEqual);
+
