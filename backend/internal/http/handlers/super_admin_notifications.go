@@ -1,0 +1,128 @@
+package handlers
+
+import (
+	"net/http"
+	"strconv"
+	"time"
+
+	"hris-backend/internal/http/middleware"
+	"hris-backend/internal/models"
+
+	"github.com/gin-gonic/gin"
+)
+
+func SuperAdminNotifications(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+		JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	db := middleware.GetDB(c)
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	perPage := 5
+
+	notifications := []map[string]any{}
+
+	letters := []models.Surat{}
+	_ = db.Select(&letters, "SELECT * FROM surat WHERE current_recipient = 'hr' AND status_persetujuan IN ('Menunggu HR','Diajukan','Diproses') ORDER BY created_at DESC")
+	for _, letter := range letters {
+		notifications = append(notifications, map[string]any{
+			"id":          "letter-" + strconv.FormatInt(letter.SuratID, 10),
+			"type":        "letter",
+			"title":       "Surat Perlu Ditindaklanjuti",
+			"description": "Surat " + letter.NomorSurat + " - " + letter.Perihal,
+			"timestamp":   diffForHumans(letter.CreatedAt),
+			"url":         "/super-admin/kelola-surat",
+			"created_at":  letter.CreatedAt,
+		})
+	}
+
+	applications := []models.Application{}
+	_ = db.Select(&applications, "SELECT * FROM applications WHERE status IN ('Applied','Screening') ORDER BY created_at DESC")
+	for _, app := range applications {
+		notifications = append(notifications, map[string]any{
+			"id":          "application-" + strconv.FormatInt(app.ID, 10),
+			"type":        "application",
+			"title":       "Aplikasi Pelamar Baru",
+			"description": app.FullName + " melamar posisi " + app.Position,
+			"timestamp":   diffForHumans(app.CreatedAt),
+			"url":         "/super-admin/recruitment",
+			"created_at":  app.CreatedAt,
+		})
+	}
+
+	terminations := []models.StaffTermination{}
+	_ = db.Select(&terminations, "SELECT * FROM staff_terminations WHERE status IN ('Diajukan','Proses') ORDER BY request_date DESC")
+	for _, term := range terminations {
+		notifications = append(notifications, map[string]any{
+			"id":          "termination-" + strconv.FormatInt(term.ID, 10),
+			"type":        "termination",
+			"title":       "Pengajuan Offboarding",
+			"description": "Pengajuan offboarding " + term.EmployeeName,
+			"timestamp":   diffForHumans(term.RequestDate),
+			"url":         "/super-admin/kelola-staff",
+			"created_at":  term.RequestDate,
+		})
+	}
+
+	complaints := []models.Complaint{}
+	_ = db.Select(&complaints, "SELECT * FROM complaints WHERE status = ? ORDER BY created_at DESC", models.ComplaintStatusNew)
+	for _, complaint := range complaints {
+		notifications = append(notifications, map[string]any{
+			"id":          "complaint-" + strconv.FormatInt(complaint.ID, 10),
+			"type":        "complaint",
+			"title":       "Pengaduan Baru",
+			"description": complaint.Subject,
+			"timestamp":   diffForHumans(complaint.CreatedAt),
+			"url":         "/super-admin/kelola-pengaduan",
+			"created_at":  complaint.CreatedAt,
+		})
+	}
+
+	// sort by created_at desc
+	for i := 0; i < len(notifications); i++ {
+		for j := i + 1; j < len(notifications); j++ {
+			t1, _ := notifications[i]["created_at"].(*time.Time)
+			t2, _ := notifications[j]["created_at"].(*time.Time)
+			if t2 != nil && t1 != nil && t2.After(*t1) {
+				notifications[i], notifications[j] = notifications[j], notifications[i]
+			}
+		}
+	}
+
+	total := len(notifications)
+	lastPage := (total + perPage - 1) / perPage
+	if lastPage == 0 {
+		lastPage = 1
+	}
+	if page > lastPage {
+		page = lastPage
+	}
+
+	start := (page - 1) * perPage
+	end := start + perPage
+	if start > total {
+		start = total
+	}
+	if end > total {
+		end = total
+	}
+
+	paginated := notifications[start:end]
+	for i := range paginated {
+		delete(paginated[i], "created_at")
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":         paginated,
+		"current_page": page,
+		"last_page":    lastPage,
+		"total":        total,
+		"per_page":     perPage,
+	})
+}
