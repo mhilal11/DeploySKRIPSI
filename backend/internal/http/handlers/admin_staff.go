@@ -508,25 +508,43 @@ func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 		if surat.ReplyBy != nil {
 			replyAuthorName = lookupUserName(db, *surat.ReplyBy)
 		}
+		senderName := lookupUserName(db, surat.UserID)
+		senderDivision := lookupDepartemenName(db, surat.DepartemenID, surat.UserID)
+		recipientName := firstString(surat.TargetDivision, surat.Penerima)
+		attachmentLink := attachmentURL(c, surat.LampiranPath)
+		var attachmentPayload map[string]any
+		if attachmentLink != nil {
+			attachmentPayload = map[string]any{
+				"name": firstString(surat.LampiranNama, "Lampiran"),
+				"size": nil,
+				"url":  attachmentLink,
+			}
+		}
 
 		result = append(result, map[string]any{
 			"id":           surat.SuratID,
 			"letterNumber": surat.NomorSurat,
-			"from":         lookupDepartemenName(db, surat.DepartemenID, surat.UserID),
-			"sender":       lookupUserName(db, surat.UserID),
-			"subject":      surat.Perihal,
-			"category":     surat.Kategori,
-			"date":         formatDate(surat.TanggalSurat),
+			"from":         senderDivision,
+			"sender":       senderName,
+			// Super Admin views consume these keys.
+			"senderName":     senderName,
+			"senderDivision": senderDivision,
+			"recipientName":  recipientName,
+			"subject":        surat.Perihal,
+			"category":       surat.Kategori,
+			"date":           formatDate(surat.TanggalSurat),
 			"status": func() string {
 				if surat.IsFinalized {
 					return "Disposisi Final"
 				}
 				return surat.StatusPersetujuan
 			}(),
-			"isFinalized":             surat.IsFinalized,
-			"priority":                surat.Prioritas,
-			"hasAttachment":           surat.LampiranPath != nil,
-			"attachmentUrl":           attachmentURL(c, surat.LampiranPath),
+			"isFinalized":   surat.IsFinalized,
+			"priority":      surat.Prioritas,
+			"hasAttachment": surat.LampiranPath != nil,
+			"attachmentUrl": attachmentLink,
+			// Super Admin tables/dialogs consume object attachment.
+			"attachment":              attachmentPayload,
 			"content":                 surat.IsiSurat,
 			"dispositionNote":         surat.DispositionNote,
 			"replyNote":               surat.ReplyNote,
@@ -534,7 +552,7 @@ func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 			"replyAt":                 formatDateTime(surat.ReplyAt),
 			"replyHistory":            historyPayload,
 			"canReply":                surat.CurrentRecipient == "division" && surat.StatusPersetujuan != "Diarsipkan" && !surat.IsFinalized,
-			"targetDivision":          firstString(surat.TargetDivision, surat.Penerima),
+			"targetDivision":          recipientName,
 			"recipient":               surat.Penerima,
 			"currentRecipient":        surat.CurrentRecipient,
 			"disposedBy":              disposerName,
