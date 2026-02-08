@@ -1,29 +1,36 @@
 ﻿import { Transition } from '@headlessui/react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useEffect } from 'react';
 
 import InputError from '@/shared/components/InputError';
 import InputLabel from '@/shared/components/InputLabel';
 import PrimaryButton from '@/shared/components/PrimaryButton';
 import TextInput from '@/shared/components/TextInput';
-import { Link, useForm, usePage } from '@/shared/lib/inertia';
+import { useForm, usePage } from '@/shared/lib/inertia';
 
 
 export default function UpdateProfileInformation({
-    mustVerifyEmail,
-    status,
     className = '',
 }: {
-    mustVerifyEmail: boolean;
-    status?: string;
     className?: string;
 }) {
-    const user = usePage().props.auth.user;
+    const user = usePage().props.auth?.user;
 
     const { data, setData, patch, errors, processing, recentlySuccessful } =
         useForm({
-            name: user.name,
-            email: user.email,
+            name: user?.name ?? '',
+            email: user?.email ?? '',
         });
+
+    useEffect(() => {
+        if (!user) {
+            return;
+        }
+        setData((prev) => ({
+            ...prev,
+            name: prev.name || user.name || '',
+            email: prev.email || user.email || '',
+        }));
+    }, [setData, user]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -75,29 +82,6 @@ export default function UpdateProfileInformation({
 
                     <InputError className="mt-2" message={errors.email} />
                 </div>
-
-                {mustVerifyEmail && user.email_verified_at === null && (
-                    <div>
-                        <p className="mt-2 text-sm text-gray-800">
-                            Your email address is unverified.
-                            <Link
-                                href={route('verification.send')}
-                                method="post"
-                                as="button"
-                                className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                            >
-                                Click here to re-send the verification email.
-                            </Link>
-                        </p>
-
-                        {status === 'verification-link-sent' && (
-                            <div className="mt-2 text-sm font-medium text-green-600">
-                                A new verification link has been sent to your
-                                email address.
-                            </div>
-                        )}
-                    </div>
-                )}
 
                 <div className="flex items-center gap-4">
                     <PrimaryButton disabled={processing}>Save</PrimaryButton>
