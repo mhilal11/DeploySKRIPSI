@@ -35,6 +35,10 @@ go run ./cmd/migrate up
 ```
 go run ./cmd/seed users
 ```
+   (Opsional) Jalankan seeder 20 data staff:
+```
+go run ./cmd/seed staff
+```
 3. Jalankan server:
 ```
 go run ./cmd/server
@@ -51,6 +55,7 @@ Catatan: rollback (`down`) belum disupport. Strategi saat ini `up-only`.
 ## Seeder Commands
 ```
 go run ./cmd/seed users
+go run ./cmd/seed staff
 ```
 
 ## Run Server

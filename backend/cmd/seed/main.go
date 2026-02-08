@@ -15,7 +15,7 @@ func main() {
 	_ = godotenv.Load()
 
 	if len(os.Args) < 2 {
-		log.Printf("usage: go run ./cmd/seed users")
+		log.Printf("usage: go run ./cmd/seed [users|staff]")
 		os.Exit(1)
 	}
 
@@ -33,9 +33,15 @@ func main() {
 			os.Exit(1)
 		}
 		log.Printf("seed users completed")
+	case "staff":
+		if err := seed.RunStaffSeeder(database); err != nil {
+			log.Printf("seed staff failed: %v", err)
+			os.Exit(1)
+		}
+		log.Printf("seed staff completed")
 	default:
 		log.Printf("unknown seeder: %s", os.Args[1])
-		log.Printf("available seeders: users")
+		log.Printf("available seeders: users, staff")
 		os.Exit(1)
 	}
 }
