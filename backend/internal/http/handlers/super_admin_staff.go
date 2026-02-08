@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"hris-backend/internal/http/middleware"
@@ -133,13 +132,11 @@ func SuperAdminStaffUpdate(c *gin.Context) {
 
 	id := c.Param("id")
 	var payload struct {
-		Status    string          `form:"status" json:"status"`
 		Notes     string          `form:"notes" json:"notes"`
 		Checklist map[string]bool `form:"checklist" json:"checklist"`
 	}
 	_ = c.ShouldBind(&payload)
 
-	status := strings.TrimSpace(payload.Status)
 	notes := payload.Notes
 	incomingChecklist := payload.Checklist
 	if incomingChecklist == nil {
@@ -169,16 +166,16 @@ func SuperAdminStaffUpdate(c *gin.Context) {
 			completed++
 		}
 	}
-	progress := termination.Progress
+	progress := 0
 	if totalItems > 0 {
 		progress = int(float64(completed) / float64(totalItems) * 100)
 	}
-	effectiveStatus := status
-	if effectiveStatus == "" {
-		effectiveStatus = strings.TrimSpace(termination.Status)
-		if effectiveStatus == "" {
-			effectiveStatus = "Diajukan"
-		}
+	effectiveStatus := "Diajukan"
+	if completed > 0 {
+		effectiveStatus = "Proses"
+	}
+	if totalItems > 0 && completed >= totalItems {
+		effectiveStatus = "Selesai"
 	}
 	if effectiveStatus == "Selesai" {
 		progress = 100

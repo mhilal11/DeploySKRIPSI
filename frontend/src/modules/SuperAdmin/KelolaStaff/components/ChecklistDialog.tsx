@@ -25,13 +25,6 @@ import {
     DialogTrigger,
 } from '@/shared/components/ui/dialog';
 import { Label } from '@/shared/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/shared/components/ui/select';
 import { Textarea } from '@/shared/components/ui/textarea';
 import {
     Tooltip,
@@ -73,7 +66,6 @@ export default function ChecklistDialog({
     const form = useForm({
         checklist: defaultChecklist,
         notes: termination.notes ?? '',
-        status: termination.status as TerminationRecord['status'],
         progress: termination.progress ?? 0,
     });
 
@@ -82,7 +74,18 @@ export default function ChecklistDialog({
         const completed = Object.values(checklist).filter(Boolean).length;
         return totalItems > 0 ? Math.round((completed / totalItems) * 100) : 0;
     };
+    const computeStatus = (checklist: Record<string, boolean>): TerminationRecord['status'] => {
+        const completed = Object.values(checklist).filter(Boolean).length;
+        if (completed <= 0) {
+            return 'Diajukan';
+        }
+        if (completed >= totalItems) {
+            return 'Selesai';
+        }
+        return 'Proses';
+    };
     const progressValue = computeProgress(form.data.checklist);
+    const computedStatus = computeStatus(form.data.checklist);
     const completedItems = Object.values(form.data.checklist).filter(Boolean).length;
     const allChecklistCompleted = completedItems === totalItems;
 
@@ -93,16 +96,18 @@ export default function ChecklistDialog({
             progressOverride?: number;
         } = {}
     ) => {
+        const computedNextStatus = computeStatus(form.data.checklist);
+        const resolvedStatus = statusOverride ?? computedNextStatus;
         const nextProgress =
             typeof options.progressOverride === 'number'
                 ? options.progressOverride
-                : statusOverride === 'Selesai'
+                : resolvedStatus === 'Selesai'
                     ? 100
                     : computeProgress(form.data.checklist);
 
         form.transform((data) => ({
             ...data,
-            status: statusOverride ?? data.status,
+            status: resolvedStatus,
             progress: nextProgress,
         }));
 
@@ -178,7 +183,7 @@ export default function ChecklistDialog({
                         <DetailItem label="Divisi" value={termination.division} />
                         <DetailItem label="Tipe" value={termination.type} />
                         <DetailItem label="Tanggal Efektif" value={termination.effectiveDate} />
-                        <DetailItem label="Status saat ini" value={termination.status} />
+                        <DetailItem label="Status saat ini" value={computedStatus} />
                         <div>
                             <p className="text-xs text-slate-500">Progress</p>
                             <div className="mt-1 flex items-center gap-2">
@@ -221,40 +226,17 @@ export default function ChecklistDialog({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label>Status Proses</Label>
-                            <Select
-                                value={form.data.status}
-                                onValueChange={(value) =>
-                                    form.setData('status', value as TerminationRecord['status'])
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Pilih status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Diajukan">Diajukan</SelectItem>
-                                    <SelectItem value="Proses">Proses</SelectItem>
-                                    <SelectItem value="Selesai">Selesai</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {form.errors.status && (
-                                <p className="text-xs text-red-500">{form.errors.status}</p>
-                            )}
-                        </div>
-                        <div>
-                            <Label>Catatan HR</Label>
-                            <Textarea
-                                rows={3}
-                                placeholder="Tambahkan catatan..."
-                                value={form.data.notes}
-                                onChange={(event) => form.setData('notes', event.target.value)}
-                            />
-                            {form.errors.notes && (
-                                <p className="text-xs text-red-500">{form.errors.notes}</p>
-                            )}
-                        </div>
+                    <div>
+                        <Label>Catatan HR</Label>
+                        <Textarea
+                            rows={3}
+                            placeholder="Tambahkan catatan..."
+                            value={form.data.notes}
+                            onChange={(event) => form.setData('notes', event.target.value)}
+                        />
+                        {form.errors.notes && (
+                            <p className="text-xs text-red-500">{form.errors.notes}</p>
+                        )}
                     </div>
 
                     <div className="flex flex-wrap gap-2">

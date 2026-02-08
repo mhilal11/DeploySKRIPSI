@@ -386,10 +386,10 @@ func StaffResignationStore(c *gin.Context) {
 		return
 	}
 
-	var activeCount int
-	_ = db.Get(&activeCount, "SELECT COUNT(*) FROM staff_terminations WHERE user_id = ? AND status IN ('Diajukan','Proses')", user.ID)
-	if activeCount > 0 {
-		ValidationErrors(c, FieldErrors{"effective_date": "Anda masih memiliki pengajuan resign yang berjalan."})
+	var submittedCount int
+	_ = db.Get(&submittedCount, "SELECT COUNT(*) FROM staff_terminations WHERE user_id = ?", user.ID)
+	if submittedCount > 0 {
+		ValidationErrors(c, FieldErrors{"effective_date": "Pengajuan resign hanya dapat dilakukan satu kali."})
 		return
 	}
 

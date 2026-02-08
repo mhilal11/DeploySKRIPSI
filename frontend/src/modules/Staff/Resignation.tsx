@@ -66,6 +66,9 @@ export default function StaffResignation() {
     });
 
     const hasActiveRequest = Boolean(activeRequest);
+    const hasSubmitted = history.length > 0;
+    const latestRequest = hasSubmitted ? history[0] : null;
+    const displayedRequest = activeRequest ?? latestRequest;
     const [clientError, setClientError] = useState<string | null>(null);
 
     const getProgressValue = (req: TerminationRecord | null) => {
@@ -81,7 +84,7 @@ export default function StaffResignation() {
     };
 
     const submit = () => {
-        if (hasActiveRequest || !form.data.confirmation) return;
+        if (hasSubmitted || !form.data.confirmation) return;
 
         const trimmedReason = form.data.reason.trim();
         const trimmedSuggestion = form.data.suggestion.trim();
@@ -104,8 +107,16 @@ export default function StaffResignation() {
                     replace: true,
                 });
             },
-            onError: () => {
-                toast.error("Pengajuan gagal dikirim. Periksa data Anda lalu coba lagi.");
+            onError: (errors) => {
+                const firstError =
+                    errors?.effective_date ||
+                    errors?.reason ||
+                    errors?.suggestion;
+                toast.error(
+                    firstError
+                        ? String(firstError)
+                        : "Pengajuan gagal dikirim. Periksa data Anda lalu coba lagi."
+                );
             },
         });
     };
@@ -122,10 +133,10 @@ export default function StaffResignation() {
                 <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
                     {/* LEFT COLUMN: FORM OR ACTIVE STATUS */}
                     <div className="space-y-6">
-                        {activeRequest ? (
+                        {displayedRequest ? (
                             <Card className="p-6">
                                 <h2 className="text-lg font-semibold text-blue-900 border-b pb-4 mb-4">
-                                    Status Pengajuan Aktif
+                                    {hasActiveRequest ? "Status Pengajuan Aktif" : "Status Pengajuan Resign"}
                                 </h2>
 
                                 <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4 mb-6">
@@ -135,11 +146,12 @@ export default function StaffResignation() {
                                         </div>
                                         <div>
                                             <p className="font-semibold text-indigo-900 text-sm">
-                                                Pengajuan Sedang Diproses
+                                                {hasActiveRequest ? "Pengajuan Sedang Diproses" : "Pengajuan Sudah Tercatat"}
                                             </p>
                                             <p className="text-sm text-indigo-700 mt-1">
-                                                Anda sudah memiliki pengajuan resign yang sedang berjalan.
-                                                Silakan pantau progress di bawah ini. Form pengajuan baru dinonaktifkan sementara.
+                                                {hasActiveRequest
+                                                    ? "Anda sudah memiliki pengajuan resign yang sedang berjalan. Silakan pantau progress di bawah ini. Form pengajuan baru dinonaktifkan sementara."
+                                                    : "Pengajuan resign hanya dapat dilakukan satu kali. Anda sudah pernah mengajukan resign, sehingga form tidak dapat digunakan lagi."}
                                             </p>
                                         </div>
                                     </div>
@@ -148,20 +160,20 @@ export default function StaffResignation() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                                     <StatusItem
                                         label="Nomor Referensi"
-                                        value={activeRequest.reference}
+                                        value={displayedRequest.reference}
                                     />
                                     <StatusItem
                                         label="Status Terkini"
-                                        value={activeRequest.status}
+                                        value={displayedRequest.status}
                                         highlight
                                     />
                                     <StatusItem
                                         label="Tanggal Diajukan"
-                                        value={activeRequest.requestDate}
+                                        value={displayedRequest.requestDate}
                                     />
                                     <StatusItem
                                         label="Tanggal Efektif"
-                                        value={activeRequest.effectiveDate}
+                                        value={displayedRequest.effectiveDate}
                                     />
                                 </div>
 
@@ -172,12 +184,12 @@ export default function StaffResignation() {
                                             Progress Approval
                                         </p>
                                         <span className="text-xs font-semibold text-slate-700">
-                                            {getProgressValue(activeRequest)}%
+                                            {getProgressValue(displayedRequest)}%
                                         </span>
                                     </div>
 
                                     <Progress
-                                        value={getProgressValue(activeRequest)}
+                                        value={getProgressValue(displayedRequest)}
                                         className="h-3 rounded-full bg-slate-100"
                                     />
                                 </div>
@@ -187,8 +199,8 @@ export default function StaffResignation() {
                                         Catatan HR / Management
                                     </p>
                                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700">
-                                        {activeRequest.notes?.trim()?.length
-                                            ? activeRequest.notes
+                                        {displayedRequest.notes?.trim()?.length
+                                            ? displayedRequest.notes
                                             : <span className="text-slate-500 italic">Belum ada catatan.</span>}
                                     </div>
                                 </div>

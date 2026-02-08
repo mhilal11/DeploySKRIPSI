@@ -1,5 +1,6 @@
 ﻿import { FileText, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 import {
     AlertDialog,
@@ -23,7 +24,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/shared/components/ui/dialog';
-import { useForm } from '@/shared/lib/inertia';
+import { router, useForm } from '@/shared/lib/inertia';
 
 
 import { InactiveEmployeeRecord } from '../types';
@@ -153,7 +154,18 @@ function DeleteArchiveButton({ employee, mode = 'text' }: DeleteArchiveButtonPro
     const handleDelete = () => {
         form.delete(route('super-admin.staff.destroy', employee.id), {
             preserveScroll: true,
-            onFinish: () => setOpen(false),
+            onSuccess: () => {
+                toast.success(`Arsip ${employee.name} berhasil dihapus`);
+                setOpen(false);
+                void router.reload({
+                    only: ['stats', 'terminations', 'inactiveEmployees', 'sidebarNotifications'],
+                    preserveScroll: true,
+                    replace: true,
+                });
+            },
+            onError: () => {
+                toast.error('Gagal menghapus arsip karyawan nonaktif');
+            },
         });
     };
 
