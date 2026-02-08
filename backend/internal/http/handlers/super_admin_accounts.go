@@ -230,9 +230,58 @@ func SuperAdminAccountsStore(c *gin.Context) {
 	registeredAt := c.PostForm("registered_at")
 	inactiveAt := c.PostForm("inactive_at")
 	password := c.PostForm("password")
+	passwordConfirmation := c.PostForm("password_confirmation")
 
-	if name == "" || email == "" || role == "" || status == "" || password == "" {
-		ValidationErrors(c, FieldErrors{"name": "Data wajib diisi."})
+	name = strings.TrimSpace(name)
+	email = strings.TrimSpace(email)
+	role = strings.TrimSpace(role)
+	division = strings.TrimSpace(division)
+	status = strings.TrimSpace(status)
+	registeredAt = strings.TrimSpace(registeredAt)
+	inactiveAt = strings.TrimSpace(inactiveAt)
+	password = strings.TrimSpace(password)
+	passwordConfirmation = strings.TrimSpace(passwordConfirmation)
+
+	fieldErrors := FieldErrors{}
+	if name == "" {
+		fieldErrors["name"] = "Nama wajib diisi."
+	}
+	if email == "" {
+		fieldErrors["email"] = "Email wajib diisi."
+	}
+	if role == "" {
+		fieldErrors["role"] = "Role wajib dipilih."
+	}
+	if status == "" {
+		fieldErrors["status"] = "Status wajib dipilih."
+	}
+	if password == "" {
+		fieldErrors["password"] = "Password wajib diisi."
+	}
+	if passwordConfirmation == "" {
+		fieldErrors["password_confirmation"] = "Konfirmasi password wajib diisi."
+	}
+	if password != "" && passwordConfirmation != "" && password != passwordConfirmation {
+		fieldErrors["password_confirmation"] = "Konfirmasi password tidak sama."
+	}
+	if role == models.RoleAdmin || role == models.RoleStaff {
+		if division == "" {
+			fieldErrors["division"] = "Divisi wajib dipilih."
+		}
+	}
+	if role == models.RoleStaff {
+		if strings.TrimSpace(c.PostForm("religion")) == "" {
+			fieldErrors["religion"] = "Agama wajib dipilih."
+		}
+		if strings.TrimSpace(c.PostForm("gender")) == "" {
+			fieldErrors["gender"] = "Jenis kelamin wajib dipilih."
+		}
+		if strings.TrimSpace(c.PostForm("education_level")) == "" {
+			fieldErrors["education_level"] = "Tingkat pendidikan wajib dipilih."
+		}
+	}
+	if len(fieldErrors) > 0 {
+		ValidationErrors(c, fieldErrors)
 		return
 	}
 
@@ -293,6 +342,49 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 	registeredAt := c.PostForm("registered_at")
 	inactiveAt := c.PostForm("inactive_at")
 	password := c.PostForm("password")
+
+	name = strings.TrimSpace(name)
+	email = strings.TrimSpace(email)
+	role = strings.TrimSpace(role)
+	division = strings.TrimSpace(division)
+	status = strings.TrimSpace(status)
+	registeredAt = strings.TrimSpace(registeredAt)
+	inactiveAt = strings.TrimSpace(inactiveAt)
+	password = strings.TrimSpace(password)
+
+	fieldErrors := FieldErrors{}
+	if name == "" {
+		fieldErrors["name"] = "Nama wajib diisi."
+	}
+	if email == "" {
+		fieldErrors["email"] = "Email wajib diisi."
+	}
+	if role == "" {
+		fieldErrors["role"] = "Role wajib dipilih."
+	}
+	if status == "" {
+		fieldErrors["status"] = "Status wajib dipilih."
+	}
+	if role == models.RoleAdmin || role == models.RoleStaff {
+		if division == "" {
+			fieldErrors["division"] = "Divisi wajib dipilih."
+		}
+	}
+	if role == models.RoleStaff {
+		if strings.TrimSpace(c.PostForm("religion")) == "" {
+			fieldErrors["religion"] = "Agama wajib dipilih."
+		}
+		if strings.TrimSpace(c.PostForm("gender")) == "" {
+			fieldErrors["gender"] = "Jenis kelamin wajib dipilih."
+		}
+		if strings.TrimSpace(c.PostForm("education_level")) == "" {
+			fieldErrors["education_level"] = "Tingkat pendidikan wajib dipilih."
+		}
+	}
+	if len(fieldErrors) > 0 {
+		ValidationErrors(c, fieldErrors)
+		return
+	}
 
 	db := middleware.GetDB(c)
 
