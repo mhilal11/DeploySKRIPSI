@@ -370,9 +370,16 @@ func StaffResignationStore(c *gin.Context) {
 	}
 	db := middleware.GetDB(c)
 
-	effectiveDate := strings.TrimSpace(c.PostForm("effective_date"))
-	reason := strings.TrimSpace(c.PostForm("reason"))
-	suggestion := strings.TrimSpace(c.PostForm("suggestion"))
+	var payload struct {
+		EffectiveDate string `form:"effective_date" json:"effective_date"`
+		Reason        string `form:"reason" json:"reason"`
+		Suggestion    string `form:"suggestion" json:"suggestion"`
+	}
+	_ = c.ShouldBind(&payload)
+
+	effectiveDate := strings.TrimSpace(payload.EffectiveDate)
+	reason := strings.TrimSpace(payload.Reason)
+	suggestion := strings.TrimSpace(payload.Suggestion)
 
 	if effectiveDate == "" || reason == "" {
 		ValidationErrors(c, FieldErrors{"effective_date": "Tanggal efektif wajib diisi.", "reason": "Alasan wajib diisi."})

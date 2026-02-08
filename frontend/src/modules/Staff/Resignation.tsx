@@ -19,7 +19,7 @@ import {
     TableRow,
 } from "@/shared/components/ui/table";
 import { Textarea } from "@/shared/components/ui/textarea";
-import { Head, useForm, usePage } from "@/shared/lib/inertia";
+import { Head, router, useForm, usePage } from "@/shared/lib/inertia";
 import type { PageProps } from "@/shared/types";
 
 import type {
@@ -98,6 +98,11 @@ export default function StaffResignation() {
             onSuccess: () => {
                 toast.success("Pengajuan resign berhasil dikirim.");
                 form.reset();
+                void router.reload({
+                    only: ["profile", "activeRequest", "history"],
+                    preserveScroll: true,
+                    replace: true,
+                });
             },
             onError: () => {
                 toast.error("Pengajuan gagal dikirim. Periksa data Anda lalu coba lagi.");
