@@ -401,7 +401,7 @@ func StaffResignationStore(c *gin.Context) {
 
 	now := time.Now()
 	_, err = db.Exec(`INSERT INTO staff_terminations (reference, user_id, requested_by, employee_code, employee_name, division, position, type, reason, suggestion, request_date, effective_date, status, progress, checklist, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'Resign', ?, ?, ?, ?, 'Diajukan', 10, ?, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'Resign', ?, ?, ?, ?, 'Diajukan', 0, ?, ?, ?)`,
 		reference, user.ID, user.ID, user.EmployeeCode, user.Name, user.Division, user.Role, reason, suggestion, now.Format("2006-01-02"), effectiveDate, "{}", now, now)
 	if err != nil {
 		JSONError(c, http.StatusInternalServerError, "Gagal menyimpan pengajuan")

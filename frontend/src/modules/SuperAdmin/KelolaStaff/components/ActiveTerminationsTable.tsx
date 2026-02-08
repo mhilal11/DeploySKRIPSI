@@ -47,19 +47,33 @@ export default function ActiveTerminationsTable({
     checklistTemplate,
 }: ActiveTerminationsTableProps) {
     const getDisplayProgress = (request: TerminationRecord) => {
-        return Math.max(0, request.progress ?? 0);
+        const status = (request.status ?? '').toLowerCase();
+        if (status.includes('diajukan') || status.includes('menunggu') || status.includes('pending') || status.includes('baru')) {
+            return 0;
+        }
+        const raw = Number(request.progress ?? 0);
+        return Number.isFinite(raw) ? Math.max(0, raw) : 0;
     };
 
     const handleCancelOffboarding = (terminationId: number, employeeName: string) => {
-        router.delete(route('super-admin.staff.destroy', terminationId), {
-            preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Offboarding berhasil dibatalkan');
-            },
-            onError: () => {
-                toast.error('Gagal membatalkan offboarding');
-            },
-        });
+        router.delete(
+            route('super-admin.staff.destroy', terminationId),
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    toast.success(`Offboarding ${employeeName} berhasil dibatalkan`);
+                    void router.reload({
+                        only: ['stats', 'terminations', 'inactiveEmployees', 'sidebarNotifications'],
+                        preserveScroll: true,
+                        replace: true,
+                    });
+                },
+                onError: () => {
+                    toast.error('Gagal membatalkan offboarding');
+                },
+            }
+        );
     };
 
     if (terminations.length === 0) {

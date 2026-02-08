@@ -77,7 +77,7 @@ export default function StaffResignation() {
             statusLower.includes("menunggu") ||
             statusLower.includes("pending") ||
             statusLower.includes("baru");
-        return isInitial ? 0 : Math.max(0, raw);
+        return isInitial ? 0 : Number.isFinite(raw) ? Math.max(0, raw) : 0;
     };
 
     const submit = () => {

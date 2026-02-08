@@ -33,10 +33,11 @@ export default function TerminationDetailDialog({
 }: TerminationDetailDialogProps) {
   const getDisplayProgress = (req: TerminationRecord) => {
     const status = (req.status || '').toLowerCase();
-    if (status.includes('diajukan') || status.includes('menunggu') || status.includes('pending')) {
+    if (status.includes('diajukan') || status.includes('menunggu') || status.includes('pending') || status.includes('baru')) {
       return 0;
     }
-    return Math.max(0, req.progress ?? 0);
+    const raw = Number(req.progress ?? 0);
+    return Number.isFinite(raw) ? Math.max(0, raw) : 0;
   };
 
   const [open, setOpen] = useState(false);

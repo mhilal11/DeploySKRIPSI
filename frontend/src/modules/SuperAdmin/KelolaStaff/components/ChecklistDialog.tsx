@@ -39,7 +39,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
-import { useForm } from '@/shared/lib/inertia';
+import { router, useForm } from '@/shared/lib/inertia';
 
 import { TerminationRecord } from '../types';
 
@@ -110,9 +110,17 @@ export default function ChecklistDialog({
             preserveScroll: true,
             onSuccess: () => {
                 toast.success('Progress checklist tersimpan.');
+                void router.reload({
+                    only: ['stats', 'terminations', 'sidebarNotifications'],
+                    preserveScroll: true,
+                    replace: true,
+                });
                 if (options.closeAfterSuccess) {
                     setOpen(false);
                 }
+            },
+            onError: () => {
+                toast.error('Gagal menyimpan progress checklist.');
             },
             onFinish: () => {
                 form.transform((data) => data);

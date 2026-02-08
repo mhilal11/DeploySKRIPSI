@@ -59,6 +59,21 @@ export default function StaffDashboard() {
     const recentComplaints = props.recentComplaints ?? EMPTY_COMPLAINTS;
     const termination = props.termination ?? EMPTY_TERMINATION;
 
+    const getDisplayProgress = (item: TerminationSummary | null) => {
+        if (!item) return 0;
+        const statusLower = (item.status ?? '').toLowerCase();
+        if (
+            statusLower.includes('diajukan') ||
+            statusLower.includes('menunggu') ||
+            statusLower.includes('pending') ||
+            statusLower.includes('baru')
+        ) {
+            return 0;
+        }
+        const raw = Number(item.progress ?? 0);
+        return Number.isFinite(raw) ? Math.max(0, raw) : 0;
+    };
+
     // Sembunyikan statistik regulasi/dokumen
     const filteredStats = stats.filter(
         (item) =>
@@ -143,7 +158,7 @@ export default function StaffDashboard() {
                                 <div>
                                     <p className="text-xs uppercase text-slate-500">Progress</p>
                                     <Progress
-                                        value={termination.active.progress ?? 0}
+                                        value={getDisplayProgress(termination.active)}
                                         className="mt-2"
                                     />
                                 </div>

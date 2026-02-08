@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"hris-backend/internal/http/middleware"
@@ -117,7 +118,7 @@ func SuperAdminStaffStore(c *gin.Context) {
 
 	now := time.Now()
 	_, _ = db.Exec(`INSERT INTO staff_terminations (reference, user_id, requested_by, employee_code, employee_name, division, position, type, reason, suggestion, request_date, effective_date, status, progress, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Diajukan', 10, ?, ?)`,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Diajukan', 0, ?, ?)`,
 		reference, employee.ID, user.ID, employee.EmployeeCode, employee.Name, employee.Division, employee.Role, c.PostForm("type"), c.PostForm("reason"), c.PostForm("suggestion"), now.Format("2006-01-02"), c.PostForm("effective_date"), now, now)
 
 	c.JSON(http.StatusOK, gin.H{"status": "Pengajuan termination berhasil dibuat."})
@@ -131,13 +132,18 @@ func SuperAdminStaffUpdate(c *gin.Context) {
 	}
 
 	id := c.Param("id")
-	status := c.PostForm("status")
-	notes := c.PostForm("notes")
-	checklistJSON := c.PostForm("checklist")
+	var payload struct {
+		Status    string          `form:"status" json:"status"`
+		Notes     string          `form:"notes" json:"notes"`
+		Checklist map[string]bool `form:"checklist" json:"checklist"`
+	}
+	_ = c.ShouldBind(&payload)
 
-	var incomingChecklist map[string]bool
-	if checklistJSON != "" {
-		_ = json.Unmarshal([]byte(checklistJSON), &incomingChecklist)
+	status := strings.TrimSpace(payload.Status)
+	notes := payload.Notes
+	incomingChecklist := payload.Checklist
+	if incomingChecklist == nil {
+		incomingChecklist = map[string]bool{}
 	}
 
 	db := middleware.GetDB(c)
@@ -167,14 +173,21 @@ func SuperAdminStaffUpdate(c *gin.Context) {
 	if totalItems > 0 {
 		progress = int(float64(completed) / float64(totalItems) * 100)
 	}
-	if status == "Selesai" {
+	effectiveStatus := status
+	if effectiveStatus == "" {
+		effectiveStatus = strings.TrimSpace(termination.Status)
+		if effectiveStatus == "" {
+			effectiveStatus = "Diajukan"
+		}
+	}
+	if effectiveStatus == "Selesai" {
 		progress = 100
 	}
 
 	mergedBytes, _ := json.Marshal(merged)
-	_, _ = db.Exec("UPDATE staff_terminations SET status = ?, notes = ?, checklist = ?, progress = ?, updated_at = ? WHERE id = ?", status, notes, mergedBytes, progress, time.Now(), id)
+	_, _ = db.Exec("UPDATE staff_terminations SET status = ?, notes = ?, checklist = ?, progress = ?, updated_at = ? WHERE id = ?", effectiveStatus, notes, mergedBytes, progress, time.Now(), id)
 
-	if status == "Selesai" && termination.UserID != nil {
+	if effectiveStatus == "Selesai" && termination.UserID != nil {
 		_, _ = db.Exec("UPDATE users SET status = 'Inactive', inactive_at = ? WHERE id = ?", time.Now(), *termination.UserID)
 	}
 
