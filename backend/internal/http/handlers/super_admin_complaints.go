@@ -69,9 +69,16 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 			reporterName = lookupUserName(db, complaint.UserID)
 			reporterEmail = lookupUserEmail(db, complaint.UserID)
 		}
-		handlerName := ""
+		var handlerName any = nil
 		if complaint.HandledByID != nil {
-			handlerName = lookupUserName(db, *complaint.HandledByID)
+			name := strings.TrimSpace(lookupUserName(db, *complaint.HandledByID))
+			if name != "" {
+				handlerName = name
+			}
+		}
+		var resolvedAt any = nil
+		if complaint.ResolvedAt != nil && !complaint.ResolvedAt.IsZero() {
+			resolvedAt = formatDateTime(complaint.ResolvedAt)
 		}
 		data = append(data, map[string]any{
 			"id":              complaint.ID,
@@ -89,7 +96,7 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 			"isAnonymous":     complaint.IsAnonymous,
 			"handler":         handlerName,
 			"resolutionNotes": complaint.ResolutionNotes,
-			"resolvedAt":      formatDateTime(complaint.ResolvedAt),
+			"resolvedAt":      resolvedAt,
 			"attachment": map[string]any{
 				"name": complaint.AttachmentName,
 				"url":  attachmentURL(c, complaint.AttachmentPath),
@@ -143,11 +150,31 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 	}
 
 	id := c.Param("id")
-	status := c.PostForm("status")
-	priority := c.PostForm("priority")
-	resolution := c.PostForm("resolution_notes")
+	var payload struct {
+		Status          string `form:"status" json:"status"`
+		Priority        string `form:"priority" json:"priority"`
+		ResolutionNotes string `form:"resolution_notes" json:"resolution_notes"`
+	}
+	_ = c.ShouldBind(&payload)
+
+	status := strings.TrimSpace(payload.Status)
+	priority := strings.TrimSpace(payload.Priority)
+	resolution := strings.TrimSpace(payload.ResolutionNotes)
 
 	db := middleware.GetDB(c)
+
+	var existing models.Complaint
+	if err := db.Get(&existing, "SELECT * FROM complaints WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "Pengaduan tidak ditemukan")
+		return
+	}
+
+	if status == "" {
+		status = existing.Status
+	}
+	if priority == "" {
+		priority = existing.Priority
+	}
 
 	resolvedAt := sql.NullTime{}
 	if status == models.ComplaintStatusResolved {

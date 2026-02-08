@@ -227,7 +227,7 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       return;
     }
-    const isSuperAdmin = user.role === 'SuperAdmin';
+    const isSuperAdmin = user.role === 'SuperAdmin' || user.role === 'Super Admin';
     const isHumanCapitalAdmin =
       user.role === 'Admin' &&
       typeof user.division === 'string' &&
@@ -243,7 +243,7 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
         const { data } = await api.get(apiUrl('/super-admin/notifications'), {
           params: { page: 1 },
         });
-        if (!active || !data?.data) {
+        if (!active) {
           return;
         }
         const counts: Record<string, number> = {
@@ -252,25 +252,42 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
           'super-admin.staff.index': 0,
           'super-admin.complaints.index': 0,
         };
-        for (const item of data.data as Array<{ type: string }>) {
-          switch (item.type) {
-            case 'letter':
-              counts['super-admin.letters.index'] += 1;
-              break;
-            case 'application':
-              counts['super-admin.recruitment'] += 1;
-              break;
-            case 'termination':
-              counts['super-admin.staff.index'] += 1;
-              break;
-            case 'complaint':
-              counts['super-admin.complaints.index'] += 1;
-              break;
-            default:
-              break;
-          }
+
+        // Prefer server-side aggregated sidebar counts to avoid
+        // undercounting when notifications are paginated.
+        if (data?.sidebarNotifications && typeof data.sidebarNotifications === 'object') {
+          Object.entries(data.sidebarNotifications as Record<string, unknown>).forEach(
+            ([key, value]) => {
+              if (key in counts && typeof value === 'number' && Number.isFinite(value)) {
+                counts[key] = value;
+              }
+            },
+          );
+          setSidebarNotifications(counts);
+          return;
         }
-        setSidebarNotifications(counts);
+
+        if (data?.data && Array.isArray(data.data)) {
+          for (const item of data.data as Array<{ type: string }>) {
+            switch (item.type) {
+              case 'letter':
+                counts['super-admin.letters.index'] += 1;
+                break;
+              case 'application':
+                counts['super-admin.recruitment'] += 1;
+                break;
+              case 'termination':
+                counts['super-admin.staff.index'] += 1;
+                break;
+              case 'complaint':
+                counts['super-admin.complaints.index'] += 1;
+                break;
+              default:
+                break;
+            }
+          }
+          setSidebarNotifications(counts);
+        }
       } catch {
         // ignore
       }

@@ -19,7 +19,7 @@ import {
     SelectValue,
 } from '@/shared/components/ui/select';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { useForm } from '@/shared/lib/inertia';
+import { router, useForm } from '@/shared/lib/inertia';
 
 import type { ComplaintRecord, Option } from '../types';
 
@@ -69,7 +69,13 @@ export default function ComplaintDetailDialog({
                 toast.success('Data pengaduan diperbarui', {
                     description: `Pengaduan ${complaint.code} telah disimpan.`,
                 });
-                onOpenChange(false);
+                void router.reload({
+                    only: ['complaints', 'stats', 'sidebarNotifications'],
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onSuccess: () => onOpenChange(false),
+                });
             },
         });
     };
@@ -84,6 +90,11 @@ export default function ComplaintDetailDialog({
         priorityOptions.find((option) => option.value === priorityValue)?.label ??
         complaint?.priorityLabel ??
         '-';
+    const handlerName = complaint?.handler?.trim()?.length
+        ? complaint.handler
+        : 'Belum ditugaskan';
+    const resolvedAtText = complaint?.resolvedAt?.trim() ?? '';
+    const hasResolvedAt = resolvedAtText.length > 0 && resolvedAtText !== '-';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -116,11 +127,11 @@ export default function ComplaintDetailDialog({
                             <SummaryCard label="Penanggung Jawab">
                                 <div className="space-y-1">
                                     <p className="text-sm font-semibold text-slate-900">
-                                        {complaint.handler ?? 'Belum ditugaskan'}
+                                        {handlerName}
                                     </p>
                                     <p className="text-xs text-slate-500">
-                                        {complaint.resolvedAt
-                                            ? `Selesai ${complaint.resolvedAt}`
+                                        {hasResolvedAt
+                                            ? `Selesai ${resolvedAtText}`
                                             : `Dibuat ${complaint.submittedAt ?? '-'}`}
                                     </p>
                                 </div>
@@ -287,9 +298,9 @@ export default function ComplaintDetailDialog({
                                                 </p>
                                             )}
                                         </div>
-                                        {complaint.resolvedAt && (
+                                        {hasResolvedAt && (
                                             <p className="text-xs text-emerald-600">
-                                                Ditandai selesai pada {complaint.resolvedAt}
+                                                Ditandai selesai pada {resolvedAtText}
                                             </p>
                                         )}
                                     </div>

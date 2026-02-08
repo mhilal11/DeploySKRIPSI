@@ -22,7 +22,8 @@ import {
     SelectValue,
 } from '@/shared/components/ui/select';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { useForm } from '@/shared/lib/inertia';
+import { router, useForm } from '@/shared/lib/inertia';
+import { route } from '@/shared/lib/route';
 
 import type { ComplaintFiltersOptions } from '../types';
 import type { ChangeEvent, FormEvent } from 'react';
@@ -176,6 +177,11 @@ export default function ComplaintComposerDialog({
             onSuccess: () => {
                 toast.success('Pengaduan berhasil dikirim', {
                     description: 'Tim HR akan meninjau laporan Anda segera.',
+                });
+                void router.reload({
+                    only: ['complaints', 'stats', 'filters'],
+                    preserveScroll: true,
+                    replace: true,
                 });
                 handleClose();
             },

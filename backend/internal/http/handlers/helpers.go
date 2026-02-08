@@ -109,7 +109,7 @@ func computeSuperAdminSidebarNotifications(db any) map[string]int {
 	type Querier interface {
 		Get(dest interface{}, query string, args ...interface{}) error
 	}
-	
+
 	q, ok := db.(Querier)
 	if !ok {
 		return map[string]int{}
@@ -121,8 +121,8 @@ func computeSuperAdminSidebarNotifications(db any) map[string]int {
 	var lettersCount int
 	_ = q.Get(&lettersCount, `
 		SELECT COUNT(*) FROM surat 
-		WHERE status_persetujuan IN ('Menunggu HR', 'Diajukan', 'Diproses') 
-		AND current_recipient = 'hr'
+		WHERE LOWER(status_persetujuan) IN ('menunggu hr', 'diajukan', 'diproses')
+		AND LOWER(current_recipient) = 'hr'
 	`)
 	notifications["super-admin.letters.index"] = lettersCount
 
@@ -130,23 +130,23 @@ func computeSuperAdminSidebarNotifications(db any) map[string]int {
 	var recruitmentCount int
 	_ = q.Get(&recruitmentCount, `
 		SELECT COUNT(*) FROM applications 
-		WHERE status IN ('Applied', 'Screening')
+		WHERE LOWER(status) IN ('applied', 'screening')
 	`)
 	notifications["super-admin.recruitment"] = recruitmentCount
 
-	// Staff terminations: status in ['Diajukan', 'Proses']
+	// Staff terminations: status in ['Diajukan', 'Proses', 'Diproses']
 	var staffCount int
 	_ = q.Get(&staffCount, `
 		SELECT COUNT(*) FROM staff_terminations 
-		WHERE status IN ('Diajukan', 'Proses')
+		WHERE status IN ('Diajukan', 'Proses', 'Diproses')
 	`)
 	notifications["super-admin.staff.index"] = staffCount
 
-	// Complaints: status = 'Baru'
+	// Complaints: status = 'new' (legacy rows might still use 'Baru')
 	var complaintsCount int
 	_ = q.Get(&complaintsCount, `
 		SELECT COUNT(*) FROM complaints 
-		WHERE status = 'Baru'
+		WHERE LOWER(status) IN ('new', 'baru')
 	`)
 	notifications["super-admin.complaints.index"] = complaintsCount
 
