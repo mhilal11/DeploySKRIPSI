@@ -511,6 +511,10 @@ func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 		senderName := lookupUserName(db, surat.UserID)
 		senderDivision := lookupDepartemenName(db, surat.DepartemenID, surat.UserID)
 		recipientName := firstString(surat.TargetDivision, surat.Penerima)
+		letterType := strings.TrimSpace(surat.JenisSurat)
+		if letterType == "" {
+			letterType = "Tidak diketahui"
+		}
 		attachmentLink := attachmentURL(c, surat.LampiranPath)
 		var attachmentPayload map[string]any
 		if attachmentLink != nil {
@@ -530,7 +534,7 @@ func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 			"senderName":     senderName,
 			"senderDivision": senderDivision,
 			"recipientName":  recipientName,
-			"letterType":     surat.JenisSurat,
+			"letterType":     letterType,
 			"subject":        surat.Perihal,
 			"category":       surat.Kategori,
 			"date":           formatDate(surat.TanggalSurat),

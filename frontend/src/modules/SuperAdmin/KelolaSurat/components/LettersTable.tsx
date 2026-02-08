@@ -211,7 +211,7 @@ export default function LettersTable({
                                     </TableCell>
                                     {!isInbox && (
                                         <TableCell className="hidden xl:table-cell">
-                                            <Badge variant="outline">{letter.letterType}</Badge>
+                                            <Badge variant="outline">{(letter.letterType ?? '').trim() || 'Tidak diketahui'}</Badge>
                                         </TableCell>
                                     )}
                                     <TableCell className="hidden md:table-cell">

@@ -3,6 +3,11 @@ import '@/shared/styles/app.css';
 
 export const metadata: Metadata = {
   title: 'HRIS LDP',
+  icons: {
+    icon: '/LogoLDP.png',
+    shortcut: '/LogoLDP.png',
+    apple: '/LogoLDP.png',
+  },
 };
 
 export default function RootLayout({
