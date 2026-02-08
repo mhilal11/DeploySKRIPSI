@@ -38,12 +38,26 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		args = append(args, like, like, like)
 	}
 	if filters["status"] != "" && filters["status"] != "all" {
-		clauses = append(clauses, "status = ?")
-		args = append(args, filters["status"])
+		switch normalizeComplaintStatus(filters["status"]) {
+		case models.ComplaintStatusNew:
+			clauses = append(clauses, "LOWER(status) IN ('new','baru','open')")
+		case models.ComplaintStatusInProgress:
+			clauses = append(clauses, "LOWER(status) IN ('in_progress','onprogress','inprogress','processing','proses','diproses')")
+		case models.ComplaintStatusResolved:
+			clauses = append(clauses, "LOWER(status) IN ('resolved','selesai','closed','done')")
+		case models.ComplaintStatusArchived:
+			clauses = append(clauses, "LOWER(status) IN ('archived','diarsipkan','archive')")
+		}
 	}
 	if filters["priority"] != "" && filters["priority"] != "all" {
-		clauses = append(clauses, "priority = ?")
-		args = append(args, filters["priority"])
+		switch normalizeComplaintPriority(filters["priority"]) {
+		case models.ComplaintPriorityHigh:
+			clauses = append(clauses, "LOWER(priority) IN ('high','tinggi')")
+		case models.ComplaintPriorityMedium:
+			clauses = append(clauses, "LOWER(priority) IN ('medium','sedang','normal')")
+		case models.ComplaintPriorityLow:
+			clauses = append(clauses, "LOWER(priority) IN ('low','rendah')")
+		}
 	}
 	if filters["category"] != "" && filters["category"] != "all" {
 		clauses = append(clauses, "category = ?")
@@ -60,6 +74,15 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 	data := make([]map[string]any, 0, len(complaints))
 	categoryOptions := map[string]bool{}
 	for _, complaint := range complaints {
+		status := normalizeComplaintStatus(complaint.Status)
+		if status == "" {
+			status = models.ComplaintStatusNew
+		}
+		priority := normalizeComplaintPriority(complaint.Priority)
+		if priority == "" {
+			priority = models.ComplaintPriorityMedium
+		}
+
 		if complaint.Category != "" {
 			categoryOptions[complaint.Category] = true
 		}
@@ -89,10 +112,10 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 			"subject":         complaint.Subject,
 			"description":     complaint.Description,
 			"submittedAt":     formatDateTime(complaint.SubmittedAt),
-			"status":          complaint.Status,
-			"statusLabel":     models.ComplaintStatusLabels[complaint.Status],
-			"priority":        complaint.Priority,
-			"priorityLabel":   models.ComplaintPriorityLabels[complaint.Priority],
+			"status":          status,
+			"statusLabel":     complaintStatusLabel(status),
+			"priority":        priority,
+			"priorityLabel":   complaintPriorityLabel(priority),
 			"isAnonymous":     complaint.IsAnonymous,
 			"handler":         handlerName,
 			"resolutionNotes": complaint.ResolutionNotes,
@@ -157,8 +180,8 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 	}
 	_ = c.ShouldBind(&payload)
 
-	status := strings.TrimSpace(payload.Status)
-	priority := strings.TrimSpace(payload.Priority)
+	status := normalizeComplaintStatus(payload.Status)
+	priority := normalizeComplaintPriority(payload.Priority)
 	resolution := strings.TrimSpace(payload.ResolutionNotes)
 
 	db := middleware.GetDB(c)
@@ -170,10 +193,16 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 	}
 
 	if status == "" {
-		status = existing.Status
+		status = normalizeComplaintStatus(existing.Status)
 	}
 	if priority == "" {
-		priority = existing.Priority
+		priority = normalizeComplaintPriority(existing.Priority)
+	}
+	if status == "" {
+		status = models.ComplaintStatusNew
+	}
+	if priority == "" {
+		priority = models.ComplaintPriorityMedium
 	}
 
 	resolvedAt := sql.NullTime{}
@@ -191,11 +220,55 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 func countComplaintsByStatus(list []models.Complaint, status string) int {
 	count := 0
 	for _, complaint := range list {
-		if complaint.Status == status {
+		if normalizeComplaintStatus(complaint.Status) == status {
 			count++
 		}
 	}
 	return count
+}
+
+func normalizeComplaintStatus(raw string) string {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	switch value {
+	case "new", "baru", "open":
+		return models.ComplaintStatusNew
+	case "in_progress", "onprogress", "inprogress", "processing", "proses", "diproses":
+		return models.ComplaintStatusInProgress
+	case "resolved", "selesai", "closed", "done":
+		return models.ComplaintStatusResolved
+	case "archived", "diarsipkan", "archive":
+		return models.ComplaintStatusArchived
+	default:
+		return ""
+	}
+}
+
+func normalizeComplaintPriority(raw string) string {
+	value := strings.ToLower(strings.TrimSpace(raw))
+	switch value {
+	case "high", "tinggi":
+		return models.ComplaintPriorityHigh
+	case "medium", "sedang", "normal":
+		return models.ComplaintPriorityMedium
+	case "low", "rendah":
+		return models.ComplaintPriorityLow
+	default:
+		return ""
+	}
+}
+
+func complaintStatusLabel(status string) string {
+	if label, ok := models.ComplaintStatusLabels[status]; ok && label != "" {
+		return label
+	}
+	return "-"
+}
+
+func complaintPriorityLabel(priority string) string {
+	if label, ok := models.ComplaintPriorityLabels[priority]; ok && label != "" {
+		return label
+	}
+	return "-"
 }
 
 func lookupUserEmail(db *sqlx.DB, userID int64) string {

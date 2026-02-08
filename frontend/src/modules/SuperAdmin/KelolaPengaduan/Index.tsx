@@ -2,7 +2,7 @@
 import { toast } from 'sonner';
 
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
-import { Head, router } from '@/shared/lib/inertia';
+import { Head, router, usePage } from '@/shared/lib/inertia';
 import type { PageProps } from '@/shared/types';
 
 import ComplaintDetailDialog from './components/ComplaintDetailDialog';
@@ -38,16 +38,16 @@ type ComplaintsPageProps = PageProps<{
     };
 }>;
 
-export default function KelolaPengaduanIndex(props: ComplaintsPageProps) {
-    const {
-        filters,
-        stats,
-        complaints,
-        statusOptions,
-        priorityOptions,
-        categoryOptions,
-        flash,
-    } = props;
+export default function KelolaPengaduanIndex(initialProps: ComplaintsPageProps) {
+    const { props } = usePage<Partial<ComplaintsPageProps>>();
+
+    const filters = props.filters ?? initialProps.filters;
+    const stats = props.stats ?? initialProps.stats;
+    const complaints = props.complaints ?? initialProps.complaints;
+    const statusOptions = props.statusOptions ?? initialProps.statusOptions;
+    const priorityOptions = props.priorityOptions ?? initialProps.priorityOptions;
+    const categoryOptions = props.categoryOptions ?? initialProps.categoryOptions;
+    const flash = props.flash ?? initialProps.flash;
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? 'all');

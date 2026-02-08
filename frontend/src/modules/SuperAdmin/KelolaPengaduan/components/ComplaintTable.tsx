@@ -183,55 +183,91 @@ export default function ComplaintTable({
     );
 }
 
-function renderPriorityBadge(priority: string, label: string, small = false) {
+function resolvePriorityLabel(priority: string, label?: string) {
+    if (label?.trim()) {
+        return label;
+    }
+    switch (priority) {
+        case 'high':
+            return 'Tinggi';
+        case 'medium':
+            return 'Sedang';
+        case 'low':
+            return 'Rendah';
+        default:
+            return '-';
+    }
+}
+
+function resolveStatusLabel(status: string, label?: string) {
+    if (label?.trim()) {
+        return label;
+    }
+    switch (status) {
+        case 'new':
+            return 'Baru';
+        case 'in_progress':
+            return 'OnProgress';
+        case 'resolved':
+            return 'Selesai';
+        case 'archived':
+            return 'Diarsipkan';
+        default:
+            return '-';
+    }
+}
+
+function renderPriorityBadge(priority: string, label?: string, small = false) {
     const sizeClass = small ? 'px-1.5 py-0.5 text-[10px]' : 'px-3 py-1 text-xs';
+    const safeLabel = resolvePriorityLabel(priority, label);
     switch (priority) {
         case 'high':
             return (
                 <span className={`rounded-full bg-red-100 ${sizeClass} font-semibold text-red-600`}>
-                    {label}
+                    {safeLabel}
                 </span>
             );
         case 'medium':
             return (
                 <span className={`rounded-full bg-amber-100 ${sizeClass} font-semibold text-amber-600`}>
-                    {label}
+                    {safeLabel}
                 </span>
             );
         default:
             return (
                 <span className={`rounded-full bg-blue-100 ${sizeClass} font-semibold text-blue-600`}>
-                    {label}
+                    {safeLabel}
                 </span>
             );
     }
 }
 
-function renderStatusBadge(status: string, label: string, small = false) {
+function renderStatusBadge(status: string, label?: string, small = false) {
     const sizeClass = small ? 'px-1.5 py-0.5 text-[10px]' : 'px-3 py-1 text-xs';
+    const safeLabel = resolveStatusLabel(status, label);
     switch (status) {
         case 'new':
             return (
                 <span className={`rounded-full border border-blue-200 ${sizeClass} font-semibold text-blue-700`}>
-                    {label}
+                    {safeLabel}
                 </span>
             );
         case 'in_progress':
             return (
                 <span className={`rounded-full border border-amber-200 ${sizeClass} font-semibold text-amber-600`}>
-                    {label}
+                    {safeLabel}
                 </span>
             );
         case 'resolved':
             return (
                 <span className={`rounded-full border border-emerald-200 ${sizeClass} font-semibold text-emerald-600`}>
-                    {label}
+                    {safeLabel}
                 </span>
             );
         default:
             return (
                 <span className={`rounded-full border border-slate-200 ${sizeClass} font-semibold text-slate-600`}>
-                    {label}
+                    {safeLabel}
                 </span>
             );
     }

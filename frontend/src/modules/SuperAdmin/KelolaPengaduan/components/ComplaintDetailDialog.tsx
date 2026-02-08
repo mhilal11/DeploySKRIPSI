@@ -55,7 +55,7 @@ export default function ComplaintDetailDialog({
             form.clearErrors();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [complaint?.id]);
+    }, [complaint?.id, complaint?.status, complaint?.priority, complaint?.resolutionNotes]);
 
     const handleSubmit = () => {
         if (!complaint) {
@@ -82,14 +82,20 @@ export default function ComplaintDetailDialog({
 
     const statusValue = form.data.status || complaint?.status || '';
     const priorityValue = form.data.priority || complaint?.priority || '';
+    const statusOptionLabel = statusOptions.find(
+        (option) => option.value === statusValue,
+    )?.label;
+    const priorityOptionLabel = priorityOptions.find(
+        (option) => option.value === priorityValue,
+    )?.label;
     const statusLabel =
-        statusOptions.find((option) => option.value === statusValue)?.label ??
-        complaint?.statusLabel ??
-        '-';
+        statusOptionLabel ||
+        complaint?.statusLabel?.trim() ||
+        statusFallbackLabel(statusValue);
     const priorityLabel =
-        priorityOptions.find((option) => option.value === priorityValue)?.label ??
-        complaint?.priorityLabel ??
-        '-';
+        priorityOptionLabel ||
+        complaint?.priorityLabel?.trim() ||
+        priorityFallbackLabel(priorityValue);
     const handlerName = complaint?.handler?.trim()?.length
         ? complaint.handler
         : 'Belum ditugaskan';
@@ -417,6 +423,34 @@ function priorityBadgeClasses(priority: string) {
             return 'border-blue-200 bg-blue-50 text-blue-700';
         default:
             return 'border-slate-200 bg-slate-50 text-slate-700';
+    }
+}
+
+function statusFallbackLabel(status: string) {
+    switch (status) {
+        case 'new':
+            return 'Baru';
+        case 'in_progress':
+            return 'OnProgress';
+        case 'resolved':
+            return 'Selesai';
+        case 'archived':
+            return 'Diarsipkan';
+        default:
+            return '-';
+    }
+}
+
+function priorityFallbackLabel(priority: string) {
+    switch (priority) {
+        case 'high':
+            return 'Tinggi';
+        case 'medium':
+            return 'Sedang';
+        case 'low':
+            return 'Rendah';
+        default:
+            return '-';
     }
 }
 
