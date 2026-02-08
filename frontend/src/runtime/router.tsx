@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 
+import StaffShell from '@/modules/Staff/components/StaffShell';
 import SuperAdminShell from '@/modules/SuperAdmin/components/SuperAdminShell';
 import {
   ROUTES,
@@ -306,6 +307,7 @@ export default function AppRoutes() {
   }
 
   const isSuperAdminRoute = matchedRoute.route.name.startsWith('super-admin.');
+  const isStaffRoute = matchedRoute.route.name.startsWith('staff.');
 
   const pageRoute = (
     <PageRoute
@@ -321,6 +323,9 @@ export default function AppRoutes() {
     return <SuperAdminShell>{pageRoute}</SuperAdminShell>;
   }
 
+  if (isStaffRoute) {
+    return <StaffShell>{pageRoute}</StaffShell>;
+  }
+
   return pageRoute;
 }
-

@@ -1,6 +1,7 @@
 ﻿import { FileText, LayoutDashboard, MessageSquare } from "lucide-react";
 
 import { Link, router, usePage } from "@/shared/lib/inertia";
+import { route } from "@/shared/lib/route";
 import type { PageProps } from "@/shared/types";
 
 import type { ComponentType, SVGProps } from "react";

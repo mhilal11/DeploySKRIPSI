@@ -39,6 +39,13 @@ interface DashboardPageProps extends Record<string, unknown> {
     };
 }
 
+const EMPTY_STATS: DashboardStats[] = [];
+const EMPTY_COMPLAINTS: ComplaintRecord[] = [];
+const EMPTY_TERMINATION: DashboardPageProps['termination'] = {
+    active: null,
+    history: [],
+};
+
 const iconMap: Record<DashboardStats['icon'], JSX.Element> = {
     alert: <AlertCircle className="h-4 w-4 text-blue-900" />,
     message: <MessageSquare className="h-4 w-4 text-blue-900" />,
@@ -47,9 +54,10 @@ const iconMap: Record<DashboardStats['icon'], JSX.Element> = {
 };
 
 export default function StaffDashboard() {
-    const {
-        props: { stats, recentComplaints, termination },
-    } = usePage<PageProps<DashboardPageProps>>();
+    const { props } = usePage<PageProps<Partial<DashboardPageProps>>>();
+    const stats = props.stats ?? EMPTY_STATS;
+    const recentComplaints = props.recentComplaints ?? EMPTY_COMPLAINTS;
+    const termination = props.termination ?? EMPTY_TERMINATION;
 
     // Sembunyikan statistik regulasi/dokumen
     const filteredStats = stats.filter(

@@ -20,6 +20,7 @@ import {
     DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
 import { Link, router, usePage } from '@/shared/lib/inertia';
+import { route } from '@/shared/lib/route';
 import { PageProps } from '@/shared/types';
 
 interface NavbarProps {

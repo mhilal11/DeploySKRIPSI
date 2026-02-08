@@ -29,9 +29,34 @@ import type {
 } from "../Staff/types";
 
 export default function StaffResignation() {
-    const {
-        props: { profile, activeRequest, history },
-    } = usePage<PageProps<ResignationPageProps>>();
+    const { props } = usePage<PageProps<Partial<ResignationPageProps>>>();
+    const profile: ProfileInfo = {
+        name: props.profile?.name ?? "",
+        employeeCode: props.profile?.employeeCode ?? null,
+        division: props.profile?.division ?? null,
+        position: props.profile?.position ?? null,
+        joinedAt: props.profile?.joinedAt ?? null,
+    };
+    const activeRequest: TerminationRecord | null = props.activeRequest
+        ? {
+            reference: props.activeRequest.reference ?? "-",
+            status: props.activeRequest.status ?? "Menunggu",
+            requestDate: props.activeRequest.requestDate ?? "-",
+            effectiveDate: props.activeRequest.effectiveDate ?? "-",
+            progress: props.activeRequest.progress ?? 0,
+            notes: props.activeRequest.notes ?? null,
+        }
+        : null;
+    const history: TerminationRecord[] = Array.isArray(props.history)
+        ? props.history.map((item) => ({
+            reference: item.reference ?? "-",
+            status: item.status ?? "Menunggu",
+            requestDate: item.requestDate ?? "-",
+            effectiveDate: item.effectiveDate ?? "-",
+            progress: item.progress ?? 0,
+            notes: item.notes ?? null,
+        }))
+        : [];
 
     const form = useForm({
         effective_date: "",

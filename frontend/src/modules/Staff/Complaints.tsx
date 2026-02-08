@@ -14,10 +14,17 @@ import ComplaintTable from "./Complaints/components/ComplaintTable";
 
 import type { ComplaintRecord, ComplaintsPageProps } from "./Complaints/types";
 
+const EMPTY_COMPLAINTS: ComplaintRecord[] = [];
+const EMPTY_FILTERS: ComplaintsPageProps["filters"] = {
+    categories: [],
+    statuses: [],
+    priorities: [],
+};
+
 export default function StaffComplaints() {
-    const {
-        props: { complaints, filters },
-    } = usePage<PageProps<ComplaintsPageProps>>();
+    const { props } = usePage<PageProps<Partial<ComplaintsPageProps>>>();
+    const complaints = props.complaints ?? EMPTY_COMPLAINTS;
+    const filters = props.filters ?? EMPTY_FILTERS;
 
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
