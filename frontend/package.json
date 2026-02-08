@@ -3,7 +3,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "next dev --turbopack -p 5173",
+        "dev": "node --disable-warning=DEP0060 ./node_modules/next/dist/bin/next dev --turbopack -p 5173",
         "build": "next build --turbopack",
         "start": "next start",
         "lint": "eslint . --ext .js,.jsx,.ts,.tsx"
