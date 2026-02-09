@@ -61,13 +61,13 @@ type DivisionSummary = {
 };
 
 type ApplicationsPageProps = PageProps<{
-    applications: ApplicationHistoryItem[];
-    defaultForm: {
+    applications?: ApplicationHistoryItem[] | null;
+    defaultForm?: {
         full_name: string;
         email: string;
         phone: string;
-    };
-    divisions: DivisionSummary[];
+    } | null;
+    divisions?: DivisionSummary[] | null;
     flash?: {
         success?: string;
         error?: string;
@@ -80,8 +80,11 @@ export default function Applications({
     divisions,
     flash,
 }: ApplicationsPageProps) {
+    const safeDivisions = divisions ?? [];
+    const safeApplications = applications ?? [];
+
     const firstOpenDivision =
-        divisions.find(
+        safeDivisions.find(
             (division) => division.is_hiring && division.available_slots > 0,
         ) ?? null;
 
@@ -97,9 +100,9 @@ export default function Applications({
 
     const form = useForm<ApplicationFormData>({
         division_id: formDivision?.id ?? null,
-        full_name: defaultForm.full_name ?? '',
-        email: defaultForm.email ?? '',
-        phone: defaultForm.phone ?? '',
+        full_name: defaultForm?.full_name ?? '',
+        email: defaultForm?.email ?? '',
+        phone: defaultForm?.phone ?? '',
         position: formDivision?.job_title ?? '',
         skills: '',
         cv: null,
@@ -130,7 +133,7 @@ export default function Applications({
             forceFormData: true,
             onSuccess: () => {
                 const currentDivision = formDivision;
-                const fallbackDivision = divisions.find(
+                const fallbackDivision = safeDivisions.find(
                     (division) =>
                         division.is_hiring &&
                         division.available_slots > 0 &&
@@ -202,7 +205,7 @@ export default function Applications({
         }));
     };
 
-    const openDivisions = divisions.filter(
+    const openDivisions = safeDivisions.filter(
         (division) => division.is_hiring && division.available_slots > 0,
     );
     const availableSlots = openDivisions.reduce(
@@ -222,7 +225,7 @@ export default function Applications({
                     <StatCard
                         icon={Building2}
                         title="Total Divisi"
-                        value={divisions.length}
+                        value={safeDivisions.length}
                         accent="bg-blue-100 text-blue-900"
                     />
                     <StatCard
@@ -250,8 +253,8 @@ export default function Applications({
                         </p>
                     </div>
                     <div className="grid gap-4 p-6 md:grid-cols-2">
-                        {divisions.map((division) => {
-                            const isApplied = applications.some(
+                        {safeDivisions.map((division) => {
+                            const isApplied = safeApplications.some(
                                 (app) =>
                                     app.division === division.name &&
                                     app.position === division.job_title,
@@ -267,7 +270,7 @@ export default function Applications({
                             );
                         })}
                     </div>
-                    {divisions.length === 0 && (
+                    {safeDivisions.length === 0 && (
                         <div className="p-6 text-center text-sm text-slate-500">
                             Belum ada konfigurasi divisi.
                         </div>
@@ -363,7 +366,7 @@ export default function Applications({
                     </DialogContent>
                 </Dialog>
 
-                <ApplicationHistory items={applications} />
+                <ApplicationHistory items={safeApplications} />
 
                 {/* Eligibility Reject Dialog */}
                 <EligibilityRejectDialog

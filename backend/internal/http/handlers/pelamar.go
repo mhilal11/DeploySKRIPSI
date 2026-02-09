@@ -292,7 +292,19 @@ func PelamarProfileUpdate(c *gin.Context) {
 	if section == "education" || section == "all" {
 		educationsJSON := c.PostForm("educations")
 		if educationsJSON != "" {
-			profile.Educations = models.JSON([]byte(educationsJSON))
+			var educations []map[string]any
+			if err := json.Unmarshal([]byte(educationsJSON), &educations); err != nil {
+				ValidationErrors(c, FieldErrors{"educations": "Format data pendidikan tidak valid."})
+				return
+			}
+
+			if errs := validateEducationYears(educations); len(errs) > 0 {
+				ValidationErrors(c, errs)
+				return
+			}
+
+			normalized, _ := json.Marshal(educations)
+			profile.Educations = models.JSON(normalized)
 		}
 	}
 
@@ -696,6 +708,37 @@ func syncCompletion(profile *models.ApplicantProfile) {
 	} else {
 		profile.CompletedAt = nil
 	}
+}
+
+func validateEducationYears(educations []map[string]any) FieldErrors {
+	errs := FieldErrors{}
+	currentYear := time.Now().Year()
+	minYear := 1900
+
+	for i, education := range educations {
+		startYear, hasStartYear := toInt(education["start_year"])
+		endYear, hasEndYear := toInt(education["end_year"])
+		startYearField := "educations." + strconv.Itoa(i) + ".start_year"
+		endYearField := "educations." + strconv.Itoa(i) + ".end_year"
+
+		if hasStartYear && (startYear < minYear || startYear > currentYear) {
+			errs[startYearField] = "Tahun mulai harus antara 1900 dan tahun sekarang."
+		}
+
+		if hasEndYear && endYear < minYear {
+			errs[endYearField] = "Tahun selesai minimal 1900."
+		}
+
+		if hasStartYear && hasEndYear && endYear < startYear {
+			errs[endYearField] = "Tahun selesai tidak boleh lebih kecil dari tahun mulai."
+		}
+
+		if hasStartYear && hasEndYear && endYear > startYear+7 {
+			errs[endYearField] = "Tahun selesai maksimal 7 tahun dari tahun mulai."
+		}
+	}
+
+	return errs
 }
 
 func stageDate(app models.Application, stage string) *time.Time {

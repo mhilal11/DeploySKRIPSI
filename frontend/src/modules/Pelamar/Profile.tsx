@@ -1,5 +1,5 @@
 ﻿import { Edit, X, Lock, AlertTriangle, CheckCircle, Info } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import PelamarLayout from '@/modules/Pelamar/Layout';
 import {
@@ -27,7 +27,7 @@ import EducationForm from './Profile/components/EducationForm';
 import ExperienceForm from './Profile/components/ExperienceForm';
 import PersonalForm from './Profile/components/PersonalForm';
 import ProfileHeader from './Profile/components/ProfileHeader';
-import { ApplicantProfilePayload, SectionKey } from './Profile/profileTypes';
+import { ApplicantProfilePayload, Education, SectionKey } from './Profile/profileTypes';
 import { useProfileForm } from './Profile/useProfileForm';
 
 
@@ -76,6 +76,11 @@ export default function Profile({
     const [isEditing, setIsEditing] = useState(false);
     const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
     const [pendingSaveSection, setPendingSaveSection] = useState<SectionKey | null>(null);
+    const editSnapshotRef = useRef<{
+        personal: typeof form.data.personal;
+        educations: Education[];
+    } | null>(null);
+    const prevWasSuccessfulRef = useRef(false);
 
     // Profile is locked only during active application process
     const isProfileLocked = hasActiveApplication;
@@ -83,6 +88,16 @@ export default function Profile({
     useEffect(() => {
         setReminderOpen(Boolean(profileReminderMessage));
     }, [profileReminderMessage]);
+
+    useEffect(() => {
+        if (isEditing && form.wasSuccessful && !prevWasSuccessfulRef.current) {
+            editSnapshotRef.current = {
+                personal: { ...form.data.personal },
+                educations: form.data.educations.map((item) => ({ ...item })),
+            };
+        }
+        prevWasSuccessfulRef.current = form.wasSuccessful;
+    }, [form.wasSuccessful, form.data.personal, form.data.educations, isEditing]);
     const flatErrors = form.errors as Record<string, string>;
 
     // Check section completion status
@@ -129,6 +144,27 @@ export default function Profile({
         }
         setConfirmSaveOpen(false);
         setPendingSaveSection(null);
+    };
+
+    const handleToggleEdit = () => {
+        if (isEditing) {
+            if (editSnapshotRef.current) {
+                form.setData((prevData) => ({
+                    ...prevData,
+                    personal: { ...editSnapshotRef.current!.personal },
+                    educations: editSnapshotRef.current!.educations.map((item) => ({ ...item })),
+                }));
+            }
+            form.clearErrors();
+            setIsEditing(false);
+            return;
+        }
+
+        editSnapshotRef.current = {
+            personal: { ...form.data.personal },
+            educations: form.data.educations.map((item) => ({ ...item })),
+        };
+        setIsEditing(true);
     };
 
     return (
@@ -188,7 +224,7 @@ export default function Profile({
                         </Button>
                     ) : (
                         <Button
-                            onClick={() => setIsEditing(!isEditing)}
+                            onClick={handleToggleEdit}
                             variant={isEditing ? "destructive" : "default"}
                             className={isEditing ? "" : "bg-blue-900 hover:bg-blue-800"}
                         >
@@ -205,6 +241,18 @@ export default function Profile({
                             )}
                         </Button>
                     )}
+                </div>
+
+                <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <div className="flex items-start gap-3">
+                        <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-700" />
+                        <div>
+                            <p className="font-medium text-blue-900">Petunjuk Kelengkapan Profil</p>
+                            <p className="text-sm text-blue-800">
+                                Data Pribadi dan Pendidikan wajib diisi. Pengalaman Kerja dan Sertifikasi bersifat opsional.
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 <Tabs defaultValue="personal" className="space-y-6">
@@ -292,7 +340,7 @@ export default function Profile({
                         <AlertDialogTitle>Profil belum lengkap</AlertDialogTitle>
                         <AlertDialogDescription>
                             {profileReminderMessage ??
-                                'Lengkapi data pribadi dan pendidikan untuk melanjutkan proses lamaran.'}
+                                'Lengkapi Data Pribadi dan Pendidikan (wajib). Data Pengalaman dan Sertifikasi bersifat opsional.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

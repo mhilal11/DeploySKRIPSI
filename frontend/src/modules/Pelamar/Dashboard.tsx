@@ -217,17 +217,19 @@ export default function Dashboard({
                             <AlertDialogTitle className="text-center text-xl">
                                 Selamat Datang! ??
                             </AlertDialogTitle>
-                            <AlertDialogDescription className="text-center text-gray-600">
-                                Sebelum mengajukan lamaran pekerjaan, lengkapi profil Anda terlebih dahulu.
-                                <br /><br />
-                                <span className="font-medium text-gray-700">
-                                    Data yang perlu dilengkapi:
-                                </span>
-                                <ul className="mt-2 text-left text-sm space-y-1">
-                                    <li> Data Pribadi (nama, kontak, alamat)</li>
-                                    <li> Pendidikan (minimal 1 data pendidikan)</li>
-                                    <li> Pengalaman Kerja (opsional)</li>
-                                </ul>
+                            <AlertDialogDescription asChild className="text-center text-gray-600">
+                                <div>
+                                    Sebelum mengajukan lamaran pekerjaan, lengkapi profil Anda terlebih dahulu.
+                                    <br /><br />
+                                    <span className="font-medium text-gray-700">
+                                        Data yang perlu dilengkapi:
+                                    </span>
+                                    <ul className="mt-2 text-left text-sm space-y-1">
+                                        <li> Data Pribadi (nama, kontak, alamat)</li>
+                                        <li> Pendidikan (minimal 1 data pendidikan)</li>
+                                        <li> Pengalaman Kerja (opsional)</li>
+                                    </ul>
+                                </div>
                             </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
