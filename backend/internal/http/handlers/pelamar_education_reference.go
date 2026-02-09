@@ -72,6 +72,19 @@ func PelamarEducationReferences(c *gin.Context) {
 		return
 	}
 
+	respondEducationReferences(c)
+}
+
+func SuperAdminEducationReferences(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+		JSONError(c, 403, "Forbidden")
+		return
+	}
+	respondEducationReferences(c)
+}
+
+func respondEducationReferences(c *gin.Context) {
 	cfg := middleware.GetConfig(c)
 	reference := loadEducationReference(cfg.EducationReferencePath)
 

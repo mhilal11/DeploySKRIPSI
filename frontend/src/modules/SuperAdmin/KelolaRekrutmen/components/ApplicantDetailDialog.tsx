@@ -11,6 +11,7 @@ import {
     DialogTitle,
     DialogFooter,
 } from '@/shared/components/ui/dialog';
+import { apiUrl, resolveAssetUrl } from '@/shared/lib/api';
 
 import { ApplicantRecord, formatApplicationId } from '../types';
 
@@ -37,16 +38,20 @@ export default function ApplicantDetailDialog({
 }: ApplicantDetailDialogProps) {
     
     if (!applicant) return null;
+    const cvUrl =
+        applicant.cv_file || applicant.cv_url
+            ? resolveAssetUrl(apiUrl(`/super-admin/recruitment/${applicant.id}/cv`))
+            : null;
 
     // FUNGSI: Melihat dokumen CV
     const handleViewDocument = () => {
-        if (!applicant.cv_url) {
+        if (!cvUrl) {
             alert('Dokumen CV belum tersedia.');
             return;
         }
 
         // Buka dokumen CV di tab baru
-        window.open(applicant.cv_url, '_blank');
+        window.open(cvUrl, '_blank');
     };
 
     return (

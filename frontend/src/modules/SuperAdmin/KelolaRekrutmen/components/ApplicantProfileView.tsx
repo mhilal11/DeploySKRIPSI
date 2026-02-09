@@ -2,7 +2,6 @@
   User,
   Mail,
   Phone,
-  MapPin,
   Calendar,
   Briefcase,
   GraduationCap,
@@ -10,17 +9,17 @@
   FileText,
   Download,
   CheckCircle,
-  XCircle,
-  Building2,
   Clock,
+  Sparkles,
+  ShieldAlert,
 } from 'lucide-react';
 import { useState } from 'react';
 
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
-import { Separator } from '@/shared/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { apiUrl, resolveAssetUrl } from '@/shared/lib/api';
 
 import { ApplicantRecord } from '../types';
 import AcceptanceModal from './AcceptanceModal';
@@ -60,6 +59,27 @@ export function ApplicantProfileView({
   const profileBirthDate = applicant.profile_date_of_birth;
   const isHired = applicant.status === 'Hired';
   const isRejected = applicant.status === 'Rejected';
+  const scoring = applicant.recruitment_score;
+  const cvUrl =
+    applicant.cv_file || applicant.cv_url
+      ? resolveAssetUrl(apiUrl(`/super-admin/recruitment/${applicant.id}/cv`))
+      : null;
+  const profilePhotoUrl = resolveAssetUrl(applicant.profile_photo_url ?? null);
+  const scoreValue = scoring?.total;
+  const rankingLabel =
+    scoring?.rank && scoring?.total_candidates
+      ? `#${scoring.rank} dari ${scoring.total_candidates}`
+      : null;
+  const scoreBadgeClassName =
+    typeof scoreValue !== 'number'
+      ? 'border-slate-300 text-slate-600'
+      : scoreValue >= 85
+        ? 'border-emerald-500 text-emerald-700'
+        : scoreValue >= 70
+          ? 'border-blue-500 text-blue-700'
+          : scoreValue >= 55
+            ? 'border-amber-500 text-amber-700'
+            : 'border-rose-500 text-rose-700';
   const hasInterviewSchedule =
     applicant.has_interview_schedule ||
     applicant.status === 'Interview' ||
@@ -117,9 +137,9 @@ export function ApplicantProfileView({
             {/* Avatar */}
             <div className="relative">
               <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center border-4 border-white shadow-xl overflow-hidden">
-                {applicant.profile_photo_url ? (
+                {profilePhotoUrl ? (
                   <img
-                    src={applicant.profile_photo_url}
+                    src={profilePhotoUrl}
                     alt={applicant.name}
                     className="w-full h-full object-cover"
                   />
@@ -146,6 +166,16 @@ export function ApplicantProfileView({
                     <Badge variant="outline" className="border-gray-400 text-gray-700">
                       {applicant.position}
                     </Badge>
+                    {typeof scoreValue === 'number' && (
+                      <Badge variant="outline" className={scoreBadgeClassName}>
+                        Skor {scoreValue.toFixed(1)}
+                      </Badge>
+                    )}
+                    {rankingLabel && (
+                      <Badge variant="outline" className="border-indigo-400 text-indigo-700">
+                        Rank {rankingLabel}
+                      </Badge>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap gap-4 text-sm text-gray-600">
@@ -175,11 +205,11 @@ export function ApplicantProfileView({
 
       {/* Modern Action Buttons */}
       <div className="flex flex-wrap items-center gap-3">
-        {applicant.cv_url && (
+        {cvUrl && (
           <Button
             variant="outline"
             className="shadow-sm hover:shadow-md transition-all hover:bg-gray-50"
-            onClick={() => applicant.cv_url && window.open(applicant.cv_url, '_blank')}
+            onClick={() => cvUrl && window.open(cvUrl, '_blank')}
           >
             <FileText className="w-4 h-4 mr-2" />
             Lihat CV
@@ -230,7 +260,7 @@ export function ApplicantProfileView({
 
       {/* Modern Tabbed Content */}
       <Tabs defaultValue="personal" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 h-auto bg-gray-100 p-1 rounded-xl">
+        <TabsList className="grid w-full grid-cols-5 h-auto bg-gray-100 p-1 rounded-xl">
           <TabsTrigger value="personal" className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-lg py-3 px-2 sm:px-4">
             <User className="w-4 h-4 mr-0 sm:mr-2" />
             <span className="hidden sm:inline">Data Pribadi</span>
@@ -250,6 +280,11 @@ export function ApplicantProfileView({
             <Award className="w-4 h-4 mr-0 sm:mr-2" />
             <span className="hidden sm:inline">Sertifikasi</span>
             <span className="sm:hidden">Cert</span>
+          </TabsTrigger>
+          <TabsTrigger value="scoring" className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-lg py-3 px-2 sm:px-4">
+            <Sparkles className="w-4 h-4 mr-0 sm:mr-2" />
+            <span className="hidden sm:inline">Skoring</span>
+            <span className="sm:hidden">Skor</span>
           </TabsTrigger>
         </TabsList>
 
@@ -489,8 +524,15 @@ export function ApplicantProfileView({
                               ID Kredensial: {certification.credential_id}
                             </p>
                           )}
-                          {certification.file_url && (
+                          {(resolveAssetUrl(certification.file_url ?? certification.file_path ?? null)) && (
                             <div className="mt-3 flex items-center gap-2">
+                              {(() => {
+                                const certificationUrl = resolveAssetUrl(certification.file_url ?? certification.file_path ?? null);
+                                if (!certificationUrl) {
+                                  return null;
+                                }
+                                return (
+                                  <>
                               <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
                                 <FileText className="w-3.5 h-3.5" />
                                 <span className="max-w-[150px] truncate">
@@ -498,7 +540,7 @@ export function ApplicantProfileView({
                                 </span>
                               </div>
                               <a
-                                href={certification.file_url}
+                                href={certificationUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors"
@@ -507,13 +549,16 @@ export function ApplicantProfileView({
                                 Lihat
                               </a>
                               <a
-                                href={certification.file_url}
+                                href={certificationUrl}
                                 download
                                 className="inline-flex items-center gap-1 text-xs font-medium text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 px-2 py-1 rounded transition-colors"
                               >
                                 <Download className="w-3.5 h-3.5" />
                                 Download
                               </a>
+                                  </>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>
@@ -526,6 +571,129 @@ export function ApplicantProfileView({
                   <Award className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                   <p className="text-gray-500 text-sm">Pelamar belum menambahkan data sertifikasi</p>
                 </div>
+              )}
+            </div>
+          </Card>
+        </TabsContent>
+
+        {/* Explainable Scoring Tab */}
+        <TabsContent value="scoring">
+          <Card className="border-0 shadow-md">
+            <div className="p-6 space-y-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-blue-900">Explainable Recruitment Scoring</h3>
+                  <p className="text-sm text-slate-600">
+                    Hasil penilaian kandidat per lowongan berdasarkan bobot multi-kriteria.
+                  </p>
+                </div>
+                {scoring && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={`${scoreBadgeClassName} px-3 py-1`}>
+                      Total {scoring.total.toFixed(1)}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={
+                        scoring.eligible
+                          ? 'border-emerald-500 text-emerald-700'
+                          : 'border-rose-500 text-rose-700'
+                      }
+                    >
+                      {scoring.eligible ? 'Eligible' : 'Tidak Eligible'}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+
+              {!scoring ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  Skor belum tersedia untuk kandidat ini.
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Metode</p>
+                      <p className="text-sm font-medium text-slate-900 mt-1">{scoring.method}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Rekomendasi</p>
+                      <p className="text-sm font-medium text-slate-900 mt-1">{scoring.recommendation}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Posisi Ranking</p>
+                      <p className="text-sm font-medium text-slate-900 mt-1">
+                        {scoring.rank > 0 && scoring.total_candidates > 0
+                          ? `#${scoring.rank} dari ${scoring.total_candidates}`
+                          : '-'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {scoring.breakdown.map((item) => (
+                      <div key={item.key} className="rounded-xl border border-slate-200 p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">{item.detail}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold text-slate-900">{item.score.toFixed(1)}/100</p>
+                            <p className="text-xs text-slate-500">
+                              Bobot {item.weight.toFixed(1)}% | Kontribusi {item.contribution.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 h-2 rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-600"
+                            style={{ width: `${Math.max(0, Math.min(100, item.score))}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                        <p className="text-sm font-semibold text-emerald-900">Kekuatan Kandidat</p>
+                      </div>
+                      {scoring.highlights.length === 0 ? (
+                        <p className="text-xs text-emerald-800">Belum ada highlight tambahan.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {scoring.highlights.map((item, index) => (
+                            <p key={`highlight-${index}`} className="text-xs text-emerald-900">
+                              {item}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <ShieldAlert className="h-4 w-4 text-amber-600" />
+                        <p className="text-sm font-semibold text-amber-900">Risiko & Catatan</p>
+                      </div>
+                      {scoring.risks.length === 0 ? (
+                        <p className="text-xs text-amber-800">Tidak ada risiko signifikan terdeteksi.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {scoring.risks.map((item, index) => (
+                            <p key={`risk-${index}`} className="text-xs text-amber-900">
+                              {item}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </Card>

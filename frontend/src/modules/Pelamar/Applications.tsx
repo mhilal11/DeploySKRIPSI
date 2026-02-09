@@ -42,6 +42,7 @@ type EligibilityCriteria = {
     max_age?: number | null;
     gender?: string | null;
     min_education?: string | null;
+    program_studies?: string[] | null;
     min_experience_years?: number | null;
 };
 

@@ -112,6 +112,36 @@ const statusBadge = (status: ApplicantStatus) => {
     }
 };
 
+const formatScore = (score?: number | null) => {
+    if (typeof score !== 'number' || Number.isNaN(score)) return '-';
+    return score.toFixed(1);
+};
+
+const scoreBadgeClass = (score?: number | null) => {
+    if (typeof score !== 'number') {
+        return 'border-slate-300 bg-slate-50 text-slate-500';
+    }
+    if (score >= 85) {
+        return 'border-emerald-500 bg-emerald-50 text-emerald-700';
+    }
+    if (score >= 70) {
+        return 'border-blue-500 bg-blue-50 text-blue-700';
+    }
+    if (score >= 55) {
+        return 'border-amber-500 bg-amber-50 text-amber-700';
+    }
+    return 'border-rose-500 bg-rose-50 text-rose-700';
+};
+
+const recommendationBadgeClass = (recommendation?: string | null, eligible?: boolean) => {
+    if (!recommendation) return 'border-slate-300 bg-slate-50 text-slate-600';
+    if (eligible === false) return 'border-rose-500 bg-rose-50 text-rose-700';
+    if (recommendation === 'Prioritas Tinggi') return 'border-emerald-500 bg-emerald-50 text-emerald-700';
+    if (recommendation === 'Direkomendasikan') return 'border-blue-500 bg-blue-50 text-blue-700';
+    if (recommendation === 'Pertimbangkan') return 'border-amber-500 bg-amber-50 text-amber-700';
+    return 'border-slate-400 bg-slate-50 text-slate-700';
+};
+
 export default function ApplicantsTab({
     statusOptions,
     searchTerm,
@@ -292,6 +322,13 @@ export default function ApplicantsTab({
                     ) : (
                         paginatedApplications.map((application) => {
                             const isCurrentlyUpdating = isUpdatingStatus && updatingApplicantId === application.id;
+                            const recruitmentScore = application.recruitment_score;
+                            const totalScore = recruitmentScore?.total;
+                            const rankingLabel =
+                                recruitmentScore?.rank && recruitmentScore?.total_candidates
+                                    ? `${recruitmentScore.rank}/${recruitmentScore.total_candidates}`
+                                    : '-';
+                            const recommendation = recruitmentScore?.recommendation;
                             return (
                                 <div key={application.id} className="rounded-lg border p-3 space-y-2">
                                     <div className="flex items-start justify-between gap-2">
@@ -309,6 +346,25 @@ export default function ApplicantsTab({
                                         <div>
                                             <p className="text-[10px] text-slate-400">Posisi</p>
                                             <p className="text-[11px] text-slate-700 truncate">{application.position}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-slate-400">Skor</p>
+                                            <Badge variant="outline" className={`text-[10px] ${scoreBadgeClass(totalScore)}`}>
+                                                {formatScore(totalScore)}
+                                            </Badge>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-slate-400">Peringkat</p>
+                                            <p className="text-[11px] font-semibold text-slate-700">{rankingLabel}</p>
+                                        </div>
+                                        <div className="col-span-2">
+                                            <p className="text-[10px] text-slate-400">Rekomendasi</p>
+                                            <Badge
+                                                variant="outline"
+                                                className={`text-[10px] ${recommendationBadgeClass(recommendation, recruitmentScore?.eligible)}`}
+                                            >
+                                                {recommendation ?? '-'}
+                                            </Badge>
                                         </div>
                                     </div>
                                     {onViewProfile && (
@@ -340,6 +396,9 @@ export default function ApplicantsTab({
                                 <TableHead>ID Lamaran</TableHead>
                                 <TableHead>Pelamar</TableHead>
                                 <TableHead>Posisi</TableHead>
+                                <TableHead>Skor</TableHead>
+                                <TableHead>Peringkat</TableHead>
+                                <TableHead>Rekomendasi</TableHead>
                                 <TableHead className="w-[90px]">Status</TableHead>
                                 <TableHead className="text-right w-[210px]">Aksi</TableHead>
                             </TableRow>
@@ -349,6 +408,13 @@ export default function ApplicantsTab({
                             {paginatedApplications.map((application, index) => {
                                 const isCurrentlyUpdating =
                                     isUpdatingStatus && updatingApplicantId === application.id;
+                                const recruitmentScore = application.recruitment_score;
+                                const totalScore = recruitmentScore?.total;
+                                const rankingLabel =
+                                    recruitmentScore?.rank && recruitmentScore?.total_candidates
+                                        ? `${recruitmentScore.rank}/${recruitmentScore.total_candidates}`
+                                        : '-';
+                                const recommendation = recruitmentScore?.recommendation;
 
                                 return (
                                     <TableRow key={application.id}>
@@ -367,6 +433,22 @@ export default function ApplicantsTab({
                                             </p>
                                         </TableCell>
                                         <TableCell>{application.position}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className={scoreBadgeClass(totalScore)}>
+                                                {formatScore(totalScore)}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="font-semibold text-slate-700">
+                                            {rankingLabel}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge
+                                                variant="outline"
+                                                className={recommendationBadgeClass(recommendation, recruitmentScore?.eligible)}
+                                            >
+                                                {recommendation ?? '-'}
+                                            </Badge>
+                                        </TableCell>
                                         <TableCell>{statusBadge(application.status)}</TableCell>
                                         <TableCell>
                                             <div className="flex flex-wrap items-center justify-end gap-2">

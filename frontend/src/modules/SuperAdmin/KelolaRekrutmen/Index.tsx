@@ -1,11 +1,16 @@
 ﻿// src/Pages/SuperAdmin/Recruitment/KelolaRekrutmenIndex.tsx
 
-import { Calendar as CalendarIcon, Users, Video, UserCheck } from 'lucide-react';
+import { Calendar as CalendarIcon, Users, Video, UserCheck, FileDown, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
+import { Button } from '@/shared/components/ui/button';
+import { Card } from '@/shared/components/ui/card';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Input } from '@/shared/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
 import { Head, router } from '@/shared/lib/inertia';
 
 import ApplicantProfileDialog from './components/ApplicantProfileDialog';
@@ -21,6 +26,7 @@ import {
     ApplicantRejectHandler,
     InterviewSchedule,
     OnboardingItem,
+    RecruitmentScoringAudit,
     RecruitmentPageProps,
     StatusSummary,
 } from './types';
@@ -123,10 +129,12 @@ export default function KelolaRekrutmenIndex({
     statusOptions,
     interviews,
     onboarding,
+    scoringAudits: initialScoringAudits = [],
 }: RecruitmentPageProps) {
     const [applicationRows, setApplicationRows] = useState(applications);
     const [interviewRows, setInterviewRows] = useState(interviews);
     const [onboardingRows, setOnboardingRows] = useState(onboarding);
+    const [scoringAuditRows, setScoringAuditRows] = useState<RecruitmentScoringAudit[]>(initialScoringAudits);
     const [activeTab, setActiveTab] = useState('applicants');
     const [statusFilter, setStatusFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -142,6 +150,10 @@ export default function KelolaRekrutmenIndex({
 
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [updatingApplicantId, setUpdatingApplicantId] = useState<number | null>(null);
+    const [autoShortlistTopN, setAutoShortlistTopN] = useState(3);
+    const [autoShortlistMinScore, setAutoShortlistMinScore] = useState(70);
+    const [autoShortlistEligibleOnly, setAutoShortlistEligibleOnly] = useState(true);
+    const [isRunningAutoShortlist, setIsRunningAutoShortlist] = useState(false);
 
     useEffect(() => {
         setApplicationRows(applications);
@@ -154,6 +166,10 @@ export default function KelolaRekrutmenIndex({
     useEffect(() => {
         setOnboardingRows(onboarding);
     }, [onboarding]);
+
+    useEffect(() => {
+        setScoringAuditRows(initialScoringAudits);
+    }, [initialScoringAudits]);
 
     useEffect(() => {
         if (!selectedApplicant) {
@@ -460,6 +476,63 @@ export default function KelolaRekrutmenIndex({
         );
     };
 
+    const handleRunAutoShortlist = async () => {
+        if (isRunningAutoShortlist) return;
+
+        const topN = Math.max(1, Math.min(20, Number(autoShortlistTopN) || 1));
+        const minScore = Math.max(0, Math.min(100, Number(autoShortlistMinScore) || 0));
+
+        setIsRunningAutoShortlist(true);
+        try {
+            const response = await api.post(apiUrl('/super-admin/recruitment/auto-shortlist'), {
+                top_n: topN,
+                eligible_only: autoShortlistEligibleOnly,
+                min_score: minScore,
+            });
+            const data = response.data ?? {};
+            const summary = data.summary ?? {};
+
+            toast.success(data.status || 'Auto-shortlist selesai.', {
+                description: `Terpilih ${summary.shortlisted_count ?? 0} kandidat dari ${summary.group_count ?? 0} kelompok lowongan.`,
+            });
+
+            router.reload({
+                preserveScroll: true,
+                onSuccess: (freshData: any) => {
+                    if (freshData?.scoringAudits && Array.isArray(freshData.scoringAudits)) {
+                        setScoringAuditRows(freshData.scoringAudits);
+                    }
+                },
+            });
+        } catch (error) {
+            if (isAxiosError(error)) {
+                const message =
+                    (error.response?.data as any)?.message ||
+                    (error.response?.data as any)?.status ||
+                    'Gagal menjalankan auto-shortlist.';
+                toast.error(message);
+            } else {
+                toast.error('Gagal menjalankan auto-shortlist.');
+            }
+        } finally {
+            setIsRunningAutoShortlist(false);
+        }
+    };
+
+    const handleExportScoreReport = () => {
+        const params = new URLSearchParams();
+        if (statusFilter !== 'all') {
+            params.set('status', statusFilter);
+        }
+        const query = params.toString();
+        const url = query
+            ? apiUrl(`/super-admin/recruitment/export-score-report?${query}`)
+            : apiUrl('/super-admin/recruitment/export-score-report');
+
+        window.open(url, '_blank');
+        toast.success('Laporan skor sedang disiapkan.');
+    };
+
     const isHumanCapitalAdmin =
         auth?.user?.role === 'Admin' &&
         typeof auth?.user?.division === 'string' &&
@@ -519,6 +592,101 @@ export default function KelolaRekrutmenIndex({
                     </TabsList>
 
                     <TabsContent value="applicants">
+                        <div className="mb-4 grid gap-4 xl:grid-cols-[1.6fr_1fr]">
+                            <Card className="p-4 md:p-5 space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-900">Scoring Action Center</p>
+                                        <p className="text-xs text-slate-600">
+                                            Jalankan shortlist otomatis dan export laporan ranking kandidat.
+                                        </p>
+                                    </div>
+                                    <Sparkles className="h-4 w-4 text-indigo-600" />
+                                </div>
+
+                                <div className="grid gap-3 md:grid-cols-4">
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-slate-500">Top N / Lowongan</p>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={20}
+                                            value={autoShortlistTopN}
+                                            onChange={(event) =>
+                                                setAutoShortlistTopN(Number(event.target.value) || 1)
+                                            }
+                                            className="h-9"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-slate-500">Minimum Skor</p>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={autoShortlistMinScore}
+                                            onChange={(event) =>
+                                                setAutoShortlistMinScore(Number(event.target.value) || 0)
+                                            }
+                                            className="h-9"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2 md:col-span-2">
+                                        <Checkbox
+                                            id="shortlist-eligible-only"
+                                            checked={autoShortlistEligibleOnly}
+                                            onCheckedChange={(checked) => setAutoShortlistEligibleOnly(Boolean(checked))}
+                                        />
+                                        <label htmlFor="shortlist-eligible-only" className="text-sm text-slate-700 cursor-pointer">
+                                            Hanya kandidat yang eligible
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        onClick={handleRunAutoShortlist}
+                                        disabled={isRunningAutoShortlist}
+                                        className="bg-indigo-600 hover:bg-indigo-700"
+                                    >
+                                        {isRunningAutoShortlist ? 'Memproses...' : 'Jalankan Auto Shortlist'}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleExportScoreReport}
+                                        className="border-slate-300"
+                                    >
+                                        <FileDown className="h-4 w-4 mr-2" />
+                                        Export Laporan Skor (CSV)
+                                    </Button>
+                                </div>
+                            </Card>
+
+                            <Card className="p-4 md:p-5 space-y-3">
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">Audit Trail Scoring</p>
+                                    <p className="text-xs text-slate-600">Aktivitas terbaru konfigurasi, shortlist, dan export.</p>
+                                </div>
+                                {scoringAuditRows.length === 0 ? (
+                                    <p className="text-xs text-slate-500">Belum ada aktivitas audit scoring.</p>
+                                ) : (
+                                    <div className="space-y-2 max-h-[210px] overflow-y-auto pr-1">
+                                        {scoringAuditRows.slice(0, 8).map((audit) => (
+                                            <div key={audit.id} className="rounded-lg border border-slate-200 p-2.5">
+                                                <p className="text-xs font-semibold text-slate-900">{audit.action_label}</p>
+                                                <p className="text-[11px] text-slate-600">
+                                                    {audit.division_name || '-'} | {audit.position_title || '-'}
+                                                </p>
+                                                <p className="text-[11px] text-slate-500">
+                                                    Oleh {audit.actor_name || 'System'} • {audit.created_at_diff || audit.created_at || '-'}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </Card>
+                        </div>
+
                         <ApplicantsTab
                             statusOptions={statusOptions}
                             searchTerm={searchTerm}

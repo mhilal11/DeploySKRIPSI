@@ -139,6 +139,12 @@ export default function KelolaDivisiIndex({
             job_requirements: data.job_requirements
                 .filter(req => req && req.trim() !== '')
                 .map(req => req.trim()),
+            job_eligibility_criteria: {
+                ...(data.job_eligibility_criteria ?? {}),
+                program_studies: (data.job_eligibility_criteria?.program_studies ?? [])
+                    .filter((item) => item && item.trim() !== '')
+                    .map((item) => item.trim()),
+            },
         }));
 
         jobForm.post(route('super-admin.divisions.open-job', jobDivision.id), {
@@ -239,4 +245,3 @@ export default function KelolaDivisiIndex({
         </SuperAdminLayout>
     );
 }
-

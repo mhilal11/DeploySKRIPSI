@@ -2,7 +2,11 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +47,8 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 	applications := make([]map[string]any, 0, len(apps))
 	interviews := make([]map[string]any, 0)
 	onboarding := make([]map[string]any, 0)
+	scoreByApplicationID := buildRecruitmentScoreIndex(db, apps, profileByUser)
+	scoringAudits := loadRecruitmentScoringAudits(db, 25)
 
 	for _, app := range apps {
 		var profile *models.ApplicantProfile
@@ -85,6 +91,7 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 
 		educationSummary := summarizeEducation(educations)
 		experienceSummary := summarizeExperience(experiences)
+		recruitmentScore, hasRecruitmentScore := scoreByApplicationID[app.ID]
 
 		applications = append(applications, map[string]any{
 			"id":                     app.ID,
@@ -119,7 +126,7 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 			"phone":                  app.Phone,
 			"skills":                 app.Skills,
 			"cv_file":                app.CvFile,
-			"cv_url":                 attachmentURL(c, app.CvFile),
+			"cv_url":                 superAdminRecruitmentCVURL(c, app.ID, app.CvFile),
 			"profile_photo_url": func() any {
 				if profile != nil {
 					return attachmentURL(c, profile.ProfilePhotoPath)
@@ -127,6 +134,12 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 				return nil
 			}(),
 			"rejection_reason": app.RejectionReason,
+			"recruitment_score": func() any {
+				if hasRecruitmentScore {
+					return recruitmentScore
+				}
+				return nil
+			}(),
 		})
 
 		if app.Status == "Interview" {
@@ -185,8 +198,46 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 		"statusOptions":        models.ApplicationStatuses,
 		"interviews":           interviews,
 		"onboarding":           onboarding,
+		"scoringAudits":        scoringAudits,
 		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
 	})
+}
+
+func SuperAdminRecruitmentViewCV(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+		JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	id := c.Param("id")
+	db := middleware.GetDB(c)
+	var app models.Application
+	if err := db.Get(&app, "SELECT * FROM applications WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "Lamaran tidak ditemukan")
+		return
+	}
+	if app.CvFile == nil || strings.TrimSpace(*app.CvFile) == "" {
+		JSONError(c, http.StatusNotFound, "File CV tidak tersedia")
+		return
+	}
+
+	normalized := normalizeAttachmentPath(*app.CvFile)
+	if normalized == "" {
+		JSONError(c, http.StatusNotFound, "Path file CV tidak valid")
+		return
+	}
+
+	storagePath := middleware.GetConfig(c).StoragePath
+	absPath, ok := resolveStorageFilePath(storagePath, normalized)
+	if !ok {
+		JSONError(c, http.StatusNotFound, "File CV tidak ditemukan pada storage")
+		return
+	}
+
+	filename := filepath.Base(filepath.FromSlash(normalized))
+	c.Header("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", filename))
+	c.File(absPath)
 }
 
 func SuperAdminRecruitmentUpdateStatus(c *gin.Context) {
@@ -638,6 +689,71 @@ func isValidApplicationStatus(status string) bool {
 		}
 	}
 	return false
+}
+
+func superAdminRecruitmentCVURL(c *gin.Context, applicationID int64, cvPath *string) *string {
+	if cvPath == nil || strings.TrimSpace(*cvPath) == "" {
+		return nil
+	}
+	cfg := middleware.GetConfig(c)
+	base := strings.TrimRight(cfg.BaseURL, "/")
+	url := fmt.Sprintf("%s/api/super-admin/recruitment/%d/cv", base, applicationID)
+	return &url
+}
+
+func resolveStorageFilePath(storagePath, relativePath string) (string, bool) {
+	cleaned := strings.TrimSpace(strings.ReplaceAll(relativePath, "\\", "/"))
+	if cleaned == "" || strings.HasPrefix(cleaned, "http://") || strings.HasPrefix(cleaned, "https://") {
+		return "", false
+	}
+
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	cleaned = path.Clean("/" + cleaned)
+	cleaned = strings.TrimPrefix(cleaned, "/")
+	if cleaned == "" || strings.HasPrefix(cleaned, "../") {
+		return "", false
+	}
+
+	addRoot := func(roots []string, candidate string) []string {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			return roots
+		}
+		for _, existing := range roots {
+			if strings.EqualFold(existing, candidate) {
+				return roots
+			}
+		}
+		return append(roots, candidate)
+	}
+
+	roots := []string{}
+	roots = addRoot(roots, storagePath)
+
+	if cwd, err := os.Getwd(); err == nil {
+		trimmed := strings.TrimPrefix(storagePath, "./")
+		roots = addRoot(roots, filepath.Join(cwd, storagePath))
+		roots = addRoot(roots, filepath.Join(cwd, trimmed))
+		roots = addRoot(roots, filepath.Join(cwd, "storage"))
+		roots = addRoot(roots, filepath.Join(cwd, "backend", "storage"))
+	}
+
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		trimmed := strings.TrimPrefix(storagePath, "./")
+		roots = addRoot(roots, filepath.Join(exeDir, trimmed))
+		roots = addRoot(roots, filepath.Join(exeDir, "..", "storage"))
+		roots = addRoot(roots, filepath.Join(exeDir, "..", "..", "storage"))
+	}
+
+	for _, root := range roots {
+		candidate := filepath.Clean(filepath.Join(root, filepath.FromSlash(cleaned)))
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate, true
+		}
+	}
+
+	return "", false
 }
 
 // satisfy unused

@@ -415,10 +415,32 @@ func attachmentURL(c *gin.Context, path *string) *string {
 	if path == nil || *path == "" {
 		return nil
 	}
+	normalized := normalizeAttachmentPath(*path)
+	if normalized == "" {
+		return nil
+	}
+	if strings.HasPrefix(normalized, "http://") || strings.HasPrefix(normalized, "https://") {
+		return &normalized
+	}
 	cfg := middleware.GetConfig(c)
-	// Generate full URL using backend base URL
-	url := cfg.BaseURL + "/storage/" + strings.TrimPrefix(*path, "/")
+	base := strings.TrimRight(cfg.BaseURL, "/")
+	url := base + "/storage/" + normalized
 	return &url
+}
+
+func normalizeAttachmentPath(path string) string {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return ""
+	}
+	trimmed = strings.ReplaceAll(trimmed, "\\", "/")
+	trimmed = strings.TrimPrefix(trimmed, "./")
+	trimmed = strings.TrimPrefix(trimmed, "/")
+	if strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://") {
+		return trimmed
+	}
+	trimmed = strings.TrimPrefix(trimmed, "storage/")
+	return strings.TrimPrefix(trimmed, "/")
 }
 
 func firstString(ptr *string, fallback string) string {

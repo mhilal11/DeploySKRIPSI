@@ -39,6 +39,48 @@ export function apiUrl(path: string): string {
   return API_BASE.replace(/\/$/, '') + normalized;
 }
 
+function backendOrigin(): string {
+  const envOrigin = process.env.NEXT_PUBLIC_BACKEND_ORIGIN;
+  if (envOrigin && envOrigin.trim() !== '') {
+    return envOrigin.replace(/\/$/, '');
+  }
+
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:8080`;
+  }
+
+  return 'http://localhost:8080';
+}
+
+export function resolveAssetUrl(path?: string | null): string | null {
+  if (!path) {
+    return null;
+  }
+
+  const raw = path.trim();
+  if (raw === '') {
+    return null;
+  }
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+
+  const normalized = raw.replace(/\\/g, '/').replace(/^\.\//, '');
+  const base = backendOrigin();
+
+  if (normalized.startsWith('/storage/')) {
+    return `${base}${normalized}`;
+  }
+  if (normalized.startsWith('storage/')) {
+    return `${base}/${normalized}`;
+  }
+  if (normalized.startsWith('/')) {
+    return `${base}${normalized}`;
+  }
+
+  return `${base}/storage/${normalized}`;
+}
+
 export async function ensureCsrfToken(): Promise<void> {
   try {
     await api.get(apiUrl('/csrf'));

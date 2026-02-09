@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -39,6 +40,7 @@ func Load() Config {
 	if primaryFrontendURL == "" {
 		primaryFrontendURL = baseURL
 	}
+	storagePath := resolveStoragePath(getenv("STORAGE_PATH", "./storage"))
 	return Config{
 		Env:                     getenv("APP_ENV", "development"),
 		Address:                 getenv("APP_ADDR", ":8080"),
@@ -52,7 +54,7 @@ func Load() Config {
 		DBName:                  getenv("DB_NAME", "hris"),
 		SessionSecret:           getenv("SESSION_SECRET", "change-me"),
 		CSRFSecret:              getenv("CSRF_SECRET", "change-me"),
-		StoragePath:             getenv("STORAGE_PATH", "./storage"),
+		StoragePath:             storagePath,
 		CookieSecure:            getenvBool("COOKIE_SECURE", false),
 		SMTPHost:                getenv("SMTP_HOST", ""),
 		SMTPPort:                getenvInt("SMTP_PORT", 587),
@@ -64,6 +66,36 @@ func Load() Config {
 		GoogleOAuthClientSecret: getenv("GOOGLE_OAUTH_CLIENT_SECRET", ""),
 		GoogleOAuthRedirectURL:  getenv("GOOGLE_OAUTH_REDIRECT_URL", strings.TrimRight(primaryFrontendURL, "/")+"/api/auth/google/register/callback"),
 	}
+}
+
+func resolveStoragePath(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		raw = "./storage"
+	}
+	if filepath.IsAbs(raw) {
+		return raw
+	}
+
+	if info, err := os.Stat(raw); err == nil && info.IsDir() {
+		return raw
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return raw
+	}
+	candidate := filepath.Join(cwd, raw)
+	if info, statErr := os.Stat(candidate); statErr == nil && info.IsDir() {
+		return candidate
+	}
+
+	trimmedRaw := strings.TrimPrefix(raw, "./")
+	backendCandidate := filepath.Join(cwd, "backend", trimmedRaw)
+	if info, statErr := os.Stat(backendCandidate); statErr == nil && info.IsDir() {
+		return backendCandidate
+	}
+
+	return raw
 }
 
 func getenv(key, fallback string) string {

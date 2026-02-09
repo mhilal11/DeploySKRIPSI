@@ -72,21 +72,44 @@ export function DivisionTabs({
         <Tabs value={activeDivisionId} onValueChange={onTabChange}>
             <TabsList className="w-full justify-start overflow-x-auto flex-nowrap bg-transparent p-0 gap-2">
                 {divisions.map((division) => (
+                    (() => {
+                        const isHiringActive = division.is_hiring && Boolean(division.job_title);
+                        const isHiringButFull = isHiringActive && division.available_slots <= 0;
+                        const triggerClass = isHiringButFull
+                            ? 'border-red-200 bg-red-50 text-red-800 hover:bg-red-100 data-[state=active]:bg-red-200 data-[state=active]:text-red-900 data-[state=active]:border-red-300'
+                            : division.is_hiring
+                                ? 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100 data-[state=active]:bg-green-200 data-[state=active]:text-green-900 data-[state=active]:border-green-300'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 data-[state=active]:bg-blue-900 data-[state=active]:text-white data-[state=active]:border-blue-900';
+
+                        return (
                     <TabsTrigger
                         key={division.id}
                         value={division.id.toString()}
-                        className={`rounded-full px-4 py-2 text-sm font-medium border transition-all shadow-sm ${division.is_hiring
-                            ? 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100 data-[state=active]:bg-green-200 data-[state=active]:text-green-900 data-[state=active]:border-green-300'
-                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 data-[state=active]:bg-blue-900 data-[state=active]:text-white data-[state=active]:border-blue-900'
-                            }`}
+                        className={`rounded-full px-4 py-2 text-sm font-medium border transition-all shadow-sm ${triggerClass}`}
                     >
                         <div className="flex items-center gap-2">
                             <Building2 className="h-4 w-4" />
                             <span>{division.name}</span>
                         </div>
                     </TabsTrigger>
+                        );
+                    })()
                 ))}
             </TabsList>
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-green-800">
+                    <span className="h-2 w-2 rounded-full bg-green-600" />
+                    Hijau: Lowongan aktif, slot masih tersedia
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-red-800">
+                    <span className="h-2 w-2 rounded-full bg-red-600" />
+                    Merah: Lowongan aktif, kapasitas penuh
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700">
+                    <span className="h-2 w-2 rounded-full bg-slate-500" />
+                    Putih: Tidak ada lowongan aktif
+                </span>
+            </div>
 
             {divisions.map((division) => (
                 <TabsContent key={division.id} value={division.id.toString()} className="space-y-6 pt-6">
@@ -336,6 +359,19 @@ function DivisionVacancySection({
     onCloseJob: () => void;
 }) {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const criteria: NonNullable<DivisionRecord['job_eligibility_criteria']> =
+        division.job_eligibility_criteria ?? {};
+    const scoringWeights = criteria.scoring_weights;
+    const hasCustomScoring = Boolean(
+        scoringWeights &&
+            (
+                scoringWeights.education != null ||
+                scoringWeights.experience != null ||
+                scoringWeights.skills != null ||
+                scoringWeights.certification != null ||
+                scoringWeights.profile != null
+            ),
+    );
 
     if (division.is_hiring && division.job_title) {
         return (
@@ -356,6 +392,44 @@ function DivisionVacancySection({
                                     ))}
                             </ul>
                         )}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {criteria.min_education && (
+                                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                    Min Edu: {criteria.min_education}
+                                </Badge>
+                            )}
+                            {Array.isArray(criteria.program_studies) &&
+                                criteria.program_studies.filter((item) => item && item.trim() !== '').slice(0, 3).map((program) => (
+                                    <Badge key={program} variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                        Prodi: {program}
+                                    </Badge>
+                                ))}
+                            {Array.isArray(criteria.program_studies) && criteria.program_studies.filter((item) => item && item.trim() !== '').length > 3 && (
+                                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                    +{criteria.program_studies.filter((item) => item && item.trim() !== '').length - 3} prodi lain
+                                </Badge>
+                            )}
+                            {(criteria.min_experience_years ?? 0) > 0 && (
+                                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                    Min Exp: {criteria.min_experience_years} th
+                                </Badge>
+                            )}
+                            {(criteria.min_age ?? 0) > 0 && (
+                                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                    Umur Min: {criteria.min_age}
+                                </Badge>
+                            )}
+                            {(criteria.max_age ?? 0) > 0 && (
+                                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                    Umur Max: {criteria.max_age}
+                                </Badge>
+                            )}
+                            {hasCustomScoring && (
+                                <Badge variant="outline" className="border-indigo-300 bg-white text-indigo-700">
+                                    Custom Scoring Aktif
+                                </Badge>
+                            )}
+                        </div>
                     </div>
                     <div className="flex flex-col gap-2">
                         <TooltipProvider>
@@ -441,4 +515,3 @@ function DivisionVacancySection({
         </div>
     );
 }
-

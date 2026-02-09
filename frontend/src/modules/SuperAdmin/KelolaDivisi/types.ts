@@ -13,7 +13,23 @@ export type EligibilityCriteria = {
     max_age?: number | null;
     gender?: string | null;
     min_education?: string | null;
+    program_studies?: string[] | null;
     min_experience_years?: number | null;
+    scoring_weights?: {
+        education?: number | null;
+        experience?: number | null;
+        skills?: number | null;
+        certification?: number | null;
+        profile?: number | null;
+    } | null;
+    scoring_thresholds?: {
+        priority?: number | null;
+        recommended?: number | null;
+        consider?: number | null;
+    } | null;
+    ineligible_penalty_per_failure?: number | null;
+    extra_penalty_after_failed_criteria?: number | null;
+    extra_penalty_score?: number | null;
 };
 
 export type DivisionRecord = {

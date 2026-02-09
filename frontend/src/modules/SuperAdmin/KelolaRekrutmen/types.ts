@@ -53,6 +53,41 @@ export interface ApplicantRecord {
     cv_url?: string | null;
     profile_photo_url?: string | null;
     rejection_reason?: string | null;
+    recruitment_score?: RecruitmentScore | null;
+}
+
+export interface RecruitmentScoreBreakdown {
+    key: string;
+    label: string;
+    weight: number;
+    score: number;
+    contribution: number;
+    detail: string;
+}
+
+export interface RecruitmentScore {
+    method: string;
+    total: number;
+    rank: number;
+    total_candidates: number;
+    eligible: boolean;
+    recommendation: string;
+    breakdown: RecruitmentScoreBreakdown[];
+    highlights: string[];
+    risks: string[];
+}
+
+export interface RecruitmentScoringAudit {
+    id: number;
+    action: string;
+    action_label: string;
+    actor_user_id?: number | null;
+    actor_name?: string | null;
+    division_name?: string | null;
+    position_title?: string | null;
+    details?: Record<string, unknown> | null;
+    created_at?: string | null;
+    created_at_diff?: string | null;
 }
 
 export interface ApplicantEducation {
@@ -118,6 +153,7 @@ export type RecruitmentPageProps = PageProps<{
     statusOptions: string[];
     interviews: InterviewSchedule[];
     onboarding: OnboardingItem[];
+    scoringAudits?: RecruitmentScoringAudit[];
 }>;
 
 export type StatusSummary = Partial<Record<ApplicantStatus, number>>;

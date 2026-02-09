@@ -8,14 +8,18 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 	rg.GET("/super-admin/notifications", SuperAdminNotifications)
 
 	rg.GET("/super-admin/recruitment", SuperAdminRecruitmentIndex)
+	rg.GET("/super-admin/recruitment/:id/cv", SuperAdminRecruitmentViewCV)
 	rg.PUT("/super-admin/recruitment/:id/update-status", SuperAdminRecruitmentUpdateStatus)
 	rg.POST("/super-admin/recruitment/:id/reject", SuperAdminRecruitmentReject)
 	rg.POST("/super-admin/recruitment/:id/schedule-interview", SuperAdminRecruitmentScheduleInterview)
+	rg.POST("/super-admin/recruitment/auto-shortlist", SuperAdminRecruitmentAutoShortlist)
+	rg.GET("/super-admin/recruitment/export-score-report", SuperAdminRecruitmentExportScoreReport)
 	rg.DELETE("/super-admin/recruitment/:id", SuperAdminRecruitmentDelete)
 	rg.POST("/super-admin/onboarding/:id/update-checklist", SuperAdminOnboardingUpdateChecklist)
 	rg.POST("/super-admin/onboarding/:id/convert-to-staff", SuperAdminOnboardingConvertToStaff)
 
 	rg.GET("/super-admin/kelola-divisi", SuperAdminDivisionsIndex)
+	rg.GET("/super-admin/references/education", SuperAdminEducationReferences)
 	rg.PATCH("/super-admin/kelola-divisi/:id", SuperAdminDivisionsUpdate)
 	rg.POST("/super-admin/kelola-divisi/:id/open-job", SuperAdminDivisionsOpenJob)
 	rg.DELETE("/super-admin/kelola-divisi/:id/open-job", SuperAdminDivisionsCloseJob)

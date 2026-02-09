@@ -667,8 +667,9 @@ func formatCertifications(c *gin.Context, certs []map[string]any) []map[string]a
 	for _, cert := range certs {
 		path, _ := cert["file_path"].(string)
 		if path != "" {
-			url := "/storage/" + strings.TrimPrefix(path, "/")
-			cert["file_url"] = url
+			if fileURL := attachmentURL(c, &path); fileURL != nil {
+				cert["file_url"] = *fileURL
+			}
 			cert["file_name"] = filepathBase(path)
 		}
 		out = append(out, cert)
@@ -677,6 +678,7 @@ func formatCertifications(c *gin.Context, certs []map[string]any) []map[string]a
 }
 
 func filepathBase(path string) string {
+	path = strings.ReplaceAll(path, "\\", "/")
 	parts := strings.Split(path, "/")
 	return parts[len(parts)-1]
 }
