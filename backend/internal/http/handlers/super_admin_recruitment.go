@@ -197,8 +197,24 @@ func SuperAdminRecruitmentUpdateStatus(c *gin.Context) {
 	}
 
 	id := c.Param("id")
-	status := c.PostForm("status")
-	rejection := c.PostForm("rejection_reason")
+	status := strings.TrimSpace(c.PostForm("status"))
+	rejection := strings.TrimSpace(c.PostForm("rejection_reason"))
+
+	if status == "" || rejection == "" {
+		var payload map[string]any
+		if err := c.ShouldBindJSON(&payload); err == nil {
+			if status == "" {
+				if raw, ok := payload["status"].(string); ok {
+					status = strings.TrimSpace(raw)
+				}
+			}
+			if rejection == "" {
+				if raw, ok := payload["rejection_reason"].(string); ok {
+					rejection = strings.TrimSpace(raw)
+				}
+			}
+		}
+	}
 
 	if status == "" {
 		ValidationErrors(c, FieldErrors{"status": "Status wajib diisi."})
@@ -257,7 +273,15 @@ func SuperAdminRecruitmentReject(c *gin.Context) {
 	}
 
 	id := c.Param("id")
-	rejection := c.PostForm("rejection_reason")
+	rejection := strings.TrimSpace(c.PostForm("rejection_reason"))
+	if rejection == "" {
+		var payload map[string]any
+		if err := c.ShouldBindJSON(&payload); err == nil {
+			if raw, ok := payload["rejection_reason"].(string); ok {
+				rejection = strings.TrimSpace(raw)
+			}
+		}
+	}
 	if rejection == "" {
 		ValidationErrors(c, FieldErrors{"rejection_reason": "Alasan penolakan wajib diisi."})
 		return

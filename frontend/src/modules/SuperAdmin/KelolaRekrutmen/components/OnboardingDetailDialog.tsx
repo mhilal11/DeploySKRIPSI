@@ -1,5 +1,6 @@
 ﻿import { CheckCircle, FileText, Package, GraduationCap, User } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -20,12 +21,21 @@ interface OnboardingDetailDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     item: OnboardingItem | null;
+    onSaved?: (
+        applicationId: number,
+        checklist: {
+            contract_signed: boolean;
+            inventory_handover: boolean;
+            training_orientation: boolean;
+        },
+    ) => void;
 }
 
 export default function OnboardingDetailDialog({
     open,
     onOpenChange,
     item,
+    onSaved,
 }: OnboardingDetailDialogProps) {
     const [checklist, setChecklist] = useState({
         contract_signed: false,
@@ -75,11 +85,17 @@ export default function OnboardingDetailDialog({
                 preserveScroll: true,
                 onSuccess: () => {
                     setIsSaving(false);
+                    onSaved?.(item.application_id, checklist);
+                    toast.success('Progress onboarding berhasil disimpan.');
                     onOpenChange(false);
                 },
                 onError: (errors) => {
                     setIsSaving(false);
-                    console.error('Failed to save onboarding checklist:', errors);
+                    toast.error('Gagal menyimpan progress onboarding.', {
+                        description:
+                            Object.values(errors)[0] ??
+                            'Terjadi kesalahan saat menyimpan checklist.',
+                    });
                 },
             }
         );

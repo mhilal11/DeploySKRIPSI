@@ -13,9 +13,22 @@ import OnboardingDetailDialog from './OnboardingDetailDialog';
 
 interface OnboardingTabProps {
     items: OnboardingItem[];
+    onChecklistSaved?: (
+        applicationId: number,
+        checklist: {
+            contract_signed: boolean;
+            inventory_handover: boolean;
+            training_orientation: boolean;
+        },
+    ) => void;
+    onConvertToStaffSuccess?: (applicationId: number) => void;
 }
 
-export default function OnboardingTab({ items }: OnboardingTabProps) {
+export default function OnboardingTab({
+    items,
+    onChecklistSaved,
+    onConvertToStaffSuccess,
+}: OnboardingTabProps) {
     const [detailOpen, setDetailOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<OnboardingItem | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
@@ -35,13 +48,9 @@ export default function OnboardingTab({ items }: OnboardingTabProps) {
     };
 
     const handleConvertToStaff = (applicationId: number) => {
-        // Tidak perlu confirm dialog browser lagi jika ingin UX lebih modern, 
-        // tapi user minta popup berhasil/gagal, jadi confirm tetap oke atau bisa pakai custom dialog.
-        // User request: "ketika klik jadikan staff tambahkan pop up kalau berhasil atau gagal"
-        // Kita pakai toast untuk feedback hasil.
-
         router.post(route('super-admin.onboarding.convert-to-staff', applicationId), {}, {
             onSuccess: () => {
+                onConvertToStaffSuccess?.(applicationId);
                 toast.success('Berhasil menjadikan staff', {
                     description: 'Akun pelamar telah diubah menjadi akun staff.',
                 });
@@ -187,6 +196,7 @@ export default function OnboardingTab({ items }: OnboardingTabProps) {
                 open={detailOpen}
                 onOpenChange={setDetailOpen}
                 item={selectedItem}
+                onSaved={onChecklistSaved}
             />
         </>
     );

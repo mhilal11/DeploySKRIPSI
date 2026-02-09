@@ -56,7 +56,18 @@ interface ScheduleInterviewDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     applicant: ApplicantRecord | null;
-    onSuccessSubmit: (applicantId: number) => void;
+    onSuccessSubmit: (
+        applicantId: number,
+        scheduleData: {
+            date: string;
+            time: string;
+            end_time: string;
+            mode: string;
+            interviewer: string;
+            meeting_link: string;
+            notes: string;
+        },
+    ) => void;
     existingInterviews?: InterviewSchedule[];
 }
 
@@ -239,11 +250,23 @@ export default function ScheduleInterviewDialog({
             route('super-admin.recruitment.schedule-interview', applicant.id),
             {
                 onSuccess: () => {
-                    onSuccessSubmit(applicant.id);
+                    onSuccessSubmit(applicant.id, {
+                        date: data.date,
+                        time: data.time,
+                        end_time: data.end_time,
+                        mode: data.mode,
+                        interviewer: data.interviewer,
+                        meeting_link: data.meeting_link,
+                        notes: data.notes,
+                    });
                     toast.success(isEditing ? 'Jadwal interview diperbarui.' : 'Jadwal interview disimpan.');
                 },
                 onError: (backendErrors) => {
-                    console.error('Validation Errors:', backendErrors);
+                    toast.error('Gagal menyimpan jadwal interview.', {
+                        description:
+                            Object.values(backendErrors)[0] ??
+                            'Periksa kembali data yang diisi.',
+                    });
                 }
             }
         );

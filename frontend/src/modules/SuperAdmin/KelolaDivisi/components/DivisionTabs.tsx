@@ -75,7 +75,10 @@ export function DivisionTabs({
                     <TabsTrigger
                         key={division.id}
                         value={division.id.toString()}
-                        className="rounded-full px-4 py-2 text-sm font-medium border border-slate-200 bg-white text-slate-600 data-[state=active]:bg-blue-900 data-[state=active]:text-white data-[state=active]:border-blue-900 transition-all hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+                        className={`rounded-full px-4 py-2 text-sm font-medium border transition-all shadow-sm ${division.is_hiring
+                            ? 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100 data-[state=active]:bg-green-200 data-[state=active]:text-green-900 data-[state=active]:border-green-300'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 data-[state=active]:bg-blue-900 data-[state=active]:text-white data-[state=active]:border-blue-900'
+                            }`}
                     >
                         <div className="flex items-center gap-2">
                             <Building2 className="h-4 w-4" />
@@ -438,5 +441,4 @@ function DivisionVacancySection({
         </div>
     );
 }
-
 

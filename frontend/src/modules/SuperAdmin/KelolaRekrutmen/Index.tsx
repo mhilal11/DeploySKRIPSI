@@ -1,7 +1,8 @@
 ﻿// src/Pages/SuperAdmin/Recruitment/KelolaRekrutmenIndex.tsx
 
 import { Calendar as CalendarIcon, Users, Video, UserCheck } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
@@ -18,6 +19,8 @@ import {
     ApplicantRecord,
     ApplicantStatus,
     ApplicantRejectHandler,
+    InterviewSchedule,
+    OnboardingItem,
     RecruitmentPageProps,
     StatusSummary,
 } from './types';
@@ -34,6 +37,86 @@ const statusOrder: ApplicantStatus[] = [
     'Rejected',
 ];
 
+const onboardingStepLabels = [
+    'Kontrak ditandatangani',
+    'Serah terima inventaris',
+    'Training & orientasi',
+] as const;
+
+const getFirstErrorMessage = (errors: Record<string, string>) =>
+    Object.values(errors)[0] || 'Terjadi kesalahan. Silakan coba lagi.';
+
+const formatDateLabel = (dateValue?: string | null) => {
+    if (!dateValue) return '-';
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return dateValue;
+    return parsed.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    });
+};
+
+const buildOnboardingSteps = (
+    contractSigned: boolean,
+    inventoryHandover: boolean,
+    trainingOrientation: boolean,
+) => [
+    { label: onboardingStepLabels[0], complete: contractSigned },
+    {
+        label: onboardingStepLabels[1],
+        complete: inventoryHandover,
+        pending: !inventoryHandover && contractSigned,
+    },
+    {
+        label: onboardingStepLabels[2],
+        complete: trainingOrientation,
+        pending: !trainingOrientation && inventoryHandover,
+    },
+];
+
+const buildInterviewRow = (application: ApplicantRecord): InterviewSchedule => {
+    const dateValue = application.interview_date ?? '';
+    return {
+        application_id: application.id,
+        candidate: application.name,
+        position: application.position,
+        date: formatDateLabel(dateValue),
+        date_value: dateValue,
+        time: application.interview_time ?? '-',
+        end_time: application.interview_end_time ?? undefined,
+        mode: (application.interview_mode ?? 'Online') as 'Online' | 'Offline',
+        interviewer: application.interviewer_name ?? '-',
+        meeting_link: application.meeting_link ?? null,
+        interview_notes: application.interview_notes ?? null,
+    };
+};
+
+const buildOnboardingItem = (
+    application: ApplicantRecord,
+    current?: OnboardingItem,
+): OnboardingItem => {
+    const contractSigned = current?.steps[0]?.complete ?? false;
+    const inventoryHandover = current?.steps[1]?.complete ?? false;
+    const trainingOrientation = current?.steps[2]?.complete ?? false;
+    const steps = buildOnboardingSteps(contractSigned, inventoryHandover, trainingOrientation);
+    const allComplete = steps.every((step) => step.complete);
+
+    return {
+        application_id: application.id,
+        name: application.name,
+        position: application.position,
+        startedAt:
+            current?.startedAt ??
+            application.date ??
+            formatDateLabel(application.submitted_date) ??
+            '-',
+        status: allComplete ? 'Selesai' : 'In Progress',
+        is_staff: current?.is_staff ?? false,
+        steps,
+    };
+};
+
 export default function KelolaRekrutmenIndex({
     auth,
     applications,
@@ -41,6 +124,9 @@ export default function KelolaRekrutmenIndex({
     interviews,
     onboarding,
 }: RecruitmentPageProps) {
+    const [applicationRows, setApplicationRows] = useState(applications);
+    const [interviewRows, setInterviewRows] = useState(interviews);
+    const [onboardingRows, setOnboardingRows] = useState(onboarding);
     const [activeTab, setActiveTab] = useState('applicants');
     const [statusFilter, setStatusFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -57,11 +143,35 @@ export default function KelolaRekrutmenIndex({
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [updatingApplicantId, setUpdatingApplicantId] = useState<number | null>(null);
 
+    useEffect(() => {
+        setApplicationRows(applications);
+    }, [applications]);
+
+    useEffect(() => {
+        setInterviewRows(interviews);
+    }, [interviews]);
+
+    useEffect(() => {
+        setOnboardingRows(onboarding);
+    }, [onboarding]);
+
+    useEffect(() => {
+        if (!selectedApplicant) {
+            return;
+        }
+        const refreshedApplicant = applicationRows.find(
+            (application) => application.id === selectedApplicant.id,
+        );
+        if (refreshedApplicant && refreshedApplicant !== selectedApplicant) {
+            setSelectedApplicant(refreshedApplicant);
+        }
+    }, [applicationRows, selectedApplicant]);
+
     // FILTER DATA
     const filteredByStatus =
         statusFilter === 'all'
-            ? applications
-            : applications.filter((application) => application.status === statusFilter);
+            ? applicationRows
+            : applicationRows.filter((application) => application.status === statusFilter);
 
     const filteredByDate = filteredByStatus.filter((application) => {
         const submittedDate = application.submitted_date;
@@ -85,26 +195,114 @@ export default function KelolaRekrutmenIndex({
         )
         : filteredByDate;
 
-    const statusSummary: StatusSummary = applications.reduce((acc, application) => {
+    const statusSummary: StatusSummary = applicationRows.reduce((acc, application) => {
         acc[application.status as ApplicantStatus] =
             (acc[application.status as ApplicantStatus] ?? 0) + 1;
         return acc;
     }, {} as StatusSummary);
 
+    const syncRelatedRows = (application: ApplicantRecord) => {
+        setInterviewRows((prev) => {
+            if (application.status !== 'Interview') {
+                return prev.filter((item) => item.application_id !== application.id);
+            }
+
+            const interviewRow = buildInterviewRow(application);
+            const exists = prev.some((item) => item.application_id === application.id);
+            if (!exists) {
+                return [interviewRow, ...prev];
+            }
+            return prev.map((item) =>
+                item.application_id === application.id ? interviewRow : item,
+            );
+        });
+
+        setOnboardingRows((prev) => {
+            if (application.status !== 'Hired') {
+                return prev.filter((item) => item.application_id !== application.id);
+            }
+
+            const existing = prev.find((item) => item.application_id === application.id);
+            const onboardingItem = buildOnboardingItem(application, existing);
+            if (!existing) {
+                return [onboardingItem, ...prev];
+            }
+            return prev.map((item) =>
+                item.application_id === application.id ? onboardingItem : item,
+            );
+        });
+    };
+
     // -----------------------------------------
     // UPDATE STATUS
     // -----------------------------------------
-    const handleStatusUpdate: ApplicantActionHandler = (applicantId, newStatus) => {
+    const updateStatus = (
+        applicantId: number,
+        newStatus: ApplicantStatus,
+        rejectionReason?: string,
+    ) => {
         if (isUpdatingStatus) return;
+
+        const previousApplicant =
+            applicationRows.find((application) => application.id === applicantId) ?? null;
+        if (!previousApplicant) {
+            toast.error('Pelamar tidak ditemukan.');
+            return;
+        }
+
+        const optimisticApplicant: ApplicantRecord = {
+            ...previousApplicant,
+            status: newStatus,
+            rejection_reason:
+                newStatus === 'Rejected' ? rejectionReason ?? null : null,
+        };
 
         setUpdatingApplicantId(applicantId);
         setIsUpdatingStatus(true);
+        setApplicationRows((prev) =>
+            prev.map((application) =>
+                application.id === applicantId
+                    ? optimisticApplicant
+                    : application,
+            ),
+        );
+        setSelectedApplicant((prev) =>
+            prev && prev.id === applicantId ? optimisticApplicant : prev,
+        );
+        syncRelatedRows(optimisticApplicant);
 
         router.put(
             route('super-admin.recruitment.update-status', applicantId),
-            { status: newStatus },
+            {
+                status: newStatus,
+                rejection_reason: rejectionReason,
+            },
             {
                 preserveScroll: true,
+                onSuccess: () => {
+                    const successTitle =
+                        newStatus === 'Rejected'
+                            ? 'Pelamar berhasil ditolak.'
+                            : 'Status pelamar berhasil diperbarui.';
+                    toast.success(successTitle, {
+                        description: `${optimisticApplicant.name} sekarang berstatus ${newStatus}.`,
+                    });
+                },
+                onError: (errors) => {
+                    setApplicationRows((prev) =>
+                        prev.map((application) =>
+                            application.id === applicantId ? previousApplicant : application,
+                        ),
+                    );
+                    setSelectedApplicant((prev) =>
+                        prev && prev.id === applicantId ? previousApplicant : prev,
+                    );
+                    syncRelatedRows(previousApplicant);
+
+                    toast.error('Gagal memperbarui status.', {
+                        description: getFirstErrorMessage(errors),
+                    });
+                },
                 onFinish: () => {
                     setIsUpdatingStatus(false);
                     setUpdatingApplicantId(null);
@@ -113,16 +311,20 @@ export default function KelolaRekrutmenIndex({
         );
     };
 
+    const handleStatusUpdate: ApplicantActionHandler = (applicantId, newStatus) => {
+        updateStatus(applicantId, newStatus);
+    };
+
     const handleReject: ApplicantRejectHandler = (id, reason) => {
-        router.put(
-            route('super-admin.recruitment.update-status', id),
-            { status: 'Rejected', rejection_reason: reason },
-            { preserveScroll: true }
-        );
+        updateStatus(id, 'Rejected', reason);
     };
 
     const handleViewProfile = (application: ApplicantRecord) => {
-        setSelectedApplicant(application);
+        const optimisticApplicant =
+            application.status === 'Applied'
+                ? { ...application, status: 'Screening' as ApplicantStatus }
+                : application;
+        setSelectedApplicant(optimisticApplicant);
         setProfileOpen(true);
 
         // Auto-screening: if status is 'Applied', update to 'Screening'
@@ -142,8 +344,50 @@ export default function KelolaRekrutmenIndex({
     // -----------------------------------------
     // AFTER SUCCESS SUBMIT SCHEDULE
     // -----------------------------------------
-    const handleScheduleSuccess = (applicantId: number) => {
-        handleStatusUpdate(applicantId, 'Interview');
+    const handleScheduleSuccess = (
+        applicantId: number,
+        scheduleData: {
+            date: string;
+            time: string;
+            end_time: string;
+            mode: string;
+            interviewer: string;
+            meeting_link: string;
+            notes: string;
+        },
+    ) => {
+        let nextApplicant: ApplicantRecord | null = null;
+
+        setApplicationRows((prev) =>
+            prev.map((application) => {
+                if (application.id !== applicantId) {
+                    return application;
+                }
+
+                nextApplicant = {
+                    ...application,
+                    status: 'Interview',
+                    has_interview_schedule: true,
+                    interview_date: scheduleData.date,
+                    interview_time: scheduleData.time,
+                    interview_end_time: scheduleData.end_time,
+                    interview_mode: scheduleData.mode as 'Online' | 'Offline',
+                    interviewer_name: scheduleData.interviewer,
+                    meeting_link: scheduleData.meeting_link || null,
+                    interview_notes: scheduleData.notes,
+                    rejection_reason: null,
+                };
+                return nextApplicant;
+            }),
+        );
+
+        if (nextApplicant) {
+            setSelectedApplicant((prev) =>
+                prev && prev.id === applicantId ? nextApplicant : prev,
+            );
+            syncRelatedRows(nextApplicant);
+        }
+
         setScheduleOpen(false);
         setSelectedApplicant(null);
     };
@@ -174,6 +418,46 @@ export default function KelolaRekrutmenIndex({
 
         setProfileOpen(false);
         setInterviewDetailOpen(true);
+    };
+
+    const handleOnboardingChecklistSaved = (
+        applicationId: number,
+        checklist: {
+            contract_signed: boolean;
+            inventory_handover: boolean;
+            training_orientation: boolean;
+        },
+    ) => {
+        setOnboardingRows((prev) =>
+            prev.map((item) => {
+                if (item.application_id !== applicationId) {
+                    return item;
+                }
+                const steps = buildOnboardingSteps(
+                    checklist.contract_signed,
+                    checklist.inventory_handover,
+                    checklist.training_orientation,
+                );
+
+                return {
+                    ...item,
+                    steps,
+                    status: steps.every((step) => step.complete)
+                        ? 'Selesai'
+                        : 'In Progress',
+                };
+            }),
+        );
+    };
+
+    const handleOnboardingConvertSuccess = (applicationId: number) => {
+        setOnboardingRows((prev) =>
+            prev.map((item) =>
+                item.application_id === applicationId
+                    ? { ...item, is_staff: true }
+                    : item,
+            ),
+        );
     };
 
     const isHumanCapitalAdmin =
@@ -256,15 +540,19 @@ export default function KelolaRekrutmenIndex({
                     </TabsContent>
 
                     <TabsContent value="interviews">
-                        <InterviewsTab interviews={interviews} />
+                        <InterviewsTab interviews={interviewRows} />
                     </TabsContent>
 
                     <TabsContent value="onboarding">
-                        <OnboardingTab items={onboarding} />
+                        <OnboardingTab
+                            items={onboardingRows}
+                            onChecklistSaved={handleOnboardingChecklistSaved}
+                            onConvertToStaffSuccess={handleOnboardingConvertSuccess}
+                        />
                     </TabsContent>
 
                     <TabsContent value="calendar">
-                        <RecruitmentCalendar interviews={interviews} isEmbedded />
+                        <RecruitmentCalendar interviews={interviewRows} isEmbedded />
                     </TabsContent>
                 </Tabs>
 
@@ -284,7 +572,7 @@ export default function KelolaRekrutmenIndex({
                     onOpenChange={setScheduleOpen}
                     applicant={selectedApplicant}
                     onSuccessSubmit={handleScheduleSuccess}
-                    existingInterviews={interviews}
+                    existingInterviews={interviewRows}
                 />
                 <InterviewDetailDialog
                     applicant={interviewDetailOpen ? selectedApplicant : null}

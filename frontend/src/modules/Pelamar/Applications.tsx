@@ -9,7 +9,7 @@
     X,
     Loader2,
 } from 'lucide-react';
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent, useMemo } from 'react';
 import { toast } from 'sonner';
 
 import ApplicationForm, {
@@ -80,8 +80,11 @@ export default function Applications({
     divisions,
     flash,
 }: ApplicationsPageProps) {
-    const safeDivisions = divisions ?? [];
-    const safeApplications = applications ?? [];
+    const safeDivisions = useMemo(() => divisions ?? [], [divisions]);
+    const safeApplications = useMemo(() => applications ?? [], [applications]);
+    const [applicationRows, setApplicationRows] = useState<ApplicationHistoryItem[]>(
+        safeApplications,
+    );
 
     const firstOpenDivision =
         safeDivisions.find(
@@ -117,6 +120,10 @@ export default function Applications({
         }
     }, [flash?.success, flash?.error]);
 
+    useEffect(() => {
+        setApplicationRows(safeApplications);
+    }, [safeApplications]);
+
     const handleSetData = <K extends keyof ApplicationFormData>(
         field: K,
         value: ApplicationFormData[K],
@@ -139,6 +146,29 @@ export default function Applications({
                         division.available_slots > 0 &&
                         division.id !== currentDivision?.id,
                 );
+
+                if (currentDivision?.job_title) {
+                    setApplicationRows((prev) => {
+                        const alreadyExists = prev.some(
+                            (app) =>
+                                app.division === currentDivision.name &&
+                                app.position === currentDivision.job_title,
+                        );
+                        if (alreadyExists) {
+                            return prev;
+                        }
+
+                        const optimisticItem: ApplicationHistoryItem = {
+                            id: Date.now(),
+                            position: currentDivision.job_title,
+                            division: currentDivision.name,
+                            status: 'Applied',
+                            submitted_at: new Date().toLocaleDateString('id-ID'),
+                            notes: null,
+                        };
+                        return [optimisticItem, ...prev];
+                    });
+                }
 
                 handleCloseForm();
                 if (currentDivision && currentDivision.available_slots > 1) {
@@ -268,7 +298,7 @@ export default function Applications({
                     </div>
                     <div className="grid gap-4 p-6 md:grid-cols-2">
                         {safeDivisions.map((division) => {
-                            const isApplied = safeApplications.some(
+                            const isApplied = applicationRows.some(
                                 (app) =>
                                     app.division === division.name &&
                                     app.position === division.job_title,
@@ -380,7 +410,7 @@ export default function Applications({
                     </DialogContent>
                 </Dialog>
 
-                <ApplicationHistory items={safeApplications} />
+                <ApplicationHistory items={applicationRows} />
 
                 {/* Eligibility Reject Dialog */}
                 <EligibilityRejectDialog
