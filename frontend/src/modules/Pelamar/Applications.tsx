@@ -34,7 +34,7 @@ import {
     DialogFooter,
 } from '@/shared/components/ui/dialog';
 import { api, apiUrl } from '@/shared/lib/api';
-import { Head, useForm } from '@/shared/lib/inertia';
+import { Head, router, useForm } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
 
 type EligibilityCriteria = {
@@ -150,6 +150,11 @@ export default function Applications({
                 toast.success('Lamaran berhasil dikirim', {
                     description: 'Tim rekrutmen akan meninjau berkas Anda.',
                 });
+
+                void router.reload({
+                    only: ['applications', 'divisions', 'defaultForm', 'flash'],
+                    preserveScroll: true,
+                });
             },
         });
     };
@@ -163,9 +168,18 @@ export default function Applications({
         if (division.job_eligibility_criteria && Object.keys(division.job_eligibility_criteria).length > 0) {
             setCheckingEligibility(true);
             try {
-                const response = await api.post(apiUrl(route('pelamar.applications.check-eligibility')), {
-                    division_id: division.id,
-                });
+                const payload = new URLSearchParams();
+                payload.append('division_id', String(division.id));
+
+                const response = await api.post(
+                    apiUrl(route('pelamar.applications.check-eligibility')),
+                    payload,
+                    {
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                    },
+                );
 
                 if (!response.data.eligible) {
                     setEligibilityFailures(response.data.failures);

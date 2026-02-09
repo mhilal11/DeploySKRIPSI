@@ -1,6 +1,5 @@
-﻿import {
+import {
     AlertTriangle,
-    XCircle,
     CheckCircle2,
     User,
     GraduationCap,
@@ -21,9 +20,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/shared/components/ui/dialog';
-import { ScrollArea } from '@/shared/components/ui/scroll-area';
-import { Separator } from '@/shared/components/ui/separator';
-
 
 export type EligibilityCriteriaResult = {
     field: string;
@@ -52,19 +48,22 @@ export default function EligibilityRejectDialog({
     passed,
     jobTitle,
 }: EligibilityRejectDialogProps) {
+    const passedCount = passed.length;
+    const failedCount = failures.length;
+
     return (
         <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-            <DialogContent className="max-w-xl gap-0 p-0 sm:max-h-[90vh]">
-                <DialogHeader className="space-y-4 border-b p-6 pb-6">
-                    <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:text-left">
-                        <div className="rounded-full bg-red-100 p-3">
-                            <Ban className="h-6 w-6 text-red-600" />
+            <DialogContent className="flex max-h-[90vh] w-[96vw] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+                <DialogHeader className="shrink-0 space-y-4 border-b bg-white p-5 sm:p-6">
+                    <div className="flex items-start gap-3 pr-12">
+                        <div className="rounded-xl bg-red-100 p-2.5">
+                            <Ban className="h-5 w-5 text-red-600" />
                         </div>
-                        <div className="flex-1 space-y-1">
-                            <DialogTitle className="text-xl font-bold text-slate-900">
+                        <div className="flex-1 space-y-2">
+                            <DialogTitle className="text-left text-xl font-bold tracking-tight text-slate-900">
                                 Maaf, Anda Belum Memenuhi Kriteria
                             </DialogTitle>
-                            <DialogDescription className="text-base text-slate-600">
+                            <DialogDescription className="text-left text-[15px] leading-relaxed text-slate-600">
                                 {jobTitle ? (
                                     <>
                                         Posisi <span className="font-semibold text-slate-800">{jobTitle}</span> membutuhkan kriteria spesifik yang belum terdapat pada profil Anda.
@@ -75,76 +74,111 @@ export default function EligibilityRejectDialog({
                             </DialogDescription>
                         </div>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                            <p className="text-xs font-medium text-emerald-700">Kriteria Terpenuhi</p>
+                            <p className="text-lg font-bold text-emerald-800">{passedCount}</p>
+                        </div>
+                        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                            <p className="text-xs font-medium text-red-700">Perlu Penyesuaian</p>
+                            <p className="text-lg font-bold text-red-800">{failedCount}</p>
+                        </div>
+                    </div>
                 </DialogHeader>
 
-                <ScrollArea className="max-h-[60vh] overflow-y-auto">
-                    <div className="space-y-6 p-6">
-                        {/* Passed Criteria Section */}
-                        {passed.length > 0 && (
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 hover:bg-green-50">
-                                        Memenuhi Syarat
+                <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/40">
+                    <div className="space-y-5 p-5 pb-7 sm:p-6 sm:pb-8">
+                        {passedCount > 0 && (
+                            <section className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-semibold text-emerald-800">
+                                        Kriteria yang sudah sesuai
+                                    </h4>
+                                    <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50">
+                                        {passedCount} terpenuhi
                                     </Badge>
-                                    <Separator className="flex-1" />
                                 </div>
-                                <div className="grid gap-3">
+                                <div className="space-y-2.5">
                                     {passed.map((item, index) => {
                                         const Icon = fieldIcons[item.field] ?? CheckCircle2;
                                         return (
-                                            <Alert key={`passed-${index}`} className="border-green-200 bg-green-50/30">
-                                                <Icon className="h-4 w-4 text-green-600" />
-                                                <AlertTitle className="mb-0 text-sm font-medium text-green-800">
-                                                    Kriteria Terpenuhi
-                                                </AlertTitle>
-                                                <AlertDescription className="text-sm text-green-700/90">
-                                                    {item.message}
-                                                </AlertDescription>
-                                            </Alert>
+                                            <div
+                                                key={`passed-${index}`}
+                                                className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4"
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <div className="rounded-md bg-emerald-100 p-2">
+                                                        <Icon className="h-4 w-4 text-emerald-700" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-emerald-900">
+                                                            Kriteria Terpenuhi
+                                                        </p>
+                                                        <p className="mt-1 text-sm leading-relaxed text-emerald-800">
+                                                            {item.message}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         );
                                     })}
                                 </div>
-                            </div>
+                            </section>
                         )}
 
-                        {/* Failed Criteria Section */}
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-2">
+                        <section className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-semibold text-red-800">
+                                    Kriteria yang perlu diperbaiki
+                                </h4>
                                 <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 hover:bg-red-50">
-                                    Tidak Memenuhi Syarat
+                                    {failedCount} belum sesuai
                                 </Badge>
-                                <Separator className="flex-1" />
                             </div>
-                            <div className="grid gap-3">
+                            <div className="space-y-2.5">
                                 {failures.map((failure, index) => {
                                     const Icon = fieldIcons[failure.field] ?? AlertTriangle;
                                     return (
-                                        <Alert key={`failed-${index}`} variant="destructive" className="border-red-200 bg-red-50 text-red-800 [&>svg]:text-red-600">
-                                            <Icon className="h-4 w-4" />
-                                            <AlertTitle className="mb-0 text-sm font-medium">
-                                                Perlu Penyesuaian
-                                            </AlertTitle>
-                                            <AlertDescription className="text-sm opacity-90">
-                                                {failure.message}
-                                            </AlertDescription>
-                                        </Alert>
+                                        <div
+                                            key={`failed-${index}`}
+                                            className="rounded-xl border border-red-200 bg-red-50 p-4"
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div className="rounded-md bg-red-100 p-2">
+                                                    <Icon className="h-4 w-4 text-red-700" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-red-900">
+                                                        Perlu Penyesuaian
+                                                    </p>
+                                                    <p className="mt-1 text-sm leading-relaxed text-red-800">
+                                                        {failure.message}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     );
                                 })}
                             </div>
-                        </div>
+                        </section>
 
-                        <Alert className="border-blue-200 bg-blue-50/50">
+                        <Alert className="border-blue-200 bg-blue-50">
                             <Info className="h-4 w-4 text-blue-600" />
-                            <AlertTitle className="text-blue-800">Saran</AlertTitle>
+                            <AlertTitle className="text-blue-800">Saran Tindakan</AlertTitle>
                             <AlertDescription className="text-blue-700">
                                 Silakan perbarui data profil Anda agar sesuai dengan kriteria yang dibutuhkan, lalu coba lamar kembali.
                             </AlertDescription>
                         </Alert>
                     </div>
-                </ScrollArea>
+                </div>
 
-                <DialogFooter className="gap-2 border-t bg-slate-50/50 p-6">
-                    <Button onClick={onClose} variant="default" className="w-full sm:w-auto">
+                <DialogFooter className="relative z-10 shrink-0 gap-2 border-t bg-white p-4 sm:p-5">
+                    <Button
+                        onClick={onClose}
+                        variant="default"
+                        className="w-full bg-blue-900 text-white hover:bg-blue-800 sm:w-auto"
+                    >
                         Tutup & Perbarui Profil
                     </Button>
                 </DialogFooter>
@@ -152,5 +186,3 @@ export default function EligibilityRejectDialog({
         </Dialog>
     );
 }
-
-
