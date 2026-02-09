@@ -54,6 +54,8 @@ func RegisterAuthRoutes(rg *gin.RouterGroup) {
 	rg.GET("/me", GetMe)
 	rg.GET("/login", AuthInfo)
 	rg.GET("/register", AuthInfo)
+	rg.GET("/auth/google/register", GoogleRegister)
+	rg.GET("/auth/google/register/callback", GoogleRegisterCallback)
 	rg.POST("/login", Login)
 	rg.POST("/logout", Logout)
 	rg.POST("/register", Register)
@@ -68,7 +70,9 @@ func RegisterAuthRoutes(rg *gin.RouterGroup) {
 func AuthInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"canResetPassword": true,
-		"status":           "",
+		"status":           strings.TrimSpace(c.Query("status")),
+		"oauth_error":      strings.TrimSpace(c.Query("oauth_error")),
+		"oauth_error_code": strings.TrimSpace(c.Query("oauth_error_code")),
 	})
 }
 

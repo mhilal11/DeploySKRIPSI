@@ -6,6 +6,7 @@ Salin template:
 
 ### Variables
 - `NEXT_PUBLIC_API_URL` : base URL API backend. Untuk development disarankan `\/api` (via Next.js rewrite ke `http://localhost:8080`).
+- `NEXT_PUBLIC_BACKEND_ORIGIN` : origin backend langsung (default `http://localhost:8080`). Dipakai untuk alur redirect OAuth Google agar tidak tergantung rewrite dev server.
 
 ## Run
 ```

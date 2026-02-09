@@ -8,6 +8,7 @@ const loadLogin = () => import('@/modules/Auth/Login');
 const loadRegister = () => import('@/modules/Auth/Register');
 const loadForgotPassword = () => import('@/modules/Auth/ForgotPassword');
 const loadResetPassword = () => import('@/modules/Auth/ResetPassword');
+const loadSetPassword = () => import('@/modules/Auth/SetPassword');
 const loadConfirmPassword = () => import('@/modules/Auth/ConfirmPassword');
 const loadVerifyEmail = () => import('@/modules/Auth/VerifyEmail');
 const loadDashboard = () => import('@/modules/Dashboard');
@@ -42,6 +43,7 @@ const Login = lazy(loadLogin);
 const Register = lazy(loadRegister);
 const ForgotPassword = lazy(loadForgotPassword);
 const ResetPassword = lazy(loadResetPassword);
+const SetPassword = lazy(loadSetPassword);
 const ConfirmPassword = lazy(loadConfirmPassword);
 const VerifyEmail = lazy(loadVerifyEmail);
 const Dashboard = lazy(loadDashboard);
@@ -104,6 +106,15 @@ export const ROUTES: RouteConfig[] = [
     path: '/reset-password/:token',
     name: 'password.reset',
     component: ResetPassword,
+    loader: ({ params, search }) => ({
+      token: params.token ?? '',
+      email: search.get('email') ?? '',
+    }),
+  },
+  {
+    path: '/set-password/:token',
+    name: 'password.setup',
+    component: SetPassword,
     loader: ({ params, search }) => ({
       token: params.token ?? '',
       email: search.get('email') ?? '',

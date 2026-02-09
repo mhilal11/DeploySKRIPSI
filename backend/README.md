@@ -17,6 +17,9 @@ Salin template:
 - `CSRF_SECRET` : rahasia CSRF token
 - `STORAGE_PATH` : lokasi penyimpanan file (default `./storage`)
 - `COOKIE_SECURE` : `true` jika pakai HTTPS
+- `GOOGLE_OAUTH_CLIENT_ID` : Client ID OAuth 2.0 dari Google Cloud Console (opsional, untuk Daftar via Google)
+- `GOOGLE_OAUTH_CLIENT_SECRET` : Client Secret OAuth 2.0 (opsional)
+- `GOOGLE_OAUTH_REDIRECT_URL` : callback URL Google OAuth (default `http://localhost:5173/api/auth/google/register/callback`)
 
 ### SMTP (opsional)
 Jika SMTP tidak diisi, email akan disimpan ke outbox lokal `storage/mail_outbox`.

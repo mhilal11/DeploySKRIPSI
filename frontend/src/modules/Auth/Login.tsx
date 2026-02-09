@@ -23,9 +23,11 @@ const logo = '/img/LogoLDP.png';
 export default function Login({
     status,
     canResetPassword,
+    oauth_error,
 }: {
     status?: string;
     canResetPassword: boolean;
+    oauth_error?: string;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
@@ -133,6 +135,12 @@ export default function Login({
                                 </div>
                             )}
 
+                            {oauth_error && (
+                                <div className="mb-4 rounded-lg border border-red-400/40 bg-red-500/15 px-4 py-3 text-sm text-red-200">
+                                    {oauth_error}
+                                </div>
+                            )}
+
                             <form onSubmit={submit} className="space-y-6">
                                 <div className="space-y-2">
                                     <label
@@ -234,6 +242,7 @@ export default function Login({
                                 >
                                     {processing ? 'Memproses...' : 'Masuk'}
                                 </Button>
+
                             </form>
 
                             <div className="mt-8 text-center text-sm text-white/80">

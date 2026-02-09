@@ -3,13 +3,42 @@ import { ArrowLeft, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { FormEventHandler, useEffect, useRef, useState } from "react";
 
 import InputError from "@/shared/components/InputError";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/shared/components/ui/alert-dialog";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Head, Link, useForm } from "@/shared/lib/inertia";
 
 const logo = "/img/LogoLDP.png";
 
-export default function Register() {
+function buildGoogleRegisterUrl(): string {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || "/api";
+    if (/^https?:\/\//i.test(apiBase)) {
+        return `${apiBase.replace(/\/$/, "")}/auth/google/register`;
+    }
+
+    const backendOrigin = process.env.NEXT_PUBLIC_BACKEND_ORIGIN || "http://localhost:8080";
+    return `${backendOrigin.replace(/\/$/, "")}/api/auth/google/register`;
+}
+
+export default function Register({
+    status,
+    oauth_error,
+    oauth_error_code,
+}: {
+    status?: string;
+    oauth_error?: string;
+    oauth_error_code?: string;
+}) {
+    const googleRegisterUrl = buildGoogleRegisterUrl();
     const { data, setData, post, processing, errors, reset } = useForm({
         name: "",
         email: "",
@@ -19,8 +48,10 @@ export default function Register() {
 
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [showExistingAccountDialog, setShowExistingAccountDialog] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
+    const isExistingGoogleAccount = oauth_error_code === "email_exists";
 
     // Regex validasi nama: hanya huruf, spasi, petik atas, dan strip
     const nameRegex = /^[A-Za-z\s'-]+$/;
@@ -43,6 +74,12 @@ export default function Register() {
             });
         }
     }, []);
+
+    useEffect(() => {
+        if (isExistingGoogleAccount) {
+            setShowExistingAccountDialog(true);
+        }
+    }, [isExistingGoogleAccount]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -94,6 +131,18 @@ export default function Register() {
                                     Bergabung dengan Lintas Data Prima hari ini
                                 </p>
                             </div>
+
+                            {status && (
+                                <div className="mb-4 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-200">
+                                    {status}
+                                </div>
+                            )}
+
+                            {oauth_error && !isExistingGoogleAccount && (
+                                <div className="mb-4 rounded-lg border border-red-400/40 bg-red-500/15 px-4 py-3 text-sm text-red-200">
+                                    {oauth_error}
+                                </div>
+                            )}
 
                             <form onSubmit={submit} className="space-y-6">
                                 {/* VALIDASI NAMA */}
@@ -282,6 +331,13 @@ export default function Register() {
                                         ? "Memproses..."
                                         : "Daftar Sekarang"}
                                 </Button>
+
+                                <a
+                                    href={googleRegisterUrl}
+                                    className="inline-flex h-12 w-full items-center justify-center rounded-[20px] border border-white/30 bg-white/10 px-4 text-base font-semibold text-white transition hover:bg-white/20"
+                                >
+                                    Daftar dengan Google
+                                </a>
                             </form>
 
                             <div className="mt-8 text-center text-sm text-white/80">
@@ -297,6 +353,32 @@ export default function Register() {
                     </div>
                 </div>
             </div>
+
+            {isExistingGoogleAccount && (
+                <AlertDialog
+                    open={showExistingAccountDialog}
+                    onOpenChange={setShowExistingAccountDialog}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Email Sudah Terdaftar</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {oauth_error || "Akun dengan email Google ini sudah terdaftar. Silakan lanjut login."}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Tutup</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => {
+                                    window.location.href = route("login");
+                                }}
+                            >
+                                Ke Halaman Login
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
         </>
     );
 }
