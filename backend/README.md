@@ -62,3 +62,16 @@ go run ./cmd/seed staff
 ```
 go run ./cmd/server
 ```
+
+## Hot Reload (Air)
+Install Air:
+```
+go install github.com/air-verse/air@latest
+```
+
+Jalankan dari folder `backend`:
+```
+air
+```
+
+Konfigurasi Air ada di `backend/.air.toml`.
