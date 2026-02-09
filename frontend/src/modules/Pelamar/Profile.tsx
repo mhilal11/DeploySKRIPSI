@@ -80,7 +80,7 @@ export default function Profile({
         personal: typeof form.data.personal;
         educations: Education[];
     } | null>(null);
-    const prevWasSuccessfulRef = useRef(false);
+    const prevRecentlySuccessfulRef = useRef(false);
 
     // Profile is locked only during active application process
     const isProfileLocked = hasActiveApplication;
@@ -90,14 +90,14 @@ export default function Profile({
     }, [profileReminderMessage]);
 
     useEffect(() => {
-        if (isEditing && form.wasSuccessful && !prevWasSuccessfulRef.current) {
+        if (isEditing && form.recentlySuccessful && !prevRecentlySuccessfulRef.current) {
             editSnapshotRef.current = {
                 personal: { ...form.data.personal },
                 educations: form.data.educations.map((item) => ({ ...item })),
             };
         }
-        prevWasSuccessfulRef.current = form.wasSuccessful;
-    }, [form.wasSuccessful, form.data.personal, form.data.educations, isEditing]);
+        prevRecentlySuccessfulRef.current = form.recentlySuccessful;
+    }, [form.recentlySuccessful, form.data.personal, form.data.educations, isEditing]);
     const flatErrors = form.errors as Record<string, string>;
 
     // Check section completion status

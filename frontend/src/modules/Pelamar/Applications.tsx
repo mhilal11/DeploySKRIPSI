@@ -140,6 +140,7 @@ export default function Applications({
             forceFormData: true,
             onSuccess: () => {
                 const currentDivision = formDivision;
+                const currentJobTitle = currentDivision?.job_title?.trim() ?? '';
                 const fallbackDivision = safeDivisions.find(
                     (division) =>
                         division.is_hiring &&
@@ -147,12 +148,12 @@ export default function Applications({
                         division.id !== currentDivision?.id,
                 );
 
-                if (currentDivision?.job_title) {
+                if (currentDivision && currentJobTitle !== '') {
                     setApplicationRows((prev) => {
                         const alreadyExists = prev.some(
                             (app) =>
                                 app.division === currentDivision.name &&
-                                app.position === currentDivision.job_title,
+                                app.position === currentJobTitle,
                         );
                         if (alreadyExists) {
                             return prev;
@@ -160,7 +161,7 @@ export default function Applications({
 
                         const optimisticItem: ApplicationHistoryItem = {
                             id: Date.now(),
-                            position: currentDivision.job_title,
+                            position: currentJobTitle,
                             division: currentDivision.name,
                             status: 'Applied',
                             submitted_at: new Date().toLocaleDateString('id-ID'),

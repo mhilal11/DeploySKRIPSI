@@ -18,6 +18,7 @@ func RegisterPelamarRoutes(rg *gin.RouterGroup) {
 	rg.GET("/pelamar/dashboard", PelamarDashboard)
 	rg.GET("/pelamar/profil", PelamarProfileShow)
 	rg.POST("/pelamar/profil", PelamarProfileUpdate)
+	rg.GET("/pelamar/references/education", PelamarEducationReferences)
 	rg.GET("/pelamar/lamaran-saya", PelamarApplicationsIndex)
 	rg.POST("/pelamar/lamaran-saya", PelamarApplicationsStore)
 	rg.POST("/pelamar/lamaran-saya/check-eligibility", PelamarCheckEligibility)

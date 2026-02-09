@@ -23,6 +23,7 @@ func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(middleware.Gzip())
 
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins(cfg),

@@ -1,6 +1,8 @@
-﻿import { Plus, Save, Trash2 } from 'lucide-react';
+import { Plus, Save, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
+import { AutocompleteInput, AutocompleteOption } from '@/shared/components/ui/autocomplete-input';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
@@ -13,11 +15,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/shared/components/ui/select';
+import { api, apiUrl } from '@/shared/lib/api';
 
 import { Education, RequiredEducationField, GPA_REQUIRED_DEGREES } from '../profileTypes';
 
 const DEGREE_OPTIONS = ['SD', 'SMP', 'SMA/SMK', 'D3', 'D4', 'S1', 'S2', 'S3'];
 const MIN_EDUCATION_YEAR = 1900;
+const EDUCATION_REFERENCE_LIMIT = 50;
+const MIN_SEARCH_CHARACTERS = 2;
 
 interface EducationFormProps {
     educations: Education[];
@@ -45,6 +50,99 @@ export default function EducationForm({
     disabled = false,
 }: EducationFormProps) {
     const currentYear = new Date().getFullYear();
+    const [institutionOptions, setInstitutionOptions] = useState<AutocompleteOption[]>([]);
+    const [programOptions, setProgramOptions] = useState<AutocompleteOption[]>([]);
+    const [institutionQuery, setInstitutionQuery] = useState('');
+    const [programQuery, setProgramQuery] = useState('');
+    const [referenceError, setReferenceError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const query = institutionQuery.trim();
+        if (query.length < MIN_SEARCH_CHARACTERS) {
+            setInstitutionOptions([]);
+            return undefined;
+        }
+
+        let active = true;
+        const timer = window.setTimeout(() => {
+            void (async () => {
+                try {
+                    const response = await api.get(apiUrl('/pelamar/references/education'), {
+                        params: { q: query, limit: EDUCATION_REFERENCE_LIMIT },
+                    });
+                    if (!active) {
+                        return;
+                    }
+
+                    const institutions = Array.isArray(response.data?.institutions)
+                        ? response.data.institutions
+                        : [];
+                    setInstitutionOptions(
+                        institutions.map((name: string) => ({
+                            value: name,
+                            label: name,
+                        })),
+                    );
+                    setReferenceError(null);
+                } catch {
+                    if (!active) {
+                        return;
+                    }
+                    setInstitutionOptions([]);
+                    setReferenceError('Referensi kampus/prodi belum tersedia. Silakan isi manual.');
+                }
+            })();
+        }, 300);
+
+        return () => {
+            active = false;
+            window.clearTimeout(timer);
+        };
+    }, [institutionQuery]);
+
+    useEffect(() => {
+        const query = programQuery.trim();
+        if (query.length < MIN_SEARCH_CHARACTERS) {
+            setProgramOptions([]);
+            return undefined;
+        }
+
+        let active = true;
+        const timer = window.setTimeout(() => {
+            void (async () => {
+                try {
+                    const response = await api.get(apiUrl('/pelamar/references/education'), {
+                        params: { q: query, limit: EDUCATION_REFERENCE_LIMIT },
+                    });
+                    if (!active) {
+                        return;
+                    }
+
+                    const programs = Array.isArray(response.data?.programs)
+                        ? response.data.programs
+                        : [];
+                    setProgramOptions(
+                        programs.map((name: string) => ({
+                            value: name,
+                            label: name,
+                        })),
+                    );
+                    setReferenceError(null);
+                } catch {
+                    if (!active) {
+                        return;
+                    }
+                    setProgramOptions([]);
+                    setReferenceError('Referensi kampus/prodi belum tersedia. Silakan isi manual.');
+                }
+            })();
+        }, 300);
+
+        return () => {
+            active = false;
+            window.clearTimeout(timer);
+        };
+    }, [programQuery]);
 
     return (
         <Card className="p-6">
@@ -87,22 +185,24 @@ export default function EducationForm({
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div className="md:col-span-2">
                                 <Label>Nama Institusi *</Label>
-                                <Input
+                                <AutocompleteInput
+                                    options={institutionOptions}
                                     value={education.institution ?? ''}
-                                    onChange={(event) => {
-                                        const value = event.target.value;
-                                        // Only allow letters, numbers, and spaces
-                                        const validPattern = /^[a-zA-Z0-9\s]*$/;
-                                        if (validPattern.test(value) || value === '') {
-                                            onChange(education.id, 'institution', value);
-                                        }
-                                    }}
-                                    placeholder="Contoh: Universitas Indonesia"
+                                    onValueChange={(value) =>
+                                        onChange(education.id, 'institution', value)
+                                    }
+                                    onInputChange={setInstitutionQuery}
+                                    placeholder="Ketik nama perguruan tinggi..."
+                                    emptyText="Institusi tidak ditemukan"
+                                    allowCustomValue
                                     disabled={disabled}
                                 />
                                 <p className="mt-1 text-xs text-slate-500">
-                                    Hanya huruf, angka, dan spasi. Tulis dengan lengkap, jangan disingkat (contoh: &quot;Universitas Indonesia&quot; bukan &quot;UI&quot;)
+                                    Ketik minimal {MIN_SEARCH_CHARACTERS} karakter. Tetap bisa isi manual jika institusi belum tersedia.
                                 </p>
+                                {referenceError && (
+                                    <p className="mt-1 text-xs text-amber-600">{referenceError}</p>
+                                )}
                                 {getFieldError(index, 'institution') && (
                                     <p className="mt-1 text-sm text-red-500">
                                         {getFieldError(index, 'institution')}
@@ -137,21 +237,20 @@ export default function EducationForm({
                             </div>
                             <div>
                                 <Label>Program Studi *</Label>
-                                <Input
+                                <AutocompleteInput
+                                    options={programOptions}
                                     value={education.field_of_study ?? ''}
-                                    onChange={(event) => {
-                                        const value = event.target.value;
-                                        // Only allow letters, numbers, and spaces
-                                        const validPattern = /^[a-zA-Z0-9\s]*$/;
-                                        if (validPattern.test(value) || value === '') {
-                                            onChange(education.id, 'field_of_study', value);
-                                        }
-                                    }}
-                                    placeholder="Contoh: Teknik Informatika"
+                                    onValueChange={(value) =>
+                                        onChange(education.id, 'field_of_study', value)
+                                    }
+                                    onInputChange={setProgramQuery}
+                                    placeholder="Ketik program studi..."
+                                    emptyText="Program studi tidak ditemukan"
+                                    allowCustomValue
                                     disabled={disabled}
                                 />
                                 <p className="mt-1 text-xs text-slate-500">
-                                    Hanya huruf, angka, dan spasi
+                                    Ketik minimal {MIN_SEARCH_CHARACTERS} karakter. Tetap bisa isi manual bila belum tersedia.
                                 </p>
                                 {getFieldError(index, 'field_of_study') && (
                                     <p className="mt-1 text-sm text-red-500">
@@ -373,5 +472,3 @@ export default function EducationForm({
         </Card>
     );
 }
-
-

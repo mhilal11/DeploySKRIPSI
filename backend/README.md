@@ -11,6 +11,7 @@ Salin template:
 - `APP_ADDR` : alamat bind server, contoh `:8080`
 - `APP_URL` : base URL backend, contoh `http://localhost:8080`
 - `FRONTEND_URL` : origin frontend yang diizinkan CORS. Bisa lebih dari satu origin dipisah koma, contoh `http://localhost:5173,http://127.0.0.1:5173`
+- `EDUCATION_REFERENCE_PATH` : path file snapshot referensi universitas/prodi (default `./data/education_reference_id.json`)
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
 - `SESSION_SECRET` : rahasia session cookie
 - `CSRF_SECRET` : rahasia CSRF token
@@ -75,3 +76,32 @@ air
 ```
 
 Konfigurasi Air ada di `backend/.air.toml`.
+
+## Referensi Universitas & Program Studi (Role Pelamar)
+- Endpoint: `GET /api/pelamar/references/education`
+- Endpoint ini dipakai autocomplete pada form pendidikan pelamar.
+- Data dibaca dari file snapshot di `EDUCATION_REFERENCE_PATH`.
+- Contoh snapshot default: `backend/data/education_reference_id.json`
+- Untuk sinkronisasi dataset nasional terbaru (institusi + prodi) dari sumber resmi BAN-PT:
+```
+go run ./cmd/educationrefsync -out ./data/education_reference_id.json
+```
+
+### Format Snapshot
+```json
+{
+  "source": "BAN-PT Direktori Prodi (sumber resmi)",
+  "source_url": "https://www.banpt.or.id/direktori/model/dir_prodi/get_hasil_pencariannew.php",
+  "last_updated": "2026-02-09",
+  "institutions": [
+    {
+      "institution": "Universitas Indonesia",
+      "programs": ["Teknik Informatika", "Sistem Informasi"]
+    }
+  ]
+}
+```
+
+### Query Parameter Endpoint
+- `q` : filter nama institusi/prodi (opsional)
+- `limit` : batas data per list (default `300`, max `20000`)

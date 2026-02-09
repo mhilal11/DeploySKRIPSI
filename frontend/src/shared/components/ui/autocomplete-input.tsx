@@ -12,9 +12,11 @@ interface AutocompleteInputProps {
     options: AutocompleteOption[];
     value?: string;
     onValueChange: (value: string) => void;
+    onInputChange?: (value: string) => void;
     placeholder?: string;
     emptyText?: string;
     disabled?: boolean;
+    allowCustomValue?: boolean;
     className?: string;
 }
 
@@ -22,9 +24,11 @@ export function AutocompleteInput({
     options,
     value,
     onValueChange,
+    onInputChange,
     placeholder = 'Ketik untuk mencari...',
     emptyText = 'Tidak ditemukan',
     disabled = false,
+    allowCustomValue = false,
 }: AutocompleteInputProps) {
     const [inputValue, setInputValue] = React.useState('');
     const [isOpen, setIsOpen] = React.useState(false);
@@ -58,6 +62,7 @@ export function AutocompleteInput({
         setInputValue(newValue);
         setHighlightedIndex(-1);
         setIsOpen(newValue.trim().length > 0);
+        onInputChange?.(newValue);
 
         if (newValue.trim() === '') {
             onValueChange('');
@@ -68,10 +73,19 @@ export function AutocompleteInput({
     const handleBlur = () => {
         setTimeout(() => {
             setIsOpen(false);
-            if (!value) {
-                setInputValue('');
-            } else {
+            if (allowCustomValue && inputValue.trim() !== '') {
+                onValueChange(inputValue.trim());
+            }
+
+            if (allowCustomValue) {
+                setInputValue(inputValue.trim());
+                return;
+            }
+
+            if (value) {
                 setInputValue(selectedLabel);
+            } else {
+                setInputValue('');
             }
         }, 150);
     };
@@ -148,8 +162,6 @@ export function AutocompleteInput({
                                     onMouseDown={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
-                                        // Select on mousedown directly
-                                        console.log('MouseDown selecting:', option.value);
                                         setInputValue(option.label);
                                         setIsOpen(false);
                                         setHighlightedIndex(-1);
