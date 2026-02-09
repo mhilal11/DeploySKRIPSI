@@ -215,7 +215,7 @@ export default function Dashboard({
                                 <UserCircle className="h-10 w-10 text-blue-600" />
                             </div>
                             <AlertDialogTitle className="text-center text-xl">
-                                Selamat Datang! ??
+                                Selamat Datang!
                             </AlertDialogTitle>
                             <AlertDialogDescription asChild className="text-center text-gray-600">
                                 <div>
