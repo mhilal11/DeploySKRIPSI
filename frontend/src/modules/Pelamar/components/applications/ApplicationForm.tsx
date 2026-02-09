@@ -47,13 +47,25 @@ export default function ApplicationForm({
     setData,
     onSubmit,
 }: ApplicationFormProps) {
+    const normalizedPhone = data.phone.replace(/\D/g, '');
+    const isPhoneValid =
+        normalizedPhone.length >= 8 && normalizedPhone.length <= 13;
+
     const isFormComplete =
         Boolean(data.division_id) &&
         Boolean(data.full_name?.trim()) &&
         Boolean(data.email?.trim()) &&
         Boolean(data.phone?.trim()) &&
+        isPhoneValid &&
         Boolean(data.skills?.trim()) &&
         Boolean(data.cv);
+
+    const handlePhoneChange = (value: string) => {
+        const numbersOnly = value.replace(/\D/g, '');
+        if (numbersOnly.length <= 13) {
+            setData('phone', numbersOnly);
+        }
+    };
 
     const handleCvChange = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0] ?? null;
@@ -147,9 +159,16 @@ export default function ApplicationForm({
                         id="phone"
                         required
                         value={data.phone}
-                        onChange={(event) => setData('phone', event.target.value)}
+                        onChange={(event) => handlePhoneChange(event.target.value)}
                         placeholder="081234567890"
+                        maxLength={13}
                     />
+                    <p className="mt-1 text-xs text-slate-500">8-13 digit angka</p>
+                    {data.phone && !isPhoneValid && (
+                        <p className="mt-1 text-xs text-amber-600">
+                            Nomor telepon harus 8-13 digit
+                        </p>
+                    )}
                     {errors.phone && (
                         <p className="mt-1 text-xs text-red-500">{errors.phone}</p>
                     )}

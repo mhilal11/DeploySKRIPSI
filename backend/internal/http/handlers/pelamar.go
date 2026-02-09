@@ -252,7 +252,14 @@ func PelamarProfileUpdate(c *gin.Context) {
 				profile.Email = &v
 			}
 			if v, ok := personal["phone"]; ok {
-				profile.Phone = &v
+				normalizedPhone := normalizePhoneNumber(v)
+				if normalizedPhone != "" && !isValidPhoneNumber(normalizedPhone) {
+					ValidationErrors(c, FieldErrors{
+						"personal.phone": "Nomor telepon harus 8-13 digit angka.",
+					})
+					return
+				}
+				profile.Phone = &normalizedPhone
 			}
 			if v, ok := personal["date_of_birth"]; ok {
 				if t, err := time.Parse("2006-01-02", v); err == nil {
@@ -423,11 +430,15 @@ func PelamarApplicationsStore(c *gin.Context) {
 	divisionID := c.PostForm("division_id")
 	fullName := strings.TrimSpace(c.PostForm("full_name"))
 	email := strings.TrimSpace(c.PostForm("email"))
-	phone := strings.TrimSpace(c.PostForm("phone"))
+	phone := normalizePhoneNumber(c.PostForm("phone"))
 	skills := strings.TrimSpace(c.PostForm("skills"))
 
 	if divisionID == "" || fullName == "" || email == "" {
 		ValidationErrors(c, FieldErrors{"division_id": "Divisi wajib diisi.", "full_name": "Nama wajib diisi.", "email": "Email wajib diisi."})
+		return
+	}
+	if !isValidPhoneNumber(phone) {
+		ValidationErrors(c, FieldErrors{"phone": "Nomor telepon harus 8-13 digit angka."})
 		return
 	}
 
@@ -670,8 +681,13 @@ func filepathBase(path string) string {
 }
 
 func computeProfileCompletion(profile *models.ApplicantProfile) int {
+	phoneValid := false
+	if profile.Phone != nil {
+		phoneValid = isValidPhoneNumber(normalizePhoneNumber(*profile.Phone))
+	}
+
 	required := []bool{
-		profile.Phone != nil && *profile.Phone != "",
+		phoneValid,
 		profile.DateOfBirth != nil,
 		profile.Gender != nil && *profile.Gender != "",
 		profile.Religion != nil && *profile.Religion != "",
@@ -693,7 +709,7 @@ func isProfileComplete(profile *models.ApplicantProfile) bool {
 	if profile == nil {
 		return false
 	}
-	if profile.Phone == nil || *profile.Phone == "" || profile.DateOfBirth == nil || profile.Gender == nil || profile.Religion == nil || profile.Address == nil || profile.City == nil || profile.Province == nil {
+	if profile.Phone == nil || !isValidPhoneNumber(normalizePhoneNumber(*profile.Phone)) || profile.DateOfBirth == nil || profile.Gender == nil || profile.Religion == nil || profile.Address == nil || profile.City == nil || profile.Province == nil {
 		return false
 	}
 	return len(profile.Educations) > 0
@@ -708,6 +724,27 @@ func syncCompletion(profile *models.ApplicantProfile) {
 	} else {
 		profile.CompletedAt = nil
 	}
+}
+
+func normalizePhoneNumber(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+
+	var builder strings.Builder
+	builder.Grow(len(value))
+	for _, r := range value {
+		if r >= '0' && r <= '9' {
+			builder.WriteRune(r)
+		}
+	}
+	return builder.String()
+}
+
+func isValidPhoneNumber(value string) bool {
+	length := len(value)
+	return length >= 8 && length <= 13
 }
 
 func validateEducationYears(educations []map[string]any) FieldErrors {

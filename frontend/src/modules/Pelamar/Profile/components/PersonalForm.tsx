@@ -53,10 +53,10 @@ export default function PersonalForm({
         onChange('email', value);
     };
 
-    // Validation: Only numbers, 8-12 characters
+    // Validation: Only numbers, 8-13 characters
     const handlePhoneChange = (value: string) => {
         const numbersOnly = value.replace(/\D/g, '');
-        if (numbersOnly.length <= 12) {
+        if (numbersOnly.length <= 13) {
             onChange('phone', numbersOnly);
         }
     };
@@ -137,14 +137,14 @@ export default function PersonalForm({
                         onChange={(event) => handlePhoneChange(event.target.value)}
                         placeholder="08xxxxxxxxxx"
                         disabled={disabled}
-                        maxLength={12}
+                        maxLength={13}
                     />
                     <p className="mt-1 text-xs text-slate-500">
-                        8-12 digit angka
+                        8-13 digit angka
                     </p>
-                    {data.phone && (data.phone.length < 8 || data.phone.length > 12) && (
+                    {data.phone && (data.phone.length < 8 || data.phone.length > 13) && (
                         <p className="mt-1 text-sm text-amber-600">
-                            Nomor telepon harus 8-12 digit
+                            Nomor telepon harus 8-13 digit
                         </p>
                     )}
                     {errors['personal.phone'] && (
