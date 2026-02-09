@@ -309,6 +309,49 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 	meetingLink := c.PostForm("meeting_link")
 	notes := c.PostForm("notes")
 
+	// Frontend mengirim payload JSON lewat axios/inertia,
+	// sehingga PostForm bisa kosong jika Content-Type application/json.
+	if date == "" || timeStart == "" || timeEnd == "" || mode == "" || interviewer == "" {
+		var payload map[string]any
+		if err := c.ShouldBindJSON(&payload); err == nil {
+			if date == "" {
+				if raw, ok := payload["date"].(string); ok {
+					date = strings.TrimSpace(raw)
+				}
+			}
+			if timeStart == "" {
+				if raw, ok := payload["time"].(string); ok {
+					timeStart = strings.TrimSpace(raw)
+				}
+			}
+			if timeEnd == "" {
+				if raw, ok := payload["end_time"].(string); ok {
+					timeEnd = strings.TrimSpace(raw)
+				}
+			}
+			if mode == "" {
+				if raw, ok := payload["mode"].(string); ok {
+					mode = strings.TrimSpace(raw)
+				}
+			}
+			if interviewer == "" {
+				if raw, ok := payload["interviewer"].(string); ok {
+					interviewer = strings.TrimSpace(raw)
+				}
+			}
+			if meetingLink == "" {
+				if raw, ok := payload["meeting_link"].(string); ok {
+					meetingLink = strings.TrimSpace(raw)
+				}
+			}
+			if notes == "" {
+				if raw, ok := payload["notes"].(string); ok {
+					notes = strings.TrimSpace(raw)
+				}
+			}
+		}
+	}
+
 	if date == "" || timeStart == "" || timeEnd == "" || mode == "" || interviewer == "" {
 		ValidationErrors(c, FieldErrors{"date": "Tanggal, waktu, mode, interviewer wajib diisi."})
 		return
