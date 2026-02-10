@@ -1,12 +1,9 @@
 ﻿// src/Pages/SuperAdmin/Recruitment/KelolaRekrutmenIndex.tsx
 
 import {
-    Activity,
-    BarChart3,
     Calendar as CalendarIcon,
     FileDown,
     FileText,
-    RefreshCw,
     Sparkles,
     Users,
     UserCheck,
@@ -37,9 +34,6 @@ import {
     ApplicantRejectHandler,
     InterviewSchedule,
     OnboardingItem,
-    RecruitmentScoringAnalytics,
-    RecruitmentScoringAudit,
-    RecruitmentScoringEvaluation,
     RecruitmentPageProps,
     StatusSummary,
 } from './types';
@@ -75,8 +69,6 @@ const formatDateLabel = (dateValue?: string | null) => {
         year: 'numeric',
     });
 };
-
-const formatPercent = (value?: number | null) => `${Number(value ?? 0).toFixed(1)}%`;
 
 const recruitmentFilterStorageKey = 'super_admin_recruitment_global_filter_preferences_v1';
 const TOP_LOWONGAN_MIN = 1;
@@ -124,12 +116,6 @@ const formatDateQuery = (date?: Date | null) => {
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
-
-const TrendingValueIcon = ({ positive }: { positive: boolean }) => (
-    <span className={positive ? 'text-emerald-600' : 'text-red-600'}>
-        {positive ? '^' : 'v'}
-    </span>
-);
 
 const buildOnboardingSteps = (
     contractSigned: boolean,
@@ -196,17 +182,10 @@ export default function KelolaRekrutmenIndex({
     applications,
     interviews,
     onboarding,
-    scoringAudits: initialScoringAudits = [],
-    scoringEvaluation: initialScoringEvaluation = null,
-    scoringAnalytics: initialScoringAnalytics = null,
 }: RecruitmentPageProps) {
     const [applicationRows, setApplicationRows] = useState(applications);
     const [interviewRows, setInterviewRows] = useState(interviews);
     const [onboardingRows, setOnboardingRows] = useState(onboarding);
-    const [scoringAuditRows, setScoringAuditRows] = useState<RecruitmentScoringAudit[]>(initialScoringAudits);
-    const [scoringEvaluation, setScoringEvaluation] = useState<RecruitmentScoringEvaluation | null>(initialScoringEvaluation);
-    const [scoringAnalytics, setScoringAnalytics] = useState<RecruitmentScoringAnalytics | null>(initialScoringAnalytics);
-    const [isLoadingScoringInsights, setIsLoadingScoringInsights] = useState(false);
     const [activeTab, setActiveTab] = useState('applicants');
     const [statusFilter, setStatusFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -261,18 +240,6 @@ export default function KelolaRekrutmenIndex({
     }, [onboarding]);
 
     useEffect(() => {
-        setScoringAuditRows(initialScoringAudits);
-    }, [initialScoringAudits]);
-
-    useEffect(() => {
-        setScoringEvaluation(initialScoringEvaluation);
-    }, [initialScoringEvaluation]);
-
-    useEffect(() => {
-        setScoringAnalytics(initialScoringAnalytics);
-    }, [initialScoringAnalytics]);
-
-    useEffect(() => {
         if (!selectedApplicant) {
             return;
         }
@@ -283,41 +250,6 @@ export default function KelolaRekrutmenIndex({
             setSelectedApplicant(refreshedApplicant);
         }
     }, [applicationRows, selectedApplicant]);
-
-    const fetchScoringInsights = async () => {
-        if (isLoadingScoringInsights) return;
-
-        setIsLoadingScoringInsights(true);
-        try {
-            const [evaluationResponse, analyticsResponse] = await Promise.all([
-                api.get(apiUrl('/super-admin/recruitment/scoring-evaluation'), {
-                    params: {
-                        k: parseTopLowonganValue(autoShortlistTopN, autoShortlistTopNMax),
-                        eligible_only: autoShortlistEligibleOnly,
-                        min_score: Math.max(MINIMUM_SCORE_MIN, Math.min(MINIMUM_SCORE_MAX, Number(autoShortlistMinScore) || 0)),
-                    },
-                }),
-                api.get(apiUrl('/super-admin/recruitment/scoring-analytics'), {
-                    params: { months: 12 },
-                }),
-            ]);
-
-            setScoringEvaluation((evaluationResponse.data ?? null) as RecruitmentScoringEvaluation | null);
-            setScoringAnalytics((analyticsResponse.data ?? null) as RecruitmentScoringAnalytics | null);
-        } catch {
-            toast.error('Gagal memuat evaluasi model scoring.');
-        } finally {
-            setIsLoadingScoringInsights(false);
-        }
-    };
-
-    useEffect(() => {
-        if (initialScoringEvaluation && initialScoringAnalytics) {
-            return;
-        }
-        void fetchScoringInsights();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -700,12 +632,6 @@ export default function KelolaRekrutmenIndex({
 
             router.reload({
                 preserveScroll: true,
-                onSuccess: (freshData: any) => {
-                    if (freshData?.scoringAudits && Array.isArray(freshData.scoringAudits)) {
-                        setScoringAuditRows(freshData.scoringAudits);
-                    }
-                    void fetchScoringInsights();
-                },
             });
         } catch (error) {
             if (isAxiosError(error)) {
@@ -828,18 +754,11 @@ export default function KelolaRekrutmenIndex({
                             <CalendarIcon className="h-4 w-4" />
                             Calendar
                         </TabsTrigger>
-                        <TabsTrigger
-                            value="analytics"
-                            className="flex-none rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
-                        >
-                            <BarChart3 className="h-4 w-4" />
-                            Analytics
-                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="applicants">
-                        <div className="mb-5 grid gap-4 xl:grid-cols-12">
-                            <Card className="h-full space-y-4 p-4 md:p-5 xl:col-span-6">
+                        <div className="mb-5">
+                            <Card className="h-full space-y-4 p-4 md:p-5">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
                                         <p className="text-sm font-semibold text-slate-900">Scoring Action Center</p>
@@ -917,88 +836,10 @@ export default function KelolaRekrutmenIndex({
                                         <FileText className="h-4 w-4 mr-2" />
                                         Export Laporan Skor (PDF)
                                     </Button>
-                                    <Button
-                                        variant="outline"
-                                        onClick={fetchScoringInsights}
-                                        disabled={isLoadingScoringInsights}
-                                        className="justify-start border-slate-300"
-                                    >
-                                        <RefreshCw className="h-4 w-4 mr-2" />
-                                        {isLoadingScoringInsights ? 'Memuat...' : 'Refresh Analytics'}
-                                    </Button>
                                 </div>
-                            </Card>
-
-                            <Card className="h-full space-y-3 p-4 md:p-5 xl:col-span-3">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div>
-                                        <p className="text-sm font-semibold text-slate-900">Evaluasi Model Scoring</p>
-                                        <p className="text-xs text-slate-600">Precision@K dan recall terhadap outcome interview/hired.</p>
-                                    </div>
-                                    <Activity className="h-4 w-4 text-emerald-600" />
-                                </div>
-
-                                {!scoringEvaluation ? (
-                                    <p className="text-xs text-slate-500">
-                                        {isLoadingScoringInsights ? 'Memuat evaluasi model...' : 'Data evaluasi belum tersedia.'}
-                                    </p>
-                                ) : (
-                                    <div className="space-y-3">
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                                                <p className="text-[11px] text-slate-500">Precision@K (Interview+)</p>
-                                                <p className="text-sm font-semibold text-slate-900">
-                                                    {formatPercent(scoringEvaluation.summary?.precision_at_k_interview)}
-                                                </p>
-                                            </div>
-                                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                                                <p className="text-[11px] text-slate-500">Precision@K (Hired)</p>
-                                                <p className="text-sm font-semibold text-slate-900">
-                                                    {formatPercent(scoringEvaluation.summary?.precision_at_k_hired)}
-                                                </p>
-                                            </div>
-                                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                                                <p className="text-[11px] text-slate-500">Recall Shortlist vs Interview+</p>
-                                                <p className="text-sm font-semibold text-slate-900">
-                                                    {formatPercent(scoringEvaluation.summary?.recall_shortlist_vs_interview)}
-                                                </p>
-                                            </div>
-                                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                                                <p className="text-[11px] text-slate-500">Recall Shortlist vs Hired</p>
-                                                <p className="text-sm font-semibold text-slate-900">
-                                                    {formatPercent(scoringEvaluation.summary?.recall_shortlist_vs_hired)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <p className="text-[11px] text-slate-500">
-                                            Konfigurasi: K={scoringEvaluation.config?.top_k ?? '-'} | Eligible only: {scoringEvaluation.config?.eligible_only ? 'Ya' : 'Tidak'} | Min score: {scoringEvaluation.config?.min_score ?? '-'}
-                                        </p>
-                                    </div>
-                                )}
-                            </Card>
-
-                            <Card className="h-full space-y-3 p-4 md:p-5 xl:col-span-3">
-                                <div>
-                                    <p className="text-sm font-semibold text-slate-900">Audit Trail Scoring</p>
-                                    <p className="text-xs text-slate-600">Aktivitas terbaru konfigurasi, shortlist, dan export.</p>
-                                </div>
-                                {scoringAuditRows.length === 0 ? (
-                                    <p className="text-xs text-slate-500">Belum ada aktivitas audit scoring.</p>
-                                ) : (
-                                    <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
-                                        {scoringAuditRows.slice(0, 8).map((audit) => (
-                                            <div key={audit.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                                                <p className="text-xs font-semibold text-slate-900">{audit.action_label}</p>
-                                                <p className="text-[11px] text-slate-600">
-                                                    {audit.division_name || '-'} | {audit.position_title || '-'}
-                                                </p>
-                                                <p className="text-[11px] text-slate-500">
-                                                    Oleh {audit.actor_name || 'System'} • {audit.created_at_diff || audit.created_at || '-'}
-                                                </p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                <p className="text-[11px] text-slate-500">
+                                    Untuk evaluasi model, fairness, drift, dan audit trail, buka menu <span className="font-semibold text-slate-700">Recruitment &gt; Analytics Rekrutmen</span>.
+                                </p>
                             </Card>
                         </div>
 
@@ -1037,126 +878,6 @@ export default function KelolaRekrutmenIndex({
                         <RecruitmentCalendar interviews={interviewRows} isEmbedded />
                     </TabsContent>
 
-                    <TabsContent value="analytics">
-                        <div className="space-y-4">
-                            <Card className="p-4 md:p-5 space-y-3">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div>
-                                        <p className="text-sm font-semibold text-slate-900">Fairness & Drift Analytics</p>
-                                        <p className="text-xs text-slate-600">
-                                            Monitoring fairness antar divisi dan drift skor antar periode.
-                                        </p>
-                                    </div>
-                                    <BarChart3 className="h-4 w-4 text-indigo-600" />
-                                </div>
-
-                                {!scoringAnalytics ? (
-                                    <p className="text-xs text-slate-500">
-                                        {isLoadingScoringInsights ? 'Memuat analytics...' : 'Data analytics belum tersedia.'}
-                                    </p>
-                                ) : (
-                                    <div className="grid gap-3 md:grid-cols-4">
-                                        <div className="rounded-lg border border-slate-200 p-3">
-                                            <p className="text-[11px] text-slate-500">Global Avg Score</p>
-                                            <p className="text-base font-semibold text-slate-900">
-                                                {Number(scoringAnalytics.summary?.global_avg_score ?? 0).toFixed(2)}
-                                            </p>
-                                        </div>
-                                        <div className="rounded-lg border border-slate-200 p-3">
-                                            <p className="text-[11px] text-slate-500">Global Eligible Rate</p>
-                                            <p className="text-base font-semibold text-slate-900">
-                                                {formatPercent(scoringAnalytics.summary?.global_eligible_rate)}
-                                            </p>
-                                        </div>
-                                        <div className="rounded-lg border border-slate-200 p-3">
-                                            <p className="text-[11px] text-slate-500">Interview+ Rate</p>
-                                            <p className="text-base font-semibold text-slate-900">
-                                                {formatPercent(scoringAnalytics.summary?.global_interview_positive_rate)}
-                                            </p>
-                                        </div>
-                                        <div className="rounded-lg border border-slate-200 p-3">
-                                            <p className="text-[11px] text-slate-500">Hired Rate</p>
-                                            <p className="text-base font-semibold text-slate-900">
-                                                {formatPercent(scoringAnalytics.summary?.global_hired_rate)}
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                            </Card>
-
-                            <div className="grid gap-4 xl:grid-cols-2">
-                                <Card className="p-4 md:p-5 space-y-3">
-                                    <p className="text-sm font-semibold text-slate-900">Fairness per Divisi</p>
-                                    {!scoringAnalytics?.by_division?.length ? (
-                                        <p className="text-xs text-slate-500">Belum ada data divisi.</p>
-                                    ) : (
-                                        <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                                            {scoringAnalytics.by_division.map((row) => {
-                                                const badgeClass =
-                                                    row.fairness_flag === 'Waspada'
-                                                        ? 'bg-red-100 text-red-700'
-                                                        : row.fairness_flag === 'Monitor'
-                                                            ? 'bg-amber-100 text-amber-700'
-                                                            : 'bg-emerald-100 text-emerald-700';
-                                                return (
-                                                    <div key={row.division} className="rounded-lg border border-slate-200 p-3 space-y-1.5">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <p className="text-sm font-semibold text-slate-900">{row.division}</p>
-                                                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${badgeClass}`}>
-                                                                {row.fairness_flag}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-xs text-slate-600">
-                                                            Avg {Number(row.avg_score ?? 0).toFixed(2)} | Gap {Number(row.score_gap_from_global ?? 0).toFixed(2)} | Kandidat {row.applications_count}
-                                                        </p>
-                                                        <p className="text-[11px] text-slate-500">
-                                                            Eligible {formatPercent(row.eligible_rate)} | Interview+ {formatPercent(row.interview_positive_rate)} | Hired {formatPercent(row.hired_rate)}
-                                                        </p>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </Card>
-
-                                <Card className="p-4 md:p-5 space-y-3">
-                                    <p className="text-sm font-semibold text-slate-900">Drift Skor per Periode</p>
-                                    {!scoringAnalytics?.by_period?.length ? (
-                                        <p className="text-xs text-slate-500">Belum ada data periode.</p>
-                                    ) : (
-                                        <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                                            {scoringAnalytics.by_period.map((row) => {
-                                                const isUp = Number(row.drift_score_delta ?? 0) >= 0;
-                                                const driftClass =
-                                                    row.drift_level === 'Tinggi'
-                                                        ? 'text-red-600'
-                                                        : row.drift_level === 'Sedang'
-                                                            ? 'text-amber-600'
-                                                            : 'text-emerald-600';
-                                                return (
-                                                    <div key={row.period} className="rounded-lg border border-slate-200 p-3 space-y-1.5">
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <p className="text-sm font-semibold text-slate-900">{row.period_label}</p>
-                                                            <span className={`text-[11px] font-semibold ${driftClass}`}>
-                                                                {row.drift_level}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-xs text-slate-600">
-                                                            Avg {Number(row.avg_score ?? 0).toFixed(2)} | Median {Number(row.median_score ?? 0).toFixed(2)} | Kandidat {row.applications_count}
-                                                        </p>
-                                                        <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                                                            <TrendingValueIcon positive={isUp} />
-                                                            Drift {isUp ? '+' : ''}{Number(row.drift_score_delta ?? 0).toFixed(2)}
-                                                        </p>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </Card>
-                            </div>
-                        </div>
-                    </TabsContent>
                 </Tabs>
 
 

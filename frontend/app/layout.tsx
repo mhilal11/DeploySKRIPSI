@@ -1,4 +1,8 @@
-﻿import type { Metadata } from 'next';
+import { Suspense } from 'react';
+
+import AppClientRoot from '@/runtime/AppClientRoot';
+
+import type { Metadata } from 'next';
 import '@/shared/styles/app.css';
 
 export const metadata: Metadata = {
@@ -17,8 +21,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <Suspense fallback={null}>
+          <AppClientRoot />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }
-

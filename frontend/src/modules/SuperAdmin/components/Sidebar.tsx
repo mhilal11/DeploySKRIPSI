@@ -1,4 +1,4 @@
-﻿import {
+import {
     LayoutDashboard,
     Users,
     UserMinus,
@@ -6,12 +6,14 @@
     UserPlus,
     Mail,
     Building2,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     LogOut,
     X,
 } from 'lucide-react';
-import { memo, useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Link, router } from '@/shared/lib/inertia';
 import { route } from '@/shared/lib/route';
@@ -23,8 +25,17 @@ import type { ComponentType, SVGProps } from 'react';
 interface NavItem {
     label: string;
     icon: ComponentType<SVGProps<SVGSVGElement>>;
-    routeName: string;
-    pattern: string | string[];
+    routeName?: string;
+    href?: string;
+    pattern?: string | string[];
+    exact?: boolean;
+    children?: Array<{
+        label: string;
+        routeName?: string;
+        href?: string;
+        pattern: string | string[];
+        exact?: boolean;
+    }>;
     superAdminOnly?: boolean;
     badgeKey?: string;
 }
@@ -44,11 +55,24 @@ const defaultNavItems: NavItem[] = [
         superAdminOnly: true,
     },
     {
-        label: 'Kelola Rekrutmen',
+        label: 'Recruitment',
         icon: UserPlus,
         routeName: 'super-admin.recruitment',
-        pattern: 'super-admin.recruitment',
+        pattern: ['super-admin.recruitment', 'super-admin.recruitment.analytics'],
         badgeKey: 'super-admin.recruitment',
+        children: [
+            {
+                label: 'Kelola Rekrutmen',
+                routeName: 'super-admin.recruitment',
+                pattern: 'super-admin.recruitment',
+                exact: true,
+            },
+            {
+                label: 'Analytics Rekrutmen',
+                href: '/super-admin/recruitment/analytics',
+                pattern: 'super-admin.recruitment.analytics',
+            },
+        ],
     },
     {
         label: 'Kelola Divisi',
@@ -105,6 +129,8 @@ function Sidebar({
     user,
     initialNotifications = {}
 }: SidebarProps) {
+    const pathname = usePathname();
+
     // If the shell provides live notifications, use them directly.
     // Otherwise fall back to local Echo-driven state (standalone usage).
     const hasExternalNotifications = notifications !== undefined;
@@ -169,24 +195,82 @@ function Sidebar({
         user?.role === 'Admin' &&
         typeof user?.division === 'string' &&
         /human\s+(capital|resources)/i.test(user.division);
-    const navItems: NavItem[] = isHumanCapitalAdmin
-        ? [
-              {
-                  label: 'Dashboard',
-                  icon: LayoutDashboard,
-                  routeName: 'super-admin.admin-hr.dashboard',
-                  pattern: 'super-admin.admin-hr.dashboard',
-              },
-              ...defaultNavItems.filter((item) => item.routeName !== 'super-admin.dashboard'),
-          ]
-        : defaultNavItems;
+    const navItems: NavItem[] = useMemo(
+        () =>
+            isHumanCapitalAdmin
+                ? [
+                    {
+                        label: 'Dashboard',
+                        icon: LayoutDashboard,
+                        routeName: 'super-admin.admin-hr.dashboard',
+                        pattern: 'super-admin.admin-hr.dashboard',
+                    },
+                    ...defaultNavItems.filter((item) => item.routeName !== 'super-admin.dashboard'),
+                ]
+                : defaultNavItems,
+        [isHumanCapitalAdmin],
+    );
     const panelLabel = isHumanCapitalAdmin ? 'Admin HR' : 'Super Admin';
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
     const handleNavClick = () => {
         if (onMobileClose) {
             onMobileClose();
         }
     };
+
+    const isHrefActive = useCallback((href?: string, exact?: boolean) => {
+        if (!href) return false;
+        const normalizedHref = href.endsWith('/') && href.length > 1 ? href.slice(0, -1) : href;
+        const normalizedPath = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
+
+        if (exact) {
+            return normalizedPath === normalizedHref;
+        }
+
+        return (
+            normalizedPath === normalizedHref ||
+            normalizedPath.startsWith(`${normalizedHref}/`)
+        );
+    }, [pathname]);
+
+    const isChildActiveByPath = useCallback((child: {
+        label: string;
+        routeName?: string;
+        href?: string;
+        pattern: string | string[];
+        exact?: boolean;
+    }) => {
+        const childHref = child.href ?? (child.routeName ? route(child.routeName) : undefined);
+        return isHrefActive(childHref, child.exact);
+    }, [isHrefActive]);
+
+    const isItemActiveByPath = useCallback((item: NavItem) => {
+        if (item.children?.length) {
+            return item.children.some((child) => isChildActiveByPath(child));
+        }
+        const itemHref = item.href ?? (item.routeName ? route(item.routeName) : undefined);
+        return isHrefActive(itemHref, item.exact);
+    }, [isChildActiveByPath, isHrefActive]);
+
+    useEffect(() => {
+        setExpandedGroups((previous) => {
+            let changed = false;
+            const next = { ...previous };
+
+            navItems.forEach((item) => {
+                if (!item.children?.length) return;
+                const current = next[item.label];
+                const shouldOpen = item.children.some((child) => isChildActiveByPath(child));
+                if (current === undefined || (shouldOpen && !current)) {
+                    next[item.label] = shouldOpen;
+                    changed = true;
+                }
+            });
+
+            return changed ? next : previous;
+        });
+    }, [isChildActiveByPath, navItems]);
 
     return (
         <aside
@@ -246,61 +330,138 @@ function Sidebar({
                 {navItems
                     .filter((item) => (item.superAdminOnly ? isSuperAdmin : true))
                     .map((item) => {
-                    const Icon = item.icon;
-                    const isActive = Array.isArray(item.pattern)
-                        ? item.pattern.some((pattern) => route().current(pattern))
-                        : item.pattern
-                          ? route().current(item.pattern)
-                          : false;
+                        const Icon = item.icon;
+                        const hasChildren = Boolean(item.children?.length);
+                        const itemHref = item.href ?? (item.routeName ? route(item.routeName) : '#');
+                        const itemIsActive = isItemActiveByPath(item);
 
-                    return (
-                        <Link
-                            key={item.label}
-                            href={route(item.routeName)}
-                            title={!isOpen ? item.label : undefined}
-                            onClick={handleNavClick}
-                            className={cn(
-                                "flex items-center rounded-lg transition-all duration-200 group relative",
-                                isOpen || isMobileOpen ? "gap-2 md:gap-3 px-2 md:px-3 py-1.5 md:py-2" : "justify-center p-3",
-                                isActive
-                                    ? 'bg-white/10 text-white'
-                                    : 'text-blue-100 hover:bg-white/5'
-                            )}
-                        >
-                            <Icon className={cn("shrink-0", isOpen || isMobileOpen ? "h-3 w-3 md:h-3.5 md:w-3.5" : "h-4 w-4")} />
-                            
-                            <div className={cn(
-                                "grid transition-[grid-template-columns] duration-300 ease-in-out flex-1",
-                                isOpen || isMobileOpen ? "grid-cols-[1fr]" : "grid-cols-[0fr]"
-                            )}>
-                                <span className={cn(
-                                    "flex items-center justify-between overflow-hidden transition-opacity duration-300 min-w-0",
-                                    isOpen || isMobileOpen ? "opacity-100" : "opacity-0"
-                                )}>
-                                    <span className="truncate text-[10px] md:text-xs">{item.label}</span>
-                                    {(() => {
-                                        const rawCount = item.badgeKey
-                                            ? liveBadges[item.badgeKey] ?? 0
-                                            : 0;
-                                        if (!rawCount || rawCount <= 0) {
-                                            return null;
+                        if (hasChildren && (isOpen || isMobileOpen)) {
+                            const isExpanded = expandedGroups[item.label] ?? itemIsActive;
+                            return (
+                                <div key={item.label} className="space-y-1">
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setExpandedGroups((prev) => ({
+                                                ...prev,
+                                                [item.label]: !isExpanded,
+                                            }))
                                         }
-                                        const displayCount = rawCount > 99 ? '99+' : rawCount;
-                                        return (
-                                            <span className="ml-2 inline-flex min-w-[1.25rem] h-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
-                                                {displayCount}
+                                        className={cn(
+                                            "flex w-full items-center gap-2 md:gap-3 rounded-lg px-2 md:px-3 py-1.5 md:py-2 transition-all duration-200",
+                                            itemIsActive
+                                                ? 'bg-white/10 text-white'
+                                                : 'text-blue-100 hover:bg-white/5'
+                                        )}
+                                    >
+                                        <Icon className="h-3 w-3 shrink-0 md:h-3.5 md:w-3.5" />
+                                        <span className="flex min-w-0 flex-1 items-center justify-between text-[10px] md:text-xs">
+                                            <span className="truncate">{item.label}</span>
+                                            <span className="ml-2 flex items-center gap-1">
+                                                {(() => {
+                                                    const rawCount = item.badgeKey
+                                                        ? liveBadges[item.badgeKey] ?? 0
+                                                        : 0;
+                                                    if (!rawCount || rawCount <= 0) {
+                                                        return null;
+                                                    }
+                                                    const displayCount = rawCount > 99 ? '99+' : rawCount;
+                                                    return (
+                                                        <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                                                            {displayCount}
+                                                        </span>
+                                                    );
+                                                })()}
+                                                <ChevronDown
+                                                    className={cn(
+                                                        "h-3.5 w-3.5 transition-transform duration-200",
+                                                        isExpanded ? "rotate-180" : "rotate-0",
+                                                    )}
+                                                />
                                             </span>
-                                        );
-                                    })()}
-                                </span>
-                            </div>
+                                        </span>
+                                    </button>
 
-                            {/* Badge for collapsed state (desktop only) */}
-                            {!isOpen && !isMobileOpen && item.badgeKey && (liveBadges[item.badgeKey] ?? 0) > 0 && (
-                                <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-rose-500 border-2 border-blue-950 hidden md:block" />
-                            )}
-                        </Link>
-                    );
+                                    <div
+                                        className={cn(
+                                            "ml-5 grid gap-1 overflow-hidden transition-all duration-200",
+                                            isExpanded
+                                                ? "max-h-40 opacity-100"
+                                                : "max-h-0 opacity-0 pointer-events-none",
+                                        )}
+                                    >
+                                        {item.children!.map((child) => {
+                                            const childHref = child.href ?? (child.routeName ? route(child.routeName) : itemHref);
+                                            const childIsActive = isHrefActive(childHref, child.exact);
+                                            return (
+                                                <Link
+                                                    key={`${item.label}-${child.label}`}
+                                                    href={childHref}
+                                                    onClick={handleNavClick}
+                                                    className={cn(
+                                                        "rounded-md px-3 py-1.5 text-[10px] md:text-xs transition-colors",
+                                                        childIsActive
+                                                            ? "bg-white/15 text-white"
+                                                            : "text-blue-100 hover:bg-white/5",
+                                                    )}
+                                                >
+                                                    {child.label}
+                                                </Link>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        return (
+                            <Link
+                                key={item.label}
+                                href={itemHref}
+                                title={!isOpen ? item.label : undefined}
+                                onClick={handleNavClick}
+                                className={cn(
+                                    "flex items-center rounded-lg transition-all duration-200 group relative",
+                                    isOpen || isMobileOpen ? "gap-2 md:gap-3 px-2 md:px-3 py-1.5 md:py-2" : "justify-center p-3",
+                                    itemIsActive
+                                        ? 'bg-white/10 text-white'
+                                        : 'text-blue-100 hover:bg-white/5'
+                                )}
+                            >
+                                <Icon className={cn("shrink-0", isOpen || isMobileOpen ? "h-3 w-3 md:h-3.5 md:w-3.5" : "h-4 w-4")} />
+
+                                <div className={cn(
+                                    "grid transition-[grid-template-columns] duration-300 ease-in-out flex-1",
+                                    isOpen || isMobileOpen ? "grid-cols-[1fr]" : "grid-cols-[0fr]"
+                                )}>
+                                    <span className={cn(
+                                        "flex items-center justify-between overflow-hidden transition-opacity duration-300 min-w-0",
+                                        isOpen || isMobileOpen ? "opacity-100" : "opacity-0"
+                                    )}>
+                                        <span className="truncate text-[10px] md:text-xs">{item.label}</span>
+                                        {(() => {
+                                            const rawCount = item.badgeKey
+                                                ? liveBadges[item.badgeKey] ?? 0
+                                                : 0;
+                                            if (!rawCount || rawCount <= 0) {
+                                                return null;
+                                            }
+                                            const displayCount = rawCount > 99 ? '99+' : rawCount;
+                                            return (
+                                                <span className="ml-2 inline-flex min-w-[1.25rem] h-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                                                    {displayCount}
+                                                </span>
+                                            );
+                                        })()}
+                                    </span>
+                                </div>
+
+                                {/* Badge for collapsed state (desktop only) */}
+                                {!isOpen && !isMobileOpen && item.badgeKey && (liveBadges[item.badgeKey] ?? 0) > 0 && (
+                                    <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-rose-500 border-2 border-blue-950 hidden md:block" />
+                                )}
+                            </Link>
+                        );
                 })}
             </nav>
 
@@ -424,4 +585,6 @@ function arePropsEqual(prevProps: SidebarProps, nextProps: SidebarProps): boolea
 
 // Wrap with memo and custom comparison to prevent re-renders
 export default memo(Sidebar, arePropsEqual);
+
+
 

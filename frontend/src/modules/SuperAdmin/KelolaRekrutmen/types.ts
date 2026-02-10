@@ -242,6 +242,12 @@ export type RecruitmentPageProps = PageProps<{
     scoringAnalytics?: RecruitmentScoringAnalytics | null;
 }>;
 
+export type RecruitmentAnalyticsPageProps = PageProps<{
+    scoringAudits?: RecruitmentScoringAudit[];
+    scoringEvaluation?: RecruitmentScoringEvaluation | null;
+    scoringAnalytics?: RecruitmentScoringAnalytics | null;
+}>;
+
 export type StatusSummary = Partial<Record<ApplicantStatus, number>>;
 
 export const formatApplicationId = (id: number) =>

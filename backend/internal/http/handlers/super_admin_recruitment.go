@@ -204,6 +204,22 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 	})
 }
 
+func SuperAdminRecruitmentAnalyticsIndex(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+		JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	db := middleware.GetDB(c)
+	scoringAudits := loadRecruitmentScoringAudits(db, 25)
+
+	c.JSON(http.StatusOK, gin.H{
+		"scoringAudits":        scoringAudits,
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+	})
+}
+
 func SuperAdminRecruitmentViewCV(c *gin.Context) {
 	user := middleware.CurrentUser(c)
 	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {

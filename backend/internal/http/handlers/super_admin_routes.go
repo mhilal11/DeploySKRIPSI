@@ -8,6 +8,7 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 	rg.GET("/super-admin/notifications", SuperAdminNotifications)
 
 	rg.GET("/super-admin/recruitment", SuperAdminRecruitmentIndex)
+	rg.GET("/super-admin/recruitment/analytics", SuperAdminRecruitmentAnalyticsIndex)
 	rg.GET("/super-admin/recruitment/:id/cv", SuperAdminRecruitmentViewCV)
 	rg.PUT("/super-admin/recruitment/:id/update-status", SuperAdminRecruitmentUpdateStatus)
 	rg.POST("/super-admin/recruitment/:id/reject", SuperAdminRecruitmentReject)
