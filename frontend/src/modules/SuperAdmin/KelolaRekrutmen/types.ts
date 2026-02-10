@@ -20,6 +20,7 @@ export type ApplicantRejectHandler = (id: number, reason: string) => void;
 export interface ApplicantRecord {
     id: number;
     name: string;
+    division?: string | null;
     position: string;
     education?: string | null;
     experience?: string | null;
@@ -90,6 +91,89 @@ export interface RecruitmentScoringAudit {
     created_at_diff?: string | null;
 }
 
+export interface RecruitmentScoringEvaluationConfig {
+    top_k: number;
+    eligible_only: boolean;
+    min_score: number;
+}
+
+export interface RecruitmentScoringEvaluationSummary {
+    total_candidates: number;
+    groups: number;
+    shortlisted_count: number;
+    interview_positive_count: number;
+    hired_positive_count: number;
+    tp_interview: number;
+    tp_hired: number;
+    precision_at_k_interview: number;
+    precision_at_k_hired: number;
+    recall_shortlist_vs_interview: number;
+    recall_shortlist_vs_hired: number;
+}
+
+export interface RecruitmentScoringEvaluationVacancy {
+    group_key: string;
+    division: string;
+    position: string;
+    total_candidates: number;
+    shortlisted_count: number;
+    interview_positive_count: number;
+    hired_positive_count: number;
+    tp_interview: number;
+    tp_hired: number;
+    precision_at_k_interview: number;
+    precision_at_k_hired: number;
+    recall_shortlist_vs_interview: number;
+    recall_shortlist_vs_hired: number;
+}
+
+export interface RecruitmentScoringEvaluation {
+    config: RecruitmentScoringEvaluationConfig;
+    summary: RecruitmentScoringEvaluationSummary;
+    by_vacancy: RecruitmentScoringEvaluationVacancy[];
+}
+
+export interface RecruitmentScoringAnalyticsSummary {
+    total_candidates: number;
+    global_avg_score: number;
+    global_median_score: number;
+    global_eligible_rate: number;
+    global_interview_positive_rate: number;
+    global_hired_rate: number;
+}
+
+export interface RecruitmentScoringAnalyticsDivision {
+    division: string;
+    applications_count: number;
+    avg_score: number;
+    median_score: number;
+    eligible_rate: number;
+    interview_positive_rate: number;
+    hired_rate: number;
+    score_gap_from_global: number;
+    fairness_flag: 'Seimbang' | 'Monitor' | 'Waspada' | string;
+}
+
+export interface RecruitmentScoringAnalyticsPeriod {
+    period: string;
+    period_label: string;
+    applications_count: number;
+    avg_score: number;
+    median_score: number;
+    eligible_rate: number;
+    interview_positive_rate: number;
+    hired_rate: number;
+    drift_score_delta: number;
+    drift_level: 'Stabil' | 'Sedang' | 'Tinggi' | string;
+}
+
+export interface RecruitmentScoringAnalytics {
+    window_months: number;
+    summary: RecruitmentScoringAnalyticsSummary;
+    by_division: RecruitmentScoringAnalyticsDivision[];
+    by_period: RecruitmentScoringAnalyticsPeriod[];
+}
+
 export interface ApplicantEducation {
     institution?: string | null;
     degree?: string | null;
@@ -154,6 +238,8 @@ export type RecruitmentPageProps = PageProps<{
     interviews: InterviewSchedule[];
     onboarding: OnboardingItem[];
     scoringAudits?: RecruitmentScoringAudit[];
+    scoringEvaluation?: RecruitmentScoringEvaluation | null;
+    scoringAnalytics?: RecruitmentScoringAnalytics | null;
 }>;
 
 export type StatusSummary = Partial<Record<ApplicantStatus, number>>;

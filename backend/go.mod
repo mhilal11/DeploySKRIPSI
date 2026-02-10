@@ -10,6 +10,7 @@ require (
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
+	github.com/jung-kurt/gofpdf v1.16.2
 	golang.org/x/crypto v0.47.0
 	golang.org/x/oauth2 v0.35.0
 )

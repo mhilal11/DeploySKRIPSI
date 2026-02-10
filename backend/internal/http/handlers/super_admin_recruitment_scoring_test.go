@@ -82,3 +82,73 @@ func TestPickAutoShortlistCandidates_SortsIneligibleAfterEligible(t *testing.T) 
 		t.Fatalf("expected eligible candidate to be prioritized, got id=%d", selected[0].Application.ID)
 	}
 }
+
+func TestFilterScoringCandidates_AppliesFilters(t *testing.T) {
+	candidates := []shortlistCandidate{
+		{
+			Application: models.Application{ID: 1, Status: "Applied"},
+			Division:    "IT",
+			Position:    "Backend Engineer",
+		},
+		{
+			Application: models.Application{ID: 2, Status: "Hired"},
+			Division:    "IT",
+			Position:    "Backend Engineer",
+		},
+		{
+			Application: models.Application{ID: 3, Status: "Hired"},
+			Division:    "HR",
+			Position:    "Recruiter",
+		},
+	}
+
+	filtered := filterScoringCandidates(candidates, "Hired", "IT", "Backend Engineer")
+	if len(filtered) != 1 {
+		t.Fatalf("expected one candidate after filtering, got %d", len(filtered))
+	}
+	if filtered[0].Application.ID != 2 {
+		t.Fatalf("expected candidate id 2, got %d", filtered[0].Application.ID)
+	}
+}
+
+func TestRatioPercent(t *testing.T) {
+	if value := ratioPercent(2, 4); value != 50 {
+		t.Fatalf("expected 50 percent, got %.2f", value)
+	}
+	if value := ratioPercent(1, 0); value != 0 {
+		t.Fatalf("expected 0 percent when denominator is zero, got %.2f", value)
+	}
+}
+
+func TestMedianScore(t *testing.T) {
+	if value := medianScore([]float64{80, 60, 90}); value != 80 {
+		t.Fatalf("expected median 80, got %.2f", value)
+	}
+	if value := medianScore([]float64{80, 60, 90, 100}); value != 85 {
+		t.Fatalf("expected median 85, got %.2f", value)
+	}
+}
+
+func TestStatusHelpers(t *testing.T) {
+	if !isInterviewPositiveStatus("Interview") || !isInterviewPositiveStatus("Offering") || !isInterviewPositiveStatus("Hired") {
+		t.Fatal("expected Interview/Offering/Hired to be interview-positive statuses")
+	}
+	if isInterviewPositiveStatus("Applied") {
+		t.Fatal("did not expect Applied to be interview-positive")
+	}
+	if !isHiredPositiveStatus("Hired") {
+		t.Fatal("expected Hired to be hired-positive")
+	}
+	if isHiredPositiveStatus("Interview") {
+		t.Fatal("did not expect Interview to be hired-positive")
+	}
+}
+
+func TestFormatMonthLabel(t *testing.T) {
+	if value := formatMonthLabel("2026-02"); value != "Februari 2026" {
+		t.Fatalf("unexpected month label: %s", value)
+	}
+	if value := formatMonthLabel("invalid"); value != "invalid" {
+		t.Fatalf("expected invalid period to stay unchanged, got %s", value)
+	}
+}

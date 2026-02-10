@@ -1,7 +1,18 @@
 ﻿// src/Pages/SuperAdmin/Recruitment/KelolaRekrutmenIndex.tsx
 
-import { Calendar as CalendarIcon, Users, Video, UserCheck, FileDown, Sparkles } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import {
+    Activity,
+    BarChart3,
+    Calendar as CalendarIcon,
+    FileDown,
+    FileText,
+    RefreshCw,
+    Sparkles,
+    Users,
+    UserCheck,
+    Video,
+} from 'lucide-react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { toast } from 'sonner';
 
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
@@ -26,7 +37,9 @@ import {
     ApplicantRejectHandler,
     InterviewSchedule,
     OnboardingItem,
+    RecruitmentScoringAnalytics,
     RecruitmentScoringAudit,
+    RecruitmentScoringEvaluation,
     RecruitmentPageProps,
     StatusSummary,
 } from './types';
@@ -62,6 +75,61 @@ const formatDateLabel = (dateValue?: string | null) => {
         year: 'numeric',
     });
 };
+
+const formatPercent = (value?: number | null) => `${Number(value ?? 0).toFixed(1)}%`;
+
+const recruitmentFilterStorageKey = 'super_admin_recruitment_global_filter_preferences_v1';
+const TOP_LOWONGAN_MIN = 1;
+const MINIMUM_SCORE_MIN = 0;
+const MINIMUM_SCORE_MAX = 100;
+
+const sanitizeTopLowonganInput = (value: string, maxAllowed: number) => {
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly === '') return '';
+
+    const normalized = digitsOnly.replace(/^0+(?=\d)/, '');
+    const numeric = Number(normalized);
+    if (Number.isNaN(numeric) || numeric < TOP_LOWONGAN_MIN) return '';
+
+    return String(Math.min(maxAllowed, numeric));
+};
+
+const parseTopLowonganValue = (value: string, maxAllowed: number) => {
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) return TOP_LOWONGAN_MIN;
+    return Math.max(TOP_LOWONGAN_MIN, Math.min(maxAllowed, numeric));
+};
+
+const sanitizeMinimumScoreInput = (value: string) => {
+    const digitsOnly = value.replace(/\D/g, '');
+    if (digitsOnly === '') return '';
+
+    const normalized = digitsOnly.replace(/^0+(?=\d)/, '');
+    const numeric = Number(normalized);
+    if (Number.isNaN(numeric)) return '';
+
+    return String(Math.max(MINIMUM_SCORE_MIN, Math.min(MINIMUM_SCORE_MAX, numeric)));
+};
+
+const parseDateQuery = (value?: string | null): Date | null => {
+    if (!value) return null;
+    const parsed = new Date(`${value}T00:00:00`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const formatDateQuery = (date?: Date | null) => {
+    if (!date) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const TrendingValueIcon = ({ positive }: { positive: boolean }) => (
+    <span className={positive ? 'text-emerald-600' : 'text-red-600'}>
+        {positive ? '^' : 'v'}
+    </span>
+);
 
 const buildOnboardingSteps = (
     contractSigned: boolean,
@@ -126,15 +194,19 @@ const buildOnboardingItem = (
 export default function KelolaRekrutmenIndex({
     auth,
     applications,
-    statusOptions,
     interviews,
     onboarding,
     scoringAudits: initialScoringAudits = [],
+    scoringEvaluation: initialScoringEvaluation = null,
+    scoringAnalytics: initialScoringAnalytics = null,
 }: RecruitmentPageProps) {
     const [applicationRows, setApplicationRows] = useState(applications);
     const [interviewRows, setInterviewRows] = useState(interviews);
     const [onboardingRows, setOnboardingRows] = useState(onboarding);
     const [scoringAuditRows, setScoringAuditRows] = useState<RecruitmentScoringAudit[]>(initialScoringAudits);
+    const [scoringEvaluation, setScoringEvaluation] = useState<RecruitmentScoringEvaluation | null>(initialScoringEvaluation);
+    const [scoringAnalytics, setScoringAnalytics] = useState<RecruitmentScoringAnalytics | null>(initialScoringAnalytics);
+    const [isLoadingScoringInsights, setIsLoadingScoringInsights] = useState(false);
     const [activeTab, setActiveTab] = useState('applicants');
     const [statusFilter, setStatusFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -142,6 +214,7 @@ export default function KelolaRekrutmenIndex({
         from: null,
         to: null,
     });
+    const [isGlobalFilterHydrated, setIsGlobalFilterHydrated] = useState(false);
 
     const [scheduleOpen, setScheduleOpen] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
@@ -150,10 +223,30 @@ export default function KelolaRekrutmenIndex({
 
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [updatingApplicantId, setUpdatingApplicantId] = useState<number | null>(null);
-    const [autoShortlistTopN, setAutoShortlistTopN] = useState(3);
-    const [autoShortlistMinScore, setAutoShortlistMinScore] = useState(70);
+    const [autoShortlistTopN, setAutoShortlistTopN] = useState('3');
+    const [autoShortlistMinScore, setAutoShortlistMinScore] = useState('70');
     const [autoShortlistEligibleOnly, setAutoShortlistEligibleOnly] = useState(true);
     const [isRunningAutoShortlist, setIsRunningAutoShortlist] = useState(false);
+
+    const totalLowonganAvailable = useMemo(() => {
+        const uniquePositions = new Set<string>();
+        applicationRows.forEach((application) => {
+            const normalizedPosition = (application.position ?? '').trim().toLowerCase();
+            if (normalizedPosition !== '') {
+                uniquePositions.add(normalizedPosition);
+            }
+        });
+        return uniquePositions.size;
+    }, [applicationRows]);
+
+    const autoShortlistTopNMax = Math.max(TOP_LOWONGAN_MIN, totalLowonganAvailable);
+
+    useEffect(() => {
+        setAutoShortlistTopN((previous) => {
+            if (previous.trim() === '') return previous;
+            return String(parseTopLowonganValue(previous, autoShortlistTopNMax));
+        });
+    }, [autoShortlistTopNMax]);
 
     useEffect(() => {
         setApplicationRows(applications);
@@ -172,6 +265,14 @@ export default function KelolaRekrutmenIndex({
     }, [initialScoringAudits]);
 
     useEffect(() => {
+        setScoringEvaluation(initialScoringEvaluation);
+    }, [initialScoringEvaluation]);
+
+    useEffect(() => {
+        setScoringAnalytics(initialScoringAnalytics);
+    }, [initialScoringAnalytics]);
+
+    useEffect(() => {
         if (!selectedApplicant) {
             return;
         }
@@ -182,6 +283,106 @@ export default function KelolaRekrutmenIndex({
             setSelectedApplicant(refreshedApplicant);
         }
     }, [applicationRows, selectedApplicant]);
+
+    const fetchScoringInsights = async () => {
+        if (isLoadingScoringInsights) return;
+
+        setIsLoadingScoringInsights(true);
+        try {
+            const [evaluationResponse, analyticsResponse] = await Promise.all([
+                api.get(apiUrl('/super-admin/recruitment/scoring-evaluation'), {
+                    params: {
+                        k: parseTopLowonganValue(autoShortlistTopN, autoShortlistTopNMax),
+                        eligible_only: autoShortlistEligibleOnly,
+                        min_score: Math.max(MINIMUM_SCORE_MIN, Math.min(MINIMUM_SCORE_MAX, Number(autoShortlistMinScore) || 0)),
+                    },
+                }),
+                api.get(apiUrl('/super-admin/recruitment/scoring-analytics'), {
+                    params: { months: 12 },
+                }),
+            ]);
+
+            setScoringEvaluation((evaluationResponse.data ?? null) as RecruitmentScoringEvaluation | null);
+            setScoringAnalytics((analyticsResponse.data ?? null) as RecruitmentScoringAnalytics | null);
+        } catch {
+            toast.error('Gagal memuat evaluasi model scoring.');
+        } finally {
+            setIsLoadingScoringInsights(false);
+        }
+    };
+
+    useEffect(() => {
+        if (initialScoringEvaluation && initialScoringAnalytics) {
+            return;
+        }
+        void fetchScoringInsights();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        let stored: Record<string, string> = {};
+        try {
+            const raw = window.localStorage.getItem(recruitmentFilterStorageKey);
+            if (raw) {
+                stored = JSON.parse(raw) as Record<string, string>;
+            }
+        } catch {
+            stored = {};
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const statusFromSource = params.get('status') || stored.status || 'all';
+        const nextStatus = statusOrder.includes(statusFromSource as ApplicantStatus)
+            ? statusFromSource
+            : 'all';
+        const nextSearch = params.get('q') || stored.q || '';
+        const nextFrom = parseDateQuery(params.get('from') || stored.from || '');
+        const nextTo = parseDateQuery(params.get('to') || stored.to || '');
+
+        setStatusFilter(nextStatus);
+        setSearchTerm(nextSearch);
+        setDateRange({ from: nextFrom, to: nextTo });
+        setIsGlobalFilterHydrated(true);
+    }, []);
+
+    useEffect(() => {
+        if (!isGlobalFilterHydrated || typeof window === 'undefined') {
+            return;
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const normalizedSearch = searchTerm.trim();
+        const from = formatDateQuery(dateRange.from);
+        const to = formatDateQuery(dateRange.to);
+
+        if (statusFilter === 'all') params.delete('status');
+        else params.set('status', statusFilter);
+
+        if (normalizedSearch === '') params.delete('q');
+        else params.set('q', normalizedSearch);
+
+        if (from === '') params.delete('from');
+        else params.set('from', from);
+
+        if (to === '') params.delete('to');
+        else params.set('to', to);
+
+        const query = params.toString();
+        const nextURL = `${window.location.pathname}${query ? `?${query}` : ''}`;
+        window.history.replaceState({}, '', nextURL);
+
+        window.localStorage.setItem(
+            recruitmentFilterStorageKey,
+            JSON.stringify({
+                status: statusFilter,
+                q: normalizedSearch,
+                from,
+                to,
+            }),
+        );
+    }, [statusFilter, searchTerm, dateRange, isGlobalFilterHydrated]);
 
     // FILTER DATA
     const filteredByStatus =
@@ -206,6 +407,7 @@ export default function KelolaRekrutmenIndex({
         ? filteredByDate.filter(
             (application) =>
                 application.name.toLowerCase().includes(normalizedSearch) ||
+                (application.division ?? '').toLowerCase().includes(normalizedSearch) ||
                 application.position.toLowerCase().includes(normalizedSearch) ||
                 application.email.toLowerCase().includes(normalizedSearch),
         )
@@ -479,8 +681,8 @@ export default function KelolaRekrutmenIndex({
     const handleRunAutoShortlist = async () => {
         if (isRunningAutoShortlist) return;
 
-        const topN = Math.max(1, Math.min(20, Number(autoShortlistTopN) || 1));
-        const minScore = Math.max(0, Math.min(100, Number(autoShortlistMinScore) || 0));
+        const topN = parseTopLowonganValue(autoShortlistTopN, autoShortlistTopNMax);
+        const minScore = Math.max(MINIMUM_SCORE_MIN, Math.min(MINIMUM_SCORE_MAX, Number(autoShortlistMinScore) || 0));
 
         setIsRunningAutoShortlist(true);
         try {
@@ -502,6 +704,7 @@ export default function KelolaRekrutmenIndex({
                     if (freshData?.scoringAudits && Array.isArray(freshData.scoringAudits)) {
                         setScoringAuditRows(freshData.scoringAudits);
                     }
+                    void fetchScoringInsights();
                 },
             });
         } catch (error) {
@@ -519,6 +722,28 @@ export default function KelolaRekrutmenIndex({
         }
     };
 
+    const handleMinimumScoreChange = (event: ChangeEvent<HTMLInputElement>) => {
+        setAutoShortlistMinScore(sanitizeMinimumScoreInput(event.target.value));
+    };
+
+    const handleMinimumScoreBlur = () => {
+        setAutoShortlistMinScore((previous) => {
+            const normalized = sanitizeMinimumScoreInput(previous);
+            return normalized === '' ? String(MINIMUM_SCORE_MIN) : normalized;
+        });
+    };
+
+    const handleTopLowonganChange = (event: ChangeEvent<HTMLInputElement>) => {
+        setAutoShortlistTopN(sanitizeTopLowonganInput(event.target.value, autoShortlistTopNMax));
+    };
+
+    const handleTopLowonganBlur = () => {
+        setAutoShortlistTopN((previous) => {
+            const normalized = sanitizeTopLowonganInput(previous, autoShortlistTopNMax);
+            return normalized === '' ? String(TOP_LOWONGAN_MIN) : normalized;
+        });
+    };
+
     const handleExportScoreReport = () => {
         const params = new URLSearchParams();
         if (statusFilter !== 'all') {
@@ -531,6 +756,20 @@ export default function KelolaRekrutmenIndex({
 
         window.open(url, '_blank');
         toast.success('Laporan skor sedang disiapkan.');
+    };
+
+    const handleExportScoreReportPDF = () => {
+        const params = new URLSearchParams();
+        if (statusFilter !== 'all') {
+            params.set('status', statusFilter);
+        }
+        const query = params.toString();
+        const url = query
+            ? apiUrl(`/super-admin/recruitment/export-score-report-pdf?${query}`)
+            : apiUrl('/super-admin/recruitment/export-score-report-pdf');
+
+        window.open(url, '_blank');
+        toast.success('Laporan PDF sedang disiapkan.');
     };
 
     const isHumanCapitalAdmin =
@@ -560,109 +799,185 @@ export default function KelolaRekrutmenIndex({
                 breadcrumbs={breadcrumbs}
             >
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6 w-full">
-                    <TabsList className="w-full justify-start p-0 h-auto bg-transparent gap-3">
+                    <TabsList className="w-full justify-start overflow-x-auto p-0 h-auto bg-transparent gap-3 whitespace-nowrap">
                         <TabsTrigger
                             value="applicants"
-                            className="rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
+                            className="flex-none rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
                         >
                             <Users className="h-4 w-4" />
                             Daftar Pelamar
                         </TabsTrigger>
                         <TabsTrigger
                             value="interviews"
-                            className="rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
+                            className="flex-none rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
                         >
                             <Video className="h-4 w-4" />
                             Jadwal Interview
                         </TabsTrigger>
                         <TabsTrigger
                             value="onboarding"
-                            className="rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
+                            className="flex-none rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
                         >
                             <UserCheck className="h-4 w-4" />
                             Onboarding
                         </TabsTrigger>
                         <TabsTrigger
                             value="calendar"
-                            className="rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
+                            className="flex-none rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
                         >
                             <CalendarIcon className="h-4 w-4" />
                             Calendar
                         </TabsTrigger>
+                        <TabsTrigger
+                            value="analytics"
+                            className="flex-none rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
+                        >
+                            <BarChart3 className="h-4 w-4" />
+                            Analytics
+                        </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="applicants">
-                        <div className="mb-4 grid gap-4 xl:grid-cols-[1.6fr_1fr]">
-                            <Card className="p-4 md:p-5 space-y-3">
+                        <div className="mb-5 grid gap-4 xl:grid-cols-12">
+                            <Card className="h-full space-y-4 p-4 md:p-5 xl:col-span-6">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
                                         <p className="text-sm font-semibold text-slate-900">Scoring Action Center</p>
-                                        <p className="text-xs text-slate-600">
-                                            Jalankan shortlist otomatis dan export laporan ranking kandidat.
+                                        <p className="text-xs leading-relaxed text-slate-600">
+                                            Jalankan shortlist otomatis dan export laporan ranking kandidat (CSV/PDF).
                                         </p>
                                     </div>
                                     <Sparkles className="h-4 w-4 text-indigo-600" />
                                 </div>
 
-                                <div className="grid gap-3 md:grid-cols-4">
+                                <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="space-y-1">
-                                        <p className="text-xs text-slate-500">Top N / Lowongan</p>
+                                        <p className="text-xs text-slate-500">Top Kandidat per Lowongan</p>
                                         <Input
-                                            type="number"
-                                            min={1}
-                                            max={20}
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             value={autoShortlistTopN}
-                                            onChange={(event) =>
-                                                setAutoShortlistTopN(Number(event.target.value) || 1)
-                                            }
+                                            onChange={handleTopLowonganChange}
+                                            onBlur={handleTopLowonganBlur}
                                             className="h-9"
                                         />
+                                        <p className="text-[11px] text-slate-500">
+                                            Maksimal {autoShortlistTopNMax} (sesuai jumlah lowongan tersedia).
+                                        </p>
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-xs text-slate-500">Minimum Skor</p>
                                         <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
+                                            type="text"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
+                                            maxLength={3}
                                             value={autoShortlistMinScore}
-                                            onChange={(event) =>
-                                                setAutoShortlistMinScore(Number(event.target.value) || 0)
-                                            }
+                                            onChange={handleMinimumScoreChange}
+                                            onBlur={handleMinimumScoreBlur}
                                             className="h-9"
                                         />
                                     </div>
-                                    <div className="flex items-center gap-2 md:col-span-2">
-                                        <Checkbox
-                                            id="shortlist-eligible-only"
-                                            checked={autoShortlistEligibleOnly}
-                                            onCheckedChange={(checked) => setAutoShortlistEligibleOnly(Boolean(checked))}
-                                        />
-                                        <label htmlFor="shortlist-eligible-only" className="text-sm text-slate-700 cursor-pointer">
-                                            Hanya kandidat yang eligible
-                                        </label>
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox
+                                                id="shortlist-eligible-only"
+                                                checked={autoShortlistEligibleOnly}
+                                                onCheckedChange={(checked) => setAutoShortlistEligibleOnly(Boolean(checked))}
+                                            />
+                                            <label htmlFor="shortlist-eligible-only" className="cursor-pointer text-sm text-slate-700">
+                                                Hanya kandidat yang eligible
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap gap-2">
+                                <div className="grid gap-2 sm:grid-cols-2">
                                     <Button
                                         onClick={handleRunAutoShortlist}
                                         disabled={isRunningAutoShortlist}
-                                        className="bg-indigo-600 hover:bg-indigo-700"
+                                        className="justify-start bg-indigo-600 hover:bg-indigo-700"
                                     >
                                         {isRunningAutoShortlist ? 'Memproses...' : 'Jalankan Auto Shortlist'}
                                     </Button>
                                     <Button
                                         variant="outline"
                                         onClick={handleExportScoreReport}
-                                        className="border-slate-300"
+                                        className="justify-start border-slate-300"
                                     >
                                         <FileDown className="h-4 w-4 mr-2" />
                                         Export Laporan Skor (CSV)
                                     </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleExportScoreReportPDF}
+                                        className="justify-start border-slate-300"
+                                    >
+                                        <FileText className="h-4 w-4 mr-2" />
+                                        Export Laporan Skor (PDF)
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={fetchScoringInsights}
+                                        disabled={isLoadingScoringInsights}
+                                        className="justify-start border-slate-300"
+                                    >
+                                        <RefreshCw className="h-4 w-4 mr-2" />
+                                        {isLoadingScoringInsights ? 'Memuat...' : 'Refresh Analytics'}
+                                    </Button>
                                 </div>
                             </Card>
 
-                            <Card className="p-4 md:p-5 space-y-3">
+                            <Card className="h-full space-y-3 p-4 md:p-5 xl:col-span-3">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-900">Evaluasi Model Scoring</p>
+                                        <p className="text-xs text-slate-600">Precision@K dan recall terhadap outcome interview/hired.</p>
+                                    </div>
+                                    <Activity className="h-4 w-4 text-emerald-600" />
+                                </div>
+
+                                {!scoringEvaluation ? (
+                                    <p className="text-xs text-slate-500">
+                                        {isLoadingScoringInsights ? 'Memuat evaluasi model...' : 'Data evaluasi belum tersedia.'}
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                                <p className="text-[11px] text-slate-500">Precision@K (Interview+)</p>
+                                                <p className="text-sm font-semibold text-slate-900">
+                                                    {formatPercent(scoringEvaluation.summary?.precision_at_k_interview)}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                                <p className="text-[11px] text-slate-500">Precision@K (Hired)</p>
+                                                <p className="text-sm font-semibold text-slate-900">
+                                                    {formatPercent(scoringEvaluation.summary?.precision_at_k_hired)}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                                <p className="text-[11px] text-slate-500">Recall Shortlist vs Interview+</p>
+                                                <p className="text-sm font-semibold text-slate-900">
+                                                    {formatPercent(scoringEvaluation.summary?.recall_shortlist_vs_interview)}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                                                <p className="text-[11px] text-slate-500">Recall Shortlist vs Hired</p>
+                                                <p className="text-sm font-semibold text-slate-900">
+                                                    {formatPercent(scoringEvaluation.summary?.recall_shortlist_vs_hired)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500">
+                                            Konfigurasi: K={scoringEvaluation.config?.top_k ?? '-'} | Eligible only: {scoringEvaluation.config?.eligible_only ? 'Ya' : 'Tidak'} | Min score: {scoringEvaluation.config?.min_score ?? '-'}
+                                        </p>
+                                    </div>
+                                )}
+                            </Card>
+
+                            <Card className="h-full space-y-3 p-4 md:p-5 xl:col-span-3">
                                 <div>
                                     <p className="text-sm font-semibold text-slate-900">Audit Trail Scoring</p>
                                     <p className="text-xs text-slate-600">Aktivitas terbaru konfigurasi, shortlist, dan export.</p>
@@ -670,9 +985,9 @@ export default function KelolaRekrutmenIndex({
                                 {scoringAuditRows.length === 0 ? (
                                     <p className="text-xs text-slate-500">Belum ada aktivitas audit scoring.</p>
                                 ) : (
-                                    <div className="space-y-2 max-h-[210px] overflow-y-auto pr-1">
+                                    <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
                                         {scoringAuditRows.slice(0, 8).map((audit) => (
-                                            <div key={audit.id} className="rounded-lg border border-slate-200 p-2.5">
+                                            <div key={audit.id} className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
                                                 <p className="text-xs font-semibold text-slate-900">{audit.action_label}</p>
                                                 <p className="text-[11px] text-slate-600">
                                                     {audit.division_name || '-'} | {audit.position_title || '-'}
@@ -688,7 +1003,6 @@ export default function KelolaRekrutmenIndex({
                         </div>
 
                         <ApplicantsTab
-                            statusOptions={statusOptions}
                             searchTerm={searchTerm}
                             onSearchTermChange={setSearchTerm}
                             statusFilter={statusFilter}
@@ -721,6 +1035,127 @@ export default function KelolaRekrutmenIndex({
 
                     <TabsContent value="calendar">
                         <RecruitmentCalendar interviews={interviewRows} isEmbedded />
+                    </TabsContent>
+
+                    <TabsContent value="analytics">
+                        <div className="space-y-4">
+                            <Card className="p-4 md:p-5 space-y-3">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-900">Fairness & Drift Analytics</p>
+                                        <p className="text-xs text-slate-600">
+                                            Monitoring fairness antar divisi dan drift skor antar periode.
+                                        </p>
+                                    </div>
+                                    <BarChart3 className="h-4 w-4 text-indigo-600" />
+                                </div>
+
+                                {!scoringAnalytics ? (
+                                    <p className="text-xs text-slate-500">
+                                        {isLoadingScoringInsights ? 'Memuat analytics...' : 'Data analytics belum tersedia.'}
+                                    </p>
+                                ) : (
+                                    <div className="grid gap-3 md:grid-cols-4">
+                                        <div className="rounded-lg border border-slate-200 p-3">
+                                            <p className="text-[11px] text-slate-500">Global Avg Score</p>
+                                            <p className="text-base font-semibold text-slate-900">
+                                                {Number(scoringAnalytics.summary?.global_avg_score ?? 0).toFixed(2)}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-lg border border-slate-200 p-3">
+                                            <p className="text-[11px] text-slate-500">Global Eligible Rate</p>
+                                            <p className="text-base font-semibold text-slate-900">
+                                                {formatPercent(scoringAnalytics.summary?.global_eligible_rate)}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-lg border border-slate-200 p-3">
+                                            <p className="text-[11px] text-slate-500">Interview+ Rate</p>
+                                            <p className="text-base font-semibold text-slate-900">
+                                                {formatPercent(scoringAnalytics.summary?.global_interview_positive_rate)}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-lg border border-slate-200 p-3">
+                                            <p className="text-[11px] text-slate-500">Hired Rate</p>
+                                            <p className="text-base font-semibold text-slate-900">
+                                                {formatPercent(scoringAnalytics.summary?.global_hired_rate)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+                            </Card>
+
+                            <div className="grid gap-4 xl:grid-cols-2">
+                                <Card className="p-4 md:p-5 space-y-3">
+                                    <p className="text-sm font-semibold text-slate-900">Fairness per Divisi</p>
+                                    {!scoringAnalytics?.by_division?.length ? (
+                                        <p className="text-xs text-slate-500">Belum ada data divisi.</p>
+                                    ) : (
+                                        <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                                            {scoringAnalytics.by_division.map((row) => {
+                                                const badgeClass =
+                                                    row.fairness_flag === 'Waspada'
+                                                        ? 'bg-red-100 text-red-700'
+                                                        : row.fairness_flag === 'Monitor'
+                                                            ? 'bg-amber-100 text-amber-700'
+                                                            : 'bg-emerald-100 text-emerald-700';
+                                                return (
+                                                    <div key={row.division} className="rounded-lg border border-slate-200 p-3 space-y-1.5">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="text-sm font-semibold text-slate-900">{row.division}</p>
+                                                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${badgeClass}`}>
+                                                                {row.fairness_flag}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-600">
+                                                            Avg {Number(row.avg_score ?? 0).toFixed(2)} | Gap {Number(row.score_gap_from_global ?? 0).toFixed(2)} | Kandidat {row.applications_count}
+                                                        </p>
+                                                        <p className="text-[11px] text-slate-500">
+                                                            Eligible {formatPercent(row.eligible_rate)} | Interview+ {formatPercent(row.interview_positive_rate)} | Hired {formatPercent(row.hired_rate)}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </Card>
+
+                                <Card className="p-4 md:p-5 space-y-3">
+                                    <p className="text-sm font-semibold text-slate-900">Drift Skor per Periode</p>
+                                    {!scoringAnalytics?.by_period?.length ? (
+                                        <p className="text-xs text-slate-500">Belum ada data periode.</p>
+                                    ) : (
+                                        <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                                            {scoringAnalytics.by_period.map((row) => {
+                                                const isUp = Number(row.drift_score_delta ?? 0) >= 0;
+                                                const driftClass =
+                                                    row.drift_level === 'Tinggi'
+                                                        ? 'text-red-600'
+                                                        : row.drift_level === 'Sedang'
+                                                            ? 'text-amber-600'
+                                                            : 'text-emerald-600';
+                                                return (
+                                                    <div key={row.period} className="rounded-lg border border-slate-200 p-3 space-y-1.5">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <p className="text-sm font-semibold text-slate-900">{row.period_label}</p>
+                                                            <span className={`text-[11px] font-semibold ${driftClass}`}>
+                                                                {row.drift_level}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-600">
+                                                            Avg {Number(row.avg_score ?? 0).toFixed(2)} | Median {Number(row.median_score ?? 0).toFixed(2)} | Kandidat {row.applications_count}
+                                                        </p>
+                                                        <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                                                            <TrendingValueIcon positive={isUp} />
+                                                            Drift {isUp ? '+' : ''}{Number(row.drift_score_delta ?? 0).toFixed(2)}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </Card>
+                            </div>
+                        </div>
                     </TabsContent>
                 </Tabs>
 

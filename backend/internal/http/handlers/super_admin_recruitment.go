@@ -96,6 +96,7 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 		applications = append(applications, map[string]any{
 			"id":                     app.ID,
 			"name":                   profileFullName,
+			"division":               app.Division,
 			"position":               app.Position,
 			"education":              chooseString(educationSummary, app.Education),
 			"experience":             chooseString(experienceSummary, app.Experience),
