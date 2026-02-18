@@ -27,7 +27,13 @@ import EducationForm from './Profile/components/EducationForm';
 import ExperienceForm from './Profile/components/ExperienceForm';
 import PersonalForm from './Profile/components/PersonalForm';
 import ProfileHeader from './Profile/components/ProfileHeader';
-import { ApplicantProfilePayload, Education, SectionKey } from './Profile/profileTypes';
+import {
+    ApplicantProfilePayload,
+    Education,
+    RequiredCertificationField,
+    RequiredExperienceField,
+    SectionKey,
+} from './Profile/profileTypes';
 import { useProfileForm } from './Profile/useProfileForm';
 
 
@@ -99,6 +105,10 @@ export default function Profile({
         prevRecentlySuccessfulRef.current = form.recentlySuccessful;
     }, [form.recentlySuccessful, form.data.personal, form.data.educations, isEditing]);
     const flatErrors = form.errors as Record<string, string>;
+    const getExperienceError = (index: number, field: RequiredExperienceField) =>
+        flatErrors[`experiences.${index}.${field}`];
+    const getCertificationError = (index: number, field: RequiredCertificationField) =>
+        flatErrors[`certifications.${index}.${field}`];
 
     // Check section completion status
     const isPersonalComplete = Boolean(
@@ -109,6 +119,7 @@ export default function Profile({
         form.data.personal.gender &&
         form.data.personal.religion &&
         form.data.personal.address &&
+        form.data.personal.domicile_address &&
         form.data.personal.city &&
         form.data.personal.province
     );
@@ -121,7 +132,11 @@ export default function Profile({
     // Experience is optional, so it's "complete" if empty or all filled
     const isExperienceComplete = form.data.experiences.length === 0 ||
         form.data.experiences.every(exp =>
-            exp.company && exp.position && exp.start_date
+            exp.company &&
+            exp.position &&
+            exp.start_date &&
+            (exp.is_current || exp.end_date) &&
+            exp.description
         );
 
     // Get tab style class
@@ -249,7 +264,7 @@ export default function Profile({
                         <div>
                             <p className="font-medium text-blue-900">Petunjuk Kelengkapan Profil</p>
                             <p className="text-sm text-blue-800">
-                                Data Pribadi dan Pendidikan wajib diisi. Pengalaman Kerja dan Sertifikasi bersifat opsional.
+                                Data Pribadi dan Pendidikan wajib diisi. Pengalaman Kerja/Magang dan Sertifikasi bersifat opsional.
                             </p>
                         </div>
                     </div>
@@ -263,8 +278,8 @@ export default function Profile({
                         <TabsTrigger value="education" className={getTabClassName(isEducationComplete)}>
                             Pendidikan
                         </TabsTrigger>
-                        <TabsTrigger value="experience" className={getTabClassName(false)}>
-                            Pengalaman
+                        <TabsTrigger value="experience" className={getTabClassName(isExperienceComplete)}>
+                            Kerja/Magang
                         </TabsTrigger>
                         <TabsTrigger value="certification" className={getTabClassName(false)}>
                             Sertifikasi
@@ -305,6 +320,8 @@ export default function Profile({
                     <TabsContent value="experience">
                         <ExperienceForm
                             experiences={form.data.experiences}
+                            baseError={flatErrors['experiences']}
+                            getFieldError={getExperienceError}
                             onChange={handleExperienceChange}
                             onAdd={addExperience}
                             onRemove={removeExperience}
@@ -319,6 +336,8 @@ export default function Profile({
                     <TabsContent value="certification">
                         <CertificationForm
                             certifications={form.data.certifications}
+                            baseError={flatErrors['certifications']}
+                            getFieldError={getCertificationError}
                             onChange={handleCertificationChange}
                             onClearFile={clearCertificationFile}
                             onAdd={addCertification}
@@ -340,7 +359,7 @@ export default function Profile({
                         <AlertDialogTitle>Profil belum lengkap</AlertDialogTitle>
                         <AlertDialogDescription>
                             {profileReminderMessage ??
-                                'Lengkapi Data Pribadi dan Pendidikan (wajib). Data Pengalaman dan Sertifikasi bersifat opsional.'}
+                                'Lengkapi Data Pribadi dan Pendidikan (wajib). Data Pengalaman Kerja/Magang dan Sertifikasi bersifat opsional.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

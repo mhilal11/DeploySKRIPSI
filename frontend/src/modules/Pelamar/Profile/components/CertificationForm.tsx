@@ -7,7 +7,7 @@ import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 
-import { Certification } from '../profileTypes';
+import { Certification, RequiredCertificationField } from '../profileTypes';
 import FileUploadDialog from './FileUploadDialog';
 
 interface CertificationFormProps {
@@ -18,6 +18,8 @@ interface CertificationFormProps {
     onRemove: (id: string) => void;
     onSave: () => void;
     processing: boolean;
+    getFieldError: (index: number, field: RequiredCertificationField) => string | undefined;
+    baseError?: string;
     disabled?: boolean;
 }
 
@@ -29,6 +31,8 @@ export default function CertificationForm({
     onRemove,
     onSave,
     processing,
+    getFieldError,
+    baseError,
     disabled = false,
 }: CertificationFormProps) {
     const [uploadDialogOpen, setUploadDialogOpen] = useState<string | null>(null);
@@ -87,6 +91,7 @@ export default function CertificationForm({
                     Tambah Sertifikasi
                 </Button>
             </div>
+            {baseError && <p className="mb-4 text-sm text-red-500">{baseError}</p>}
 
             {certifications.length === 0 ? (
                 <p className="text-sm text-slate-500">
@@ -122,6 +127,11 @@ export default function CertificationForm({
                                         placeholder="Contoh: AWS Certified Solutions Architect"
                                         disabled={disabled}
                                     />
+                                    {getFieldError(index, 'name') && (
+                                        <p className="mt-1 text-sm text-red-500">
+                                            {getFieldError(index, 'name')}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>
@@ -135,6 +145,11 @@ export default function CertificationForm({
                                         placeholder="Contoh: Amazon Web Services"
                                         disabled={disabled}
                                     />
+                                    {getFieldError(index, 'issuing_organization') && (
+                                        <p className="mt-1 text-sm text-red-500">
+                                            {getFieldError(index, 'issuing_organization')}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>
@@ -148,6 +163,11 @@ export default function CertificationForm({
                                         }
                                         disabled={disabled}
                                     />
+                                    {getFieldError(index, 'issue_date') && (
+                                        <p className="mt-1 text-sm text-red-500">
+                                            {getFieldError(index, 'issue_date')}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>Tanggal Kadaluarsa</Label>
@@ -162,6 +182,11 @@ export default function CertificationForm({
                                     <p className="mt-1 text-xs text-slate-500">
                                         Kosongkan jika sertifikat tidak memiliki masa berlaku
                                     </p>
+                                    {getFieldError(index, 'expiry_date') && (
+                                        <p className="mt-1 text-sm text-red-500">
+                                            {getFieldError(index, 'expiry_date')}
+                                        </p>
+                                    )}
                                 </div>
                                 <div>
                                     <Label>ID Kredensial</Label>

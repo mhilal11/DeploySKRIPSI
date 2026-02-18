@@ -236,6 +236,25 @@ export default function PersonalForm({
                 )}
             </div>
 
+            <div className="mt-6">
+                <Label>Alamat Domisili *</Label>
+                <Textarea
+                    value={data.domicile_address}
+                    onChange={(event) => onChange('domicile_address', event.target.value)}
+                    placeholder="Alamat tempat tinggal saat ini"
+                    rows={3}
+                    disabled={disabled}
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                    Isi alamat domisili saat ini.
+                </p>
+                {errors['personal.domicile_address'] && (
+                    <p className="mt-1 text-sm text-red-500">
+                        {errors['personal.domicile_address']}
+                    </p>
+                )}
+            </div>
+
             <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
                     <Label>Provinsi *</Label>

@@ -40,6 +40,7 @@ export interface ApplicantProfilePayload {
     gender?: string | null;
     religion?: string | null;
     address?: string | null;
+    domicile_address?: string | null;
     city?: string | null;
     province?: string | null;
     profile_photo_url?: string | null;
@@ -59,6 +60,7 @@ export interface ApplicantProfileForm {
         gender: string;
         religion: string;
         address: string;
+        domicile_address: string;
         city: string;
         province: string;
     };
@@ -71,6 +73,17 @@ export interface ApplicantProfileForm {
 export type SectionKey = 'personal' | 'education' | 'experience' | 'certification' | 'photo';
 
 export type RequiredEducationField = Exclude<keyof Education, 'id'>;
+export type RequiredExperienceField =
+    | 'company'
+    | 'position'
+    | 'start_date'
+    | 'end_date'
+    | 'description';
+export type RequiredCertificationField =
+    | 'name'
+    | 'issuing_organization'
+    | 'issue_date'
+    | 'expiry_date';
 
 export type FeedbackState =
     | {

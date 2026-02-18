@@ -12,6 +12,7 @@ type ApplicantProfile struct {
 	Gender           *string    `db:"gender" json:"gender"`
 	Religion         *string    `db:"religion" json:"religion"`
 	Address          *string    `db:"address" json:"address"`
+	DomicileAddress  *string    `db:"domicile_address" json:"domicile_address"`
 	City             *string    `db:"city" json:"city"`
 	Province         *string    `db:"province" json:"province"`
 	ProfilePhotoPath *string    `db:"profile_photo_path" json:"profile_photo_path"`

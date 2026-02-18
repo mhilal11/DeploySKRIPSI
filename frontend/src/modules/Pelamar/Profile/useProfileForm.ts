@@ -27,6 +27,7 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
             gender: profile.gender ?? '',
             religion: profile.religion ?? '',
             address: profile.address ?? '',
+            domicile_address: profile.domicile_address ?? '',
             city: profile.city ?? '',
             province: profile.province ?? '',
         },
@@ -62,11 +63,14 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
 
     const completionPercentage = useMemo(() => {
         const fields: (keyof ApplicantProfileForm['personal'])[] = [
+            'full_name',
+            'email',
             'phone',
             'date_of_birth',
             'gender',
             'religion',
             'address',
+            'domicile_address',
             'city',
             'province',
         ];
@@ -303,7 +307,7 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
                 const messages = {
                     personal: 'Data pribadi berhasil disimpan.',
                     education: 'Data pendidikan berhasil disimpan.',
-                    experience: 'Data pengalaman berhasil disimpan.',
+                    experience: 'Data pengalaman kerja/magang berhasil disimpan.',
                     certification: 'Data sertifikasi berhasil disimpan.',
                     photo: 'Foto profil berhasil disimpan.',
                 };
@@ -314,10 +318,10 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
             },
             onError: () => {
                 const errorMessages = {
-                    personal: 'Gagal menyimpan data pribadi, silakan coba lagi.',
+                    personal: 'Periksa kembali semua field wajib pada data pribadi.',
                     education: 'Periksa kembali data pendidikan yang wajib diisi.',
-                    experience: 'Gagal menyimpan data pengalaman, silakan coba lagi.',
-                    certification: 'Gagal menyimpan data sertifikasi, silakan coba lagi.',
+                    experience: 'Periksa kembali semua field wajib pada data pengalaman kerja/magang.',
+                    certification: 'Periksa kembali data sertifikasi yang wajib diisi.',
                     photo: 'Gagal menyimpan foto profil, silakan coba lagi.',
                 };
                 toast.error('Gagal Menyimpan ', {

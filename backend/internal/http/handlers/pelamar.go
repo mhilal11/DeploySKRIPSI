@@ -236,6 +236,7 @@ func PelamarProfileUpdate(c *gin.Context) {
 	}
 
 	profile := getOrCreateApplicantProfile(db, user)
+	shouldSyncUserAccount := false
 
 	section := c.PostForm("section")
 	if section == "" {
@@ -248,44 +249,63 @@ func PelamarProfileUpdate(c *gin.Context) {
 			var personal map[string]string
 			_ = json.Unmarshal([]byte(personalJSON), &personal)
 			if v, ok := personal["full_name"]; ok {
-				profile.FullName = &v
+				trimmed := strings.TrimSpace(v)
+				profile.FullName = &trimmed
+				shouldSyncUserAccount = true
 			}
 			if v, ok := personal["email"]; ok {
-				profile.Email = &v
+				trimmed := strings.TrimSpace(v)
+				profile.Email = &trimmed
+				shouldSyncUserAccount = true
 			}
 			if v, ok := personal["phone"]; ok {
 				normalizedPhone := normalizePhoneNumber(v)
-				if normalizedPhone != "" && !isValidPhoneNumber(normalizedPhone) {
-					ValidationErrors(c, FieldErrors{
-						"personal.phone": "Nomor telepon harus 8-13 digit angka.",
-					})
-					return
-				}
 				profile.Phone = &normalizedPhone
 			}
 			if v, ok := personal["date_of_birth"]; ok {
-				if t, err := time.Parse("2006-01-02", v); err == nil {
+				trimmed := strings.TrimSpace(v)
+				if trimmed == "" {
+					profile.DateOfBirth = nil
+				} else {
+					t, err := time.Parse("2006-01-02", trimmed)
+					if err != nil {
+						ValidationErrors(c, FieldErrors{
+							"personal.date_of_birth": "Format tanggal lahir tidak valid.",
+						})
+						return
+					}
 					profile.DateOfBirth = &t
 				}
 			}
 			if v, ok := personal["gender"]; ok {
-				profile.Gender = &v
+				trimmed := strings.TrimSpace(v)
+				profile.Gender = &trimmed
 			}
 			if v, ok := personal["religion"]; ok {
-				profile.Religion = &v
+				trimmed := strings.TrimSpace(v)
+				profile.Religion = &trimmed
 			}
 			if v, ok := personal["address"]; ok {
-				profile.Address = &v
+				trimmed := strings.TrimSpace(v)
+				profile.Address = &trimmed
+			}
+			if v, ok := personal["domicile_address"]; ok {
+				trimmed := strings.TrimSpace(v)
+				profile.DomicileAddress = &trimmed
 			}
 			if v, ok := personal["city"]; ok {
-				profile.City = &v
+				trimmed := strings.TrimSpace(v)
+				profile.City = &trimmed
 			}
 			if v, ok := personal["province"]; ok {
-				profile.Province = &v
+				trimmed := strings.TrimSpace(v)
+				profile.Province = &trimmed
 			}
-			if profile.FullName != nil || profile.Email != nil {
-				_, _ = db.Exec("UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email) WHERE id = ?", profile.FullName, profile.Email, user.ID)
-			}
+		}
+
+		if errs := validatePersonalRequired(profile); len(errs) > 0 {
+			ValidationErrors(c, errs)
+			return
 		}
 	}
 
@@ -300,27 +320,55 @@ func PelamarProfileUpdate(c *gin.Context) {
 
 	if section == "education" || section == "all" {
 		educationsJSON := c.PostForm("educations")
-		if educationsJSON != "" {
-			var educations []map[string]any
-			if err := json.Unmarshal([]byte(educationsJSON), &educations); err != nil {
-				ValidationErrors(c, FieldErrors{"educations": "Format data pendidikan tidak valid."})
-				return
-			}
-
-			if errs := validateEducationYears(educations); len(errs) > 0 {
-				ValidationErrors(c, errs)
-				return
-			}
-
-			normalized, _ := json.Marshal(educations)
-			profile.Educations = models.JSON(normalized)
+		if strings.TrimSpace(educationsJSON) == "" {
+			ValidationErrors(c, FieldErrors{"educations": "Minimal 1 riwayat pendidikan wajib diisi."})
+			return
 		}
+		var educations []map[string]any
+		if err := json.Unmarshal([]byte(educationsJSON), &educations); err != nil {
+			ValidationErrors(c, FieldErrors{"educations": "Format data pendidikan tidak valid."})
+			return
+		}
+
+		if errs := validateEducationRequired(educations); len(errs) > 0 {
+			ValidationErrors(c, errs)
+			return
+		}
+
+		if errs := validateEducationYears(educations); len(errs) > 0 {
+			ValidationErrors(c, errs)
+			return
+		}
+
+		// Non-blocking: profil pelamar tetap harus bisa disimpan
+		// walau sinkron referensi manual gagal (mis. migration table belum dijalankan).
+		_ = persistCustomEducationReferences(db, user.ID, educations)
+
+		normalized, _ := json.Marshal(educations)
+		profile.Educations = models.JSON(normalized)
 	}
 
 	if section == "experience" || section == "all" {
 		experiencesJSON := c.PostForm("experiences")
 		if experiencesJSON != "" {
-			profile.Experiences = models.JSON([]byte(experiencesJSON))
+			var experiences []map[string]any
+			if err := json.Unmarshal([]byte(experiencesJSON), &experiences); err != nil {
+				ValidationErrors(c, FieldErrors{"experiences": "Format data pengalaman tidak valid."})
+				return
+			}
+
+			if errs := validateExperienceRequired(experiences); len(errs) > 0 {
+				ValidationErrors(c, errs)
+				return
+			}
+
+			if errs := validateExperiencePeriods(experiences); len(errs) > 0 {
+				ValidationErrors(c, errs)
+				return
+			}
+
+			normalized, _ := json.Marshal(experiences)
+			profile.Experiences = models.JSON(normalized)
 		}
 	}
 
@@ -329,6 +377,9 @@ func PelamarProfileUpdate(c *gin.Context) {
 		var certs []map[string]any
 		if certificationsJSON != "" {
 			_ = json.Unmarshal([]byte(certificationsJSON), &certs)
+		}
+		if certs == nil {
+			certs = []map[string]any{}
 		}
 		for i := range certs {
 			key := "certification_files." + strconv.Itoa(i)
@@ -347,17 +398,23 @@ func PelamarProfileUpdate(c *gin.Context) {
 				}
 			}
 		}
-		if len(certs) > 0 {
-			bytes, _ := json.Marshal(certs)
-			profile.Certifications = models.JSON(bytes)
+		if errs := validateCertificationRequired(certs); len(errs) > 0 {
+			ValidationErrors(c, errs)
+			return
 		}
+		bytes, _ := json.Marshal(certs)
+		profile.Certifications = models.JSON(bytes)
+	}
+
+	if shouldSyncUserAccount {
+		_, _ = db.Exec("UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email) WHERE id = ?", profile.FullName, profile.Email, user.ID)
 	}
 
 	syncCompletion(profile)
 
 	now := time.Now()
-	_, err := db.Exec(`UPDATE applicant_profiles SET full_name=?, email=?, phone=?, date_of_birth=?, gender=?, religion=?, address=?, city=?, province=?, profile_photo_path=?, educations=?, experiences=?, certifications=?, completed_at=?, updated_at=? WHERE user_id = ?`,
-		profile.FullName, profile.Email, profile.Phone, profile.DateOfBirth, profile.Gender, profile.Religion, profile.Address, profile.City, profile.Province, profile.ProfilePhotoPath, profile.Educations, profile.Experiences, profile.Certifications, profile.CompletedAt, now, user.ID)
+	_, err := db.Exec(`UPDATE applicant_profiles SET full_name=?, email=?, phone=?, date_of_birth=?, gender=?, religion=?, address=?, domicile_address=?, city=?, province=?, profile_photo_path=?, educations=?, experiences=?, certifications=?, completed_at=?, updated_at=? WHERE user_id = ?`,
+		profile.FullName, profile.Email, profile.Phone, profile.DateOfBirth, profile.Gender, profile.Religion, profile.Address, profile.DomicileAddress, profile.City, profile.Province, profile.ProfilePhotoPath, profile.Educations, profile.Experiences, profile.Certifications, profile.CompletedAt, now, user.ID)
 	if err != nil {
 		JSONError(c, http.StatusInternalServerError, "Gagal memperbarui profil")
 		return
@@ -604,6 +661,7 @@ func applicantProfilePayload(c *gin.Context, profile *models.ApplicantProfile, c
 		"gender":                profile.Gender,
 		"religion":              profile.Religion,
 		"address":               profile.Address,
+		"domicile_address":      profile.DomicileAddress,
 		"city":                  profile.City,
 		"province":              profile.Province,
 		"profile_photo_url":     attachmentURL(c, profile.ProfilePhotoPath),
@@ -685,17 +743,22 @@ func filepathBase(path string) string {
 }
 
 func computeProfileCompletion(profile *models.ApplicantProfile) int {
+	fullNameFilled := profile.FullName != nil && strings.TrimSpace(*profile.FullName) != ""
+	emailFilled := profile.Email != nil && strings.TrimSpace(*profile.Email) != ""
 	phoneValid := false
 	if profile.Phone != nil {
 		phoneValid = isValidPhoneNumber(normalizePhoneNumber(*profile.Phone))
 	}
 
 	required := []bool{
+		fullNameFilled,
+		emailFilled,
 		phoneValid,
 		profile.DateOfBirth != nil,
 		profile.Gender != nil && *profile.Gender != "",
 		profile.Religion != nil && *profile.Religion != "",
 		profile.Address != nil && *profile.Address != "",
+		profile.DomicileAddress != nil && *profile.DomicileAddress != "",
 		profile.City != nil && *profile.City != "",
 		profile.Province != nil && *profile.Province != "",
 	}
@@ -713,7 +776,16 @@ func isProfileComplete(profile *models.ApplicantProfile) bool {
 	if profile == nil {
 		return false
 	}
-	if profile.Phone == nil || !isValidPhoneNumber(normalizePhoneNumber(*profile.Phone)) || profile.DateOfBirth == nil || profile.Gender == nil || profile.Religion == nil || profile.Address == nil || profile.City == nil || profile.Province == nil {
+	if profile.FullName == nil || strings.TrimSpace(*profile.FullName) == "" ||
+		profile.Email == nil || strings.TrimSpace(*profile.Email) == "" ||
+		profile.Phone == nil || !isValidPhoneNumber(normalizePhoneNumber(*profile.Phone)) ||
+		profile.DateOfBirth == nil ||
+		profile.Gender == nil || strings.TrimSpace(*profile.Gender) == "" ||
+		profile.Religion == nil || strings.TrimSpace(*profile.Religion) == "" ||
+		profile.Address == nil || strings.TrimSpace(*profile.Address) == "" ||
+		profile.DomicileAddress == nil || strings.TrimSpace(*profile.DomicileAddress) == "" ||
+		profile.City == nil || strings.TrimSpace(*profile.City) == "" ||
+		profile.Province == nil || strings.TrimSpace(*profile.Province) == "" {
 		return false
 	}
 	return len(profile.Educations) > 0
@@ -751,6 +823,182 @@ func isValidPhoneNumber(value string) bool {
 	return length >= 8 && length <= 13
 }
 
+func validatePersonalRequired(profile *models.ApplicantProfile) FieldErrors {
+	errs := FieldErrors{}
+
+	fullName := strings.TrimSpace(firstString(profile.FullName, ""))
+	email := strings.TrimSpace(firstString(profile.Email, ""))
+	phone := normalizePhoneNumber(firstString(profile.Phone, ""))
+	gender := strings.TrimSpace(firstString(profile.Gender, ""))
+	religion := strings.TrimSpace(firstString(profile.Religion, ""))
+	address := strings.TrimSpace(firstString(profile.Address, ""))
+	domicileAddress := strings.TrimSpace(firstString(profile.DomicileAddress, ""))
+	city := strings.TrimSpace(firstString(profile.City, ""))
+	province := strings.TrimSpace(firstString(profile.Province, ""))
+
+	if fullName == "" {
+		errs["personal.full_name"] = "Nama lengkap wajib diisi."
+	}
+	if email == "" {
+		errs["personal.email"] = "Email wajib diisi."
+	} else if !strings.Contains(email, "@") {
+		errs["personal.email"] = "Format email tidak valid."
+	}
+	if phone == "" {
+		errs["personal.phone"] = "Nomor telepon wajib diisi."
+	} else if !isValidPhoneNumber(phone) {
+		errs["personal.phone"] = "Nomor telepon harus 8-13 digit angka."
+	}
+	if profile.DateOfBirth == nil {
+		errs["personal.date_of_birth"] = "Tanggal lahir wajib diisi."
+	}
+	if gender == "" {
+		errs["personal.gender"] = "Jenis kelamin wajib diisi."
+	}
+	if religion == "" {
+		errs["personal.religion"] = "Agama wajib diisi."
+	}
+	if address == "" {
+		errs["personal.address"] = "Alamat lengkap wajib diisi."
+	}
+	if domicileAddress == "" {
+		errs["personal.domicile_address"] = "Alamat domisili wajib diisi."
+	}
+	if province == "" {
+		errs["personal.province"] = "Provinsi wajib diisi."
+	}
+	if city == "" {
+		errs["personal.city"] = "Kota/Kabupaten wajib diisi."
+	}
+
+	return errs
+}
+
+func validateEducationRequired(educations []map[string]any) FieldErrors {
+	errs := FieldErrors{}
+	if len(educations) == 0 {
+		errs["educations"] = "Minimal 1 riwayat pendidikan wajib diisi."
+		return errs
+	}
+
+	for i, education := range educations {
+		institution := strings.TrimSpace(anyToTrimmedString(education["institution"]))
+		degree := strings.TrimSpace(anyToTrimmedString(education["degree"]))
+		fieldOfStudy := strings.TrimSpace(anyToTrimmedString(education["field_of_study"]))
+		startYear := strings.TrimSpace(anyToTrimmedString(education["start_year"]))
+		endYear := strings.TrimSpace(anyToTrimmedString(education["end_year"]))
+		gpa := strings.TrimSpace(anyToTrimmedString(education["gpa"]))
+
+		prefix := "educations." + strconv.Itoa(i) + "."
+		if institution == "" {
+			errs[prefix+"institution"] = "Nama institusi wajib diisi."
+		}
+		if degree == "" {
+			errs[prefix+"degree"] = "Jenjang wajib diisi."
+		}
+		if fieldOfStudy == "" {
+			errs[prefix+"field_of_study"] = "Program studi wajib diisi."
+		}
+		if startYear == "" {
+			errs[prefix+"start_year"] = "Tahun mulai wajib diisi."
+		} else if _, ok := toInt(education["start_year"]); !ok {
+			errs[prefix+"start_year"] = "Tahun mulai harus berupa angka."
+		}
+		if endYear == "" {
+			errs[prefix+"end_year"] = "Tahun selesai wajib diisi."
+		} else if _, ok := toInt(education["end_year"]); !ok {
+			errs[prefix+"end_year"] = "Tahun selesai harus berupa angka."
+		}
+		if requiresEducationGPA(degree) && gpa == "" {
+			errs[prefix+"gpa"] = "IPK wajib diisi untuk jenjang ini."
+		} else if gpa != "" {
+			value, err := strconv.ParseFloat(gpa, 64)
+			if err != nil {
+				errs[prefix+"gpa"] = "Format IPK tidak valid."
+			} else if value < 0 || value > 4 {
+				errs[prefix+"gpa"] = "IPK harus antara 0.00 sampai 4.00."
+			}
+		}
+	}
+
+	return errs
+}
+
+func validateExperienceRequired(experiences []map[string]any) FieldErrors {
+	errs := FieldErrors{}
+
+	for i, experience := range experiences {
+		company := strings.TrimSpace(anyToTrimmedString(experience["company"]))
+		position := strings.TrimSpace(anyToTrimmedString(experience["position"]))
+		start := strings.TrimSpace(anyToTrimmedString(experience["start_date"]))
+		end := strings.TrimSpace(anyToTrimmedString(experience["end_date"]))
+		description := strings.TrimSpace(anyToTrimmedString(experience["description"]))
+		isCurrent, _ := experience["is_current"].(bool)
+
+		prefix := "experiences." + strconv.Itoa(i) + "."
+		if company == "" {
+			errs[prefix+"company"] = "Nama perusahaan wajib diisi."
+		}
+		if position == "" {
+			errs[prefix+"position"] = "Posisi wajib diisi."
+		}
+		if start == "" {
+			errs[prefix+"start_date"] = "Tanggal mulai wajib diisi."
+		}
+		if !isCurrent && end == "" {
+			errs[prefix+"end_date"] = "Tanggal selesai wajib diisi."
+		}
+		if description == "" {
+			errs[prefix+"description"] = "Deskripsi tugas wajib diisi."
+		}
+	}
+
+	return errs
+}
+
+func validateCertificationRequired(certs []map[string]any) FieldErrors {
+	errs := FieldErrors{}
+
+	for i, cert := range certs {
+		name := strings.TrimSpace(anyToTrimmedString(cert["name"]))
+		organization := strings.TrimSpace(anyToTrimmedString(cert["issuing_organization"]))
+		issueDate := strings.TrimSpace(anyToTrimmedString(cert["issue_date"]))
+		expiryDate := strings.TrimSpace(anyToTrimmedString(cert["expiry_date"]))
+
+		prefix := "certifications." + strconv.Itoa(i) + "."
+		if name == "" {
+			errs[prefix+"name"] = "Nama sertifikasi wajib diisi."
+		}
+		if organization == "" {
+			errs[prefix+"issuing_organization"] = "Organisasi penerbit wajib diisi."
+		}
+		if issueDate == "" {
+			errs[prefix+"issue_date"] = "Tanggal terbit wajib diisi."
+		}
+		if issueDate != "" && !isValidYearMonth(issueDate) {
+			errs[prefix+"issue_date"] = "Format tanggal terbit tidak valid (YYYY-MM)."
+		}
+		if expiryDate != "" && !isValidYearMonth(expiryDate) {
+			errs[prefix+"expiry_date"] = "Format tanggal kadaluarsa tidak valid (YYYY-MM)."
+		}
+		if issueDate != "" && expiryDate != "" && isValidYearMonth(issueDate) && isValidYearMonth(expiryDate) && expiryDate < issueDate {
+			errs[prefix+"expiry_date"] = "Tanggal kadaluarsa tidak boleh sebelum tanggal terbit."
+		}
+	}
+
+	return errs
+}
+
+func requiresEducationGPA(degree string) bool {
+	normalized := strings.ToUpper(strings.TrimSpace(degree))
+	switch normalized {
+	case "D3", "D4", "S1", "S2", "S3":
+		return true
+	default:
+		return false
+	}
+}
+
 func validateEducationYears(educations []map[string]any) FieldErrors {
 	errs := FieldErrors{}
 	currentYear := time.Now().Year()
@@ -780,6 +1028,61 @@ func validateEducationYears(educations []map[string]any) FieldErrors {
 	}
 
 	return errs
+}
+
+func validateExperiencePeriods(experiences []map[string]any) FieldErrors {
+	errs := FieldErrors{}
+
+	for i, experience := range experiences {
+		start := strings.TrimSpace(anyToTrimmedString(experience["start_date"]))
+		end := strings.TrimSpace(anyToTrimmedString(experience["end_date"]))
+		isCurrent, _ := experience["is_current"].(bool)
+
+		startField := "experiences." + strconv.Itoa(i) + ".start_date"
+		endField := "experiences." + strconv.Itoa(i) + ".end_date"
+
+		if start != "" && !isValidYearMonth(start) {
+			errs[startField] = "Format tanggal mulai tidak valid (YYYY-MM)."
+		}
+		if end != "" && !isValidYearMonth(end) {
+			errs[endField] = "Format tanggal selesai tidak valid (YYYY-MM)."
+		}
+
+		if isCurrent {
+			// Normalize running experience to avoid stale end_date values.
+			experience["end_date"] = ""
+			continue
+		}
+
+		if start != "" && end != "" && isValidYearMonth(start) && isValidYearMonth(end) && end < start {
+			errs[endField] = "Tanggal selesai tidak boleh sebelum tanggal mulai."
+		}
+	}
+
+	return errs
+}
+
+func isValidYearMonth(value string) bool {
+	if len(value) != len("2006-01") {
+		return false
+	}
+	_, err := time.Parse("2006-01", value)
+	return err == nil
+}
+
+func anyToTrimmedString(value any) string {
+	switch v := value.(type) {
+	case string:
+		return strings.TrimSpace(v)
+	case float64:
+		return strings.TrimSpace(strconv.FormatFloat(v, 'f', -1, 64))
+	case int:
+		return strconv.Itoa(v)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	default:
+		return ""
+	}
 }
 
 func stageDate(app models.Application, stage string) *time.Time {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"os"
 	"sort"
@@ -13,6 +14,7 @@ import (
 	"hris-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
 
 type educationReferenceEntry struct {
@@ -25,6 +27,11 @@ type educationReferenceFile struct {
 	SourceURL    string                    `json:"source_url"`
 	LastUpdated  string                    `json:"last_updated"`
 	Institutions []educationReferenceEntry `json:"institutions"`
+}
+
+type customEducationReferenceRow struct {
+	Institution sql.NullString `db:"institution"`
+	Program     sql.NullString `db:"program"`
 }
 
 var defaultEducationReference = educationReferenceFile{
@@ -86,6 +93,7 @@ func SuperAdminEducationReferences(c *gin.Context) {
 
 func respondEducationReferences(c *gin.Context) {
 	cfg := middleware.GetConfig(c)
+	db := middleware.GetDB(c)
 	reference := loadEducationReference(cfg.EducationReferencePath)
 
 	query := strings.ToLower(strings.TrimSpace(c.Query("q")))
@@ -117,6 +125,24 @@ func respondEducationReferences(c *gin.Context) {
 		}
 	}
 
+	for _, entry := range loadCustomEducationReferenceRows(db, query, limit) {
+		institution := strings.TrimSpace(entry.Institution.String)
+		if institution != "" {
+			institutionKey := normalizeSearchKey(institution)
+			if institutionKey != "" {
+				institutionsSet[institutionKey] = pickShorterDisplay(institutionsSet[institutionKey], institution)
+			}
+		}
+
+		program := strings.TrimSpace(entry.Program.String)
+		if program != "" {
+			programKey := normalizeSearchKey(program)
+			if programKey != "" {
+				programsSet[programKey] = pickShorterDisplay(programsSet[programKey], program)
+			}
+		}
+	}
+
 	institutions := mapValues(institutionsSet)
 	programs := mapValues(programsSet)
 	sort.Strings(institutions)
@@ -135,6 +161,29 @@ func respondEducationReferences(c *gin.Context) {
 			"limit":        limit,
 		},
 	})
+}
+
+func loadCustomEducationReferenceRows(db *sqlx.DB, query string, limit int) []customEducationReferenceRow {
+	if db == nil {
+		return []customEducationReferenceRow{}
+	}
+
+	rows := make([]customEducationReferenceRow, 0)
+	sqlQuery := "SELECT institution, program FROM education_reference_custom"
+	args := make([]any, 0, 3)
+	if query != "" {
+		like := "%" + strings.ToLower(strings.TrimSpace(query)) + "%"
+		sqlQuery += " WHERE LOWER(institution) LIKE ? OR LOWER(program) LIKE ?"
+		args = append(args, like, like)
+	}
+	sqlQuery += " ORDER BY updated_at DESC, id DESC LIMIT ?"
+	args = append(args, limit)
+
+	if err := db.Select(&rows, sqlQuery, args...); err != nil {
+		// Table might not exist yet in some environments, keep API backward-compatible.
+		return []customEducationReferenceRow{}
+	}
+	return rows
 }
 
 func loadEducationReference(path string) educationReferenceFile {
@@ -305,4 +354,121 @@ func pickShorterDisplay(current, candidate string) string {
 		return candidate
 	}
 	return current
+}
+
+func persistCustomEducationReferences(db *sqlx.DB, userID int64, educations []map[string]any) error {
+	if db == nil || len(educations) == 0 {
+		return nil
+	}
+
+	type referenceEntry struct {
+		institution           string
+		program               string
+		institutionNormalized string
+		programNormalized     string
+	}
+
+	entries := make([]referenceEntry, 0, len(educations))
+	seen := map[string]struct{}{}
+
+	for _, education := range educations {
+		institution := strings.Join(strings.Fields(strings.TrimSpace(anyToString(education["institution"]))), " ")
+		program := strings.Join(strings.Fields(strings.TrimSpace(anyToString(education["field_of_study"]))), " ")
+		if institution == "" && program == "" {
+			continue
+		}
+
+		institutionNormalized := normalizeSearchKey(institution)
+		programNormalized := normalizeSearchKey(program)
+		if institutionNormalized == "" && programNormalized == "" {
+			continue
+		}
+
+		if len(institution) > 255 {
+			institution = institution[:255]
+		}
+		if len(program) > 255 {
+			program = program[:255]
+		}
+		if len(institutionNormalized) > 255 {
+			institutionNormalized = institutionNormalized[:255]
+		}
+		if len(programNormalized) > 255 {
+			programNormalized = programNormalized[:255]
+		}
+
+		entryKey := institutionNormalized + "|" + programNormalized
+		if _, exists := seen[entryKey]; exists {
+			continue
+		}
+		seen[entryKey] = struct{}{}
+
+		entries = append(entries, referenceEntry{
+			institution:           institution,
+			program:               program,
+			institutionNormalized: institutionNormalized,
+			programNormalized:     programNormalized,
+		})
+	}
+
+	if len(entries) == 0 {
+		return nil
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	const query = `INSERT INTO education_reference_custom
+		(institution, program, institution_normalized, program_normalized, source_user_id, created_at, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?)
+	ON DUPLICATE KEY UPDATE
+		institution = CASE
+			WHEN VALUES(institution) = '' THEN institution
+			WHEN institution IS NULL OR institution = '' OR CHAR_LENGTH(VALUES(institution)) < CHAR_LENGTH(institution) THEN VALUES(institution)
+			ELSE institution
+		END,
+		program = CASE
+			WHEN VALUES(program) = '' THEN program
+			WHEN program IS NULL OR program = '' OR CHAR_LENGTH(VALUES(program)) < CHAR_LENGTH(program) THEN VALUES(program)
+			ELSE program
+		END,
+		source_user_id = VALUES(source_user_id),
+		updated_at = VALUES(updated_at)`
+
+	now := time.Now()
+	for _, entry := range entries {
+		if _, execErr := tx.Exec(
+			query,
+			entry.institution,
+			entry.program,
+			entry.institutionNormalized,
+			entry.programNormalized,
+			userID,
+			now,
+			now,
+		); execErr != nil {
+			if isMissingEducationReferenceCustomTableError(execErr) {
+				return nil
+			}
+			return execErr
+		}
+	}
+
+	return tx.Commit()
+}
+
+func isMissingEducationReferenceCustomTableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	if !strings.Contains(lower, "education_reference_custom") {
+		return false
+	}
+	return strings.Contains(lower, "doesn't exist") ||
+		strings.Contains(lower, "no such table") ||
+		strings.Contains(lower, "1146")
 }
