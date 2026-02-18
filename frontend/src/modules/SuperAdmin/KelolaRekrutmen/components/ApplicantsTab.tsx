@@ -1,7 +1,7 @@
 ﻿// src/Pages/SuperAdmin/Recruitment/components/ApplicantsTab.tsx
 
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, RotateCcw, X, Filter, Search, User } from 'lucide-react';
+import { Calendar as CalendarIcon, RotateCcw, X, Filter, Search, User, Info } from 'lucide-react';
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -110,6 +110,53 @@ const statusBadge = (status: ApplicantStatus) => {
         default:
             return <Badge variant="outline">{status}</Badge>;
     }
+};
+
+const isSLATrackedStatus = (status: ApplicantStatus) =>
+    status === 'Applied' || status === 'Screening' || status === 'Interview' || status === 'Offering';
+
+const slaStageTooltipText =
+    'SLA Stage menunjukkan apakah kandidat di stage ini masih sesuai target hari proses (on track), mendekati batas, atau sudah overdue.';
+
+const slaBadge = (application: ApplicantRecord) => {
+    if (!isSLATrackedStatus(application.status)) {
+        return (
+            <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-500">
+                N/A
+            </Badge>
+        );
+    }
+
+    const indicator = application.sla;
+    if (!indicator) {
+        return (
+            <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-500">
+                Belum dihitung
+            </Badge>
+        );
+    }
+
+    if (indicator.state === 'overdue') {
+        return (
+            <Badge variant="outline" className="border-rose-500 bg-rose-50 text-rose-700">
+                Overdue {indicator.overdue_days} hari
+            </Badge>
+        );
+    }
+
+    if (indicator.state === 'warning') {
+        return (
+            <Badge variant="outline" className="border-amber-500 bg-amber-50 text-amber-700">
+                Sisa {indicator.remaining_days} hari
+            </Badge>
+        );
+    }
+
+    return (
+        <Badge variant="outline" className="border-emerald-500 bg-emerald-50 text-emerald-700">
+            On Track ({indicator.remaining_days} hari)
+        </Badge>
+    );
 };
 
 const formatScore = (score?: number | null) => {
@@ -922,6 +969,28 @@ export default function ApplicantsTab({
                                                 {recommendation ?? '-'}
                                             </Badge>
                                         </div>
+                                        <div className="col-span-2">
+                                            <div className="flex items-center gap-1">
+                                                <p className="text-[10px] text-slate-400">SLA Stage</p>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <button
+                                                                type="button"
+                                                                className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full text-slate-400 hover:text-slate-600"
+                                                                aria-label="Informasi SLA Stage"
+                                                            >
+                                                                <Info className="h-3 w-3" />
+                                                            </button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent className="max-w-[260px] text-xs leading-relaxed">
+                                                            {slaStageTooltipText}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                            {slaBadge(application)}
+                                        </div>
                                     </div>
                                     {onViewProfile && (
                                         <div className="pt-1.5 border-t border-slate-100">
@@ -956,6 +1025,27 @@ export default function ApplicantsTab({
                                 <TableHead>Skor</TableHead>
                                 <TableHead>Peringkat</TableHead>
                                 <TableHead>Rekomendasi</TableHead>
+                                <TableHead className="w-[170px]">
+                                    <div className="flex items-center gap-1">
+                                        <span>SLA Stage</span>
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <button
+                                                        type="button"
+                                                        className="inline-flex h-4 w-4 items-center justify-center rounded-full text-slate-400 hover:text-slate-600"
+                                                        aria-label="Informasi SLA Stage"
+                                                    >
+                                                        <Info className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </TooltipTrigger>
+                                                <TooltipContent className="max-w-[280px] text-xs leading-relaxed">
+                                                    {slaStageTooltipText}
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
+                                </TableHead>
                                 <TableHead className="w-[90px]">Status</TableHead>
                                 <TableHead className="text-right w-[210px]">Aksi</TableHead>
                             </TableRow>
@@ -964,7 +1054,7 @@ export default function ApplicantsTab({
                         <TableBody>
                             {paginatedApplications.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="py-8 text-center text-sm text-slate-500">
+                                    <TableCell colSpan={11} className="py-8 text-center text-sm text-slate-500">
                                         Tidak ada data pelamar untuk kombinasi filter saat ini.
                                     </TableCell>
                                 </TableRow>
@@ -1014,6 +1104,7 @@ export default function ApplicantsTab({
                                                 {recommendation ?? '-'}
                                             </Badge>
                                         </TableCell>
+                                        <TableCell>{slaBadge(application)}</TableCell>
                                         <TableCell>{statusBadge(application.status)}</TableCell>
                                         <TableCell>
                                             <div className="flex flex-wrap items-center justify-end gap-2">

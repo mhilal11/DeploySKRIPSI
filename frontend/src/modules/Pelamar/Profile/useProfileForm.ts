@@ -17,6 +17,71 @@ import {
     isEducationComplete,
 } from './profileTypes';
 
+const truthyValues = new Set(['1', 'true', 'yes', 'ya', 'aktif', 'active']);
+
+const coerceBool = (value: unknown): boolean => {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'number') {
+        return value === 1;
+    }
+    if (typeof value === 'string') {
+        return truthyValues.has(value.trim().toLowerCase());
+    }
+    return false;
+};
+
+const normalizeYearMonth = (value: unknown): string => {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    const text = value.trim();
+    if (!text) {
+        return '';
+    }
+    if (/^\d{4}-(0[1-9]|1[0-2])$/.test(text)) {
+        return text;
+    }
+    if (/^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(text)) {
+        return text.slice(0, 7);
+    }
+    return '';
+};
+
+const normalizeExperience = (item: Experience): Experience => {
+    const raw = item as Experience & {
+        start_year?: string | number;
+        end_year?: string | number;
+        is_current?: unknown;
+    };
+
+    const isCurrent = coerceBool(raw.is_current);
+    let startDate = normalizeYearMonth(raw.start_date);
+    let endDate = normalizeYearMonth(raw.end_date);
+
+    if (!startDate && raw.start_year !== undefined && raw.start_year !== null) {
+        const year = String(raw.start_year).trim();
+        if (/^\d{4}$/.test(year)) {
+            startDate = `${year}-01`;
+        }
+    }
+
+    if (!endDate && raw.end_year !== undefined && raw.end_year !== null) {
+        const year = String(raw.end_year).trim();
+        if (/^\d{4}$/.test(year)) {
+            endDate = `${year}-12`;
+        }
+    }
+
+    return {
+        ...item,
+        start_date: startDate,
+        end_date: isCurrent ? '' : endDate,
+        is_current: isCurrent,
+    };
+};
+
 export function useProfileForm(profile: ApplicantProfilePayload) {
     const initialData: ApplicantProfileForm = {
         personal: {
@@ -37,7 +102,7 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
                 : [createEmptyEducation()],
         experiences:
             profile.experiences.length > 0
-                ? profile.experiences.map((item) => ({ ...item }))
+                ? profile.experiences.map((item) => normalizeExperience(item))
                 : [],
         certifications:
             profile.certifications?.length > 0
@@ -168,13 +233,12 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
         key: keyof Experience,
         value: string | boolean,
     ) => {
-        const updated = form.data.experiences.map((item) =>
-            item.id === id ? { ...item, [key]: value } : item,
-        );
-        form.setData({
-            ...form.data,
-            experiences: updated,
-        });
+        form.setData((prevData) => ({
+            ...prevData,
+            experiences: prevData.experiences.map((item) =>
+                item.id === id ? { ...item, [key]: value } : item,
+            ),
+        }));
     };
 
     const addEducation = () => {

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -571,36 +572,98 @@ func PelamarCheckEligibility(c *gin.Context) {
 	failures := []map[string]string{}
 	passed := []map[string]string{}
 
+	appendFailure := func(field, message, actual, expected, recommendation string) {
+		failures = append(failures, map[string]string{
+			"field":          field,
+			"message":        message,
+			"detail":         message,
+			"actual":         actual,
+			"expected":       expected,
+			"recommendation": recommendation,
+		})
+	}
+	appendPassed := func(field, message, actual, expected string) {
+		passed = append(passed, map[string]string{
+			"field":    field,
+			"message":  message,
+			"detail":   message,
+			"actual":   actual,
+			"expected": expected,
+		})
+	}
+
 	minAge, _ := toInt(criteria["min_age"])
 	maxAge, _ := toInt(criteria["max_age"])
 	if minAge > 0 || maxAge > 0 {
+		expectedAge := expectedAgeText(minAge, maxAge)
 		age := calculateAge(profile.DateOfBirth)
 		if age == nil {
-			failures = append(failures, map[string]string{"field": "umur", "message": "Tanggal lahir Anda belum diisi di profil."})
+			appendFailure(
+				"umur",
+				"Tanggal lahir Anda belum diisi di profil.",
+				"Belum ada data tanggal lahir",
+				expectedAge,
+				"Lengkapi tanggal lahir pada bagian Data Pribadi profil.",
+			)
 		} else {
 			failed := false
 			if minAge > 0 && *age < minAge {
-				failures = append(failures, map[string]string{"field": "umur", "message": "Umur Anda tidak memenuhi kriteria minimal."})
+				appendFailure(
+					"umur",
+					"Umur Anda tidak memenuhi kriteria minimal.",
+					fmt.Sprintf("%d tahun", *age),
+					expectedAge,
+					"Periksa kembali tanggal lahir pada profil agar sesuai dengan persyaratan lowongan.",
+				)
 				failed = true
 			}
 			if maxAge > 0 && *age > maxAge {
-				failures = append(failures, map[string]string{"field": "umur", "message": "Umur Anda tidak memenuhi kriteria maksimal."})
+				appendFailure(
+					"umur",
+					"Umur Anda tidak memenuhi kriteria maksimal.",
+					fmt.Sprintf("%d tahun", *age),
+					expectedAge,
+					"Periksa kembali tanggal lahir pada profil agar sesuai dengan persyaratan lowongan.",
+				)
 				failed = true
 			}
 			if !failed {
-				passed = append(passed, map[string]string{"field": "umur", "message": "Umur Anda memenuhi kriteria."})
+				appendPassed(
+					"umur",
+					"Umur Anda memenuhi kriteria.",
+					fmt.Sprintf("%d tahun", *age),
+					expectedAge,
+				)
 			}
 		}
 	}
 
 	gender, _ := criteria["gender"].(string)
 	if gender != "" && gender != "any" {
+		expectedGender := strings.TrimSpace(gender)
 		if profile.Gender == nil || *profile.Gender == "" {
-			failures = append(failures, map[string]string{"field": "jenis_kelamin", "message": "Jenis kelamin Anda belum diisi di profil."})
+			appendFailure(
+				"jenis_kelamin",
+				"Jenis kelamin Anda belum diisi di profil.",
+				"Belum diisi",
+				expectedGender,
+				"Lengkapi jenis kelamin pada bagian Data Pribadi profil.",
+			)
 		} else if *profile.Gender != gender {
-			failures = append(failures, map[string]string{"field": "jenis_kelamin", "message": "Lowongan ini hanya untuk " + gender + "."})
+			appendFailure(
+				"jenis_kelamin",
+				"Lowongan ini hanya untuk "+gender+".",
+				strings.TrimSpace(*profile.Gender),
+				expectedGender,
+				"Pilih lowongan lain yang sesuai dengan profil Anda.",
+			)
 		} else {
-			passed = append(passed, map[string]string{"field": "jenis_kelamin", "message": "Jenis kelamin sesuai kriteria."})
+			appendPassed(
+				"jenis_kelamin",
+				"Jenis kelamin sesuai kriteria.",
+				strings.TrimSpace(*profile.Gender),
+				expectedGender,
+			)
 		}
 	}
 
@@ -608,21 +671,51 @@ func PelamarCheckEligibility(c *gin.Context) {
 	if minEducation != "" {
 		highest := highestEducationLevel(profile.Educations)
 		if highest == "" {
-			failures = append(failures, map[string]string{"field": "pendidikan", "message": "Data pendidikan Anda belum diisi di profil."})
+			appendFailure(
+				"pendidikan",
+				"Data pendidikan Anda belum diisi di profil.",
+				"Belum ada riwayat pendidikan",
+				"Minimal "+minEducation,
+				"Tambahkan riwayat pendidikan pada tab Pendidikan profil.",
+			)
 		} else if educationRank(highest) < educationRank(minEducation) {
-			failures = append(failures, map[string]string{"field": "pendidikan", "message": "Tingkat pendidikan tidak memenuhi kriteria minimal."})
+			appendFailure(
+				"pendidikan",
+				"Tingkat pendidikan tidak memenuhi kriteria minimal.",
+				"Tertinggi: "+highest,
+				"Minimal "+minEducation,
+				"Pastikan jenjang pendidikan tertinggi Anda tercatat dengan benar di profil.",
+			)
 		} else {
-			passed = append(passed, map[string]string{"field": "pendidikan", "message": "Tingkat pendidikan memenuhi kriteria."})
+			appendPassed(
+				"pendidikan",
+				"Tingkat pendidikan memenuhi kriteria.",
+				"Tertinggi: "+highest,
+				"Minimal "+minEducation,
+			)
 		}
 	}
 
 	minExp, _ := toInt(criteria["min_experience_years"])
 	if minExp > 0 {
 		totalExp := totalExperienceYears(profile.Experiences)
+		expectedExp := fmt.Sprintf("Minimal %d tahun", minExp)
+		actualExp := fmt.Sprintf("%.1f tahun", totalExp)
 		if totalExp < float64(minExp) {
-			failures = append(failures, map[string]string{"field": "pengalaman", "message": "Pengalaman kerja tidak memenuhi kriteria."})
+			appendFailure(
+				"pengalaman",
+				"Pengalaman kerja tidak memenuhi kriteria.",
+				actualExp,
+				expectedExp,
+				"Lengkapi pengalaman kerja/magang pada tab Pengalaman Kerja/Magang di profil.",
+			)
 		} else {
-			passed = append(passed, map[string]string{"field": "pengalaman", "message": "Pengalaman kerja memenuhi kriteria."})
+			appendPassed(
+				"pengalaman",
+				"Pengalaman kerja memenuhi kriteria.",
+				actualExp,
+				expectedExp,
+			)
 		}
 	}
 
@@ -1168,20 +1261,59 @@ func educationRank(level string) int {
 func totalExperienceYears(raw models.JSON) float64 {
 	experiences := decodeJSONArray(raw)
 	totalMonths := 0
+	now := time.Now()
+
 	for _, exp := range experiences {
-		startYear, _ := toInt(exp["start_year"])
-		endYear, _ := toInt(exp["end_year"])
-		if curr, ok := exp["is_current"].(bool); ok && curr {
-			endYear = time.Now().Year()
-		}
-		if startYear > 0 {
-			if endYear <= 0 {
-				endYear = time.Now().Year()
+		startValue := strings.TrimSpace(anyToTrimmedString(exp["start_date"]))
+		if startValue == "" {
+			if startYear, ok := toInt(exp["start_year"]); ok && startYear > 0 {
+				startValue = fmt.Sprintf("%04d-01", startYear)
 			}
-			totalMonths += (endYear - startYear) * 12
+		}
+		if !isValidYearMonth(startValue) {
+			continue
+		}
+
+		startDate, err := time.Parse("2006-01", startValue)
+		if err != nil {
+			continue
+		}
+
+		endDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		if curr, ok := exp["is_current"].(bool); !ok || !curr {
+			endValue := strings.TrimSpace(anyToTrimmedString(exp["end_date"]))
+			if endValue == "" {
+				if endYear, ok := toInt(exp["end_year"]); ok && endYear > 0 {
+					endValue = fmt.Sprintf("%04d-12", endYear)
+				}
+			}
+			if isValidYearMonth(endValue) {
+				if parsedEndDate, parseErr := time.Parse("2006-01", endValue); parseErr == nil {
+					endDate = parsedEndDate
+				}
+			}
+		}
+
+		months := (endDate.Year()-startDate.Year())*12 + int(endDate.Month()-startDate.Month()) + 1
+		if months > 0 {
+			totalMonths += months
 		}
 	}
+
 	return float64(totalMonths) / 12.0
+}
+
+func expectedAgeText(minAge, maxAge int) string {
+	if minAge > 0 && maxAge > 0 {
+		return fmt.Sprintf("%d - %d tahun", minAge, maxAge)
+	}
+	if minAge > 0 {
+		return fmt.Sprintf("Minimal %d tahun", minAge)
+	}
+	if maxAge > 0 {
+		return fmt.Sprintf("Maksimal %d tahun", maxAge)
+	}
+	return "Tidak ada batas usia"
 }
 
 func divisionSummaries(db *sqlx.DB) []map[string]any {

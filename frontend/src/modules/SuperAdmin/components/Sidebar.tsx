@@ -35,6 +35,7 @@ interface NavItem {
         href?: string;
         pattern: string | string[];
         exact?: boolean;
+        badgeKey?: string;
     }>;
     superAdminOnly?: boolean;
     badgeKey?: string;
@@ -66,6 +67,7 @@ const defaultNavItems: NavItem[] = [
                 routeName: 'super-admin.recruitment',
                 pattern: 'super-admin.recruitment',
                 exact: true,
+                badgeKey: 'super-admin.recruitment',
             },
             {
                 label: 'Analytics Rekrutmen',
@@ -240,6 +242,7 @@ function Sidebar({
         href?: string;
         pattern: string | string[];
         exact?: boolean;
+        badgeKey?: string;
     }) => {
         const childHref = child.href ?? (child.routeName ? route(child.routeName) : undefined);
         return isHrefActive(childHref, child.exact);
@@ -399,13 +402,27 @@ function Sidebar({
                                                     href={childHref}
                                                     onClick={handleNavClick}
                                                     className={cn(
-                                                        "rounded-md px-3 py-1.5 text-[10px] md:text-xs transition-colors",
+                                                        "flex items-center justify-between gap-2 rounded-md px-3 py-1.5 text-[10px] md:text-xs transition-colors",
                                                         childIsActive
                                                             ? "bg-white/15 text-white"
                                                             : "text-blue-100 hover:bg-white/5",
                                                     )}
                                                 >
-                                                    {child.label}
+                                                    <span className="truncate">{child.label}</span>
+                                                    {(() => {
+                                                        const rawCount = child.badgeKey
+                                                            ? liveBadges[child.badgeKey] ?? 0
+                                                            : 0;
+                                                        if (!rawCount || rawCount <= 0) {
+                                                            return null;
+                                                        }
+                                                        const displayCount = rawCount > 99 ? '99+' : rawCount;
+                                                        return (
+                                                            <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                                                                {displayCount}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </Link>
                                             );
                                         })}

@@ -1,9 +1,13 @@
 ﻿// src/Pages/SuperAdmin/Recruitment/KelolaRekrutmenIndex.tsx
 
 import {
+    AlertTriangle,
+    BellRing,
     Calendar as CalendarIcon,
+    Clock3,
     FileDown,
     FileText,
+    Save,
     Sparkles,
     Users,
     UserCheck,
@@ -34,6 +38,9 @@ import {
     ApplicantRejectHandler,
     InterviewSchedule,
     OnboardingItem,
+    RecruitmentSLAOverview,
+    RecruitmentSLAReminder,
+    RecruitmentSLASettings,
     RecruitmentPageProps,
     StatusSummary,
 } from './types';
@@ -49,6 +56,19 @@ const statusOrder: ApplicantStatus[] = [
     'Hired',
     'Rejected',
 ];
+const defaultSLASettings: RecruitmentSLASettings = {
+    Applied: 2,
+    Screening: 3,
+    Interview: 2,
+    Offering: 2,
+};
+const defaultSLAOverview: RecruitmentSLAOverview = {
+    active_applications: 0,
+    on_track_count: 0,
+    warning_count: 0,
+    overdue_count: 0,
+    compliance_rate: 100,
+};
 
 const onboardingStepLabels = [
     'Kontrak ditandatangani',
@@ -68,6 +88,24 @@ const formatDateLabel = (dateValue?: string | null) => {
         month: 'short',
         year: 'numeric',
     });
+};
+const clampSLAValue = (value: number) => Math.max(1, Math.min(30, value));
+const normalizeSLASettings = (input: Partial<Record<string, unknown>> | undefined): RecruitmentSLASettings => {
+    const parseStage = (camelCase: keyof RecruitmentSLASettings, snakeCase: string, fallback: number) => {
+        const raw = input?.[camelCase] ?? input?.[snakeCase];
+        const numeric = Number(raw);
+        if (Number.isNaN(numeric) || !Number.isFinite(numeric)) {
+            return fallback;
+        }
+        return clampSLAValue(Math.round(numeric));
+    };
+
+    return {
+        Applied: parseStage('Applied', 'applied', defaultSLASettings.Applied),
+        Screening: parseStage('Screening', 'screening', defaultSLASettings.Screening),
+        Interview: parseStage('Interview', 'interview', defaultSLASettings.Interview),
+        Offering: parseStage('Offering', 'offering', defaultSLASettings.Offering),
+    };
 };
 
 const recruitmentFilterStorageKey = 'super_admin_recruitment_global_filter_preferences_v1';
@@ -182,6 +220,9 @@ export default function KelolaRekrutmenIndex({
     applications,
     interviews,
     onboarding,
+    slaSettings = defaultSLASettings,
+    slaOverview = defaultSLAOverview,
+    slaReminders = [],
 }: RecruitmentPageProps) {
     const [applicationRows, setApplicationRows] = useState(applications);
     const [interviewRows, setInterviewRows] = useState(interviews);
@@ -206,6 +247,10 @@ export default function KelolaRekrutmenIndex({
     const [autoShortlistMinScore, setAutoShortlistMinScore] = useState('70');
     const [autoShortlistEligibleOnly, setAutoShortlistEligibleOnly] = useState(true);
     const [isRunningAutoShortlist, setIsRunningAutoShortlist] = useState(false);
+    const [slaSettingsForm, setSlaSettingsForm] = useState<RecruitmentSLASettings>(slaSettings);
+    const [slaOverviewState, setSlaOverviewState] = useState<RecruitmentSLAOverview>(slaOverview);
+    const [slaReminderRows, setSlaReminderRows] = useState<RecruitmentSLAReminder[]>(slaReminders);
+    const [isSavingSLA, setIsSavingSLA] = useState(false);
 
     const totalLowonganAvailable = useMemo(() => {
         const uniquePositions = new Set<string>();
@@ -238,6 +283,18 @@ export default function KelolaRekrutmenIndex({
     useEffect(() => {
         setOnboardingRows(onboarding);
     }, [onboarding]);
+
+    useEffect(() => {
+        setSlaSettingsForm(slaSettings);
+    }, [slaSettings]);
+
+    useEffect(() => {
+        setSlaOverviewState(slaOverview);
+    }, [slaOverview]);
+
+    useEffect(() => {
+        setSlaReminderRows(slaReminders);
+    }, [slaReminders]);
 
     useEffect(() => {
         if (!selectedApplicant) {
@@ -698,6 +755,71 @@ export default function KelolaRekrutmenIndex({
         toast.success('Laporan PDF sedang disiapkan.');
     };
 
+    const handleSLASettingChange = (stage: keyof RecruitmentSLASettings, value: string) => {
+        const digits = value.replace(/\D/g, '');
+        if (digits === '') {
+            setSlaSettingsForm((prev) => ({
+                ...prev,
+                [stage]: defaultSLASettings[stage],
+            }));
+            return;
+        }
+        const numeric = clampSLAValue(Number(digits));
+        setSlaSettingsForm((prev) => ({
+            ...prev,
+            [stage]: numeric,
+        }));
+    };
+
+    const handleSaveSLASettings = async () => {
+        if (isSavingSLA) return;
+        setIsSavingSLA(true);
+        try {
+            const payload = {
+                applied: clampSLAValue(Number(slaSettingsForm.Applied)),
+                screening: clampSLAValue(Number(slaSettingsForm.Screening)),
+                interview: clampSLAValue(Number(slaSettingsForm.Interview)),
+                offering: clampSLAValue(Number(slaSettingsForm.Offering)),
+            };
+
+            const response = await api.post(apiUrl('/super-admin/recruitment/sla-settings'), payload);
+            const nextSettings = normalizeSLASettings(response.data?.settings);
+            setSlaSettingsForm(nextSettings);
+            toast.success('Konfigurasi SLA berhasil disimpan.');
+            router.reload({
+                only: [
+                    'applications',
+                    'interviews',
+                    'onboarding',
+                    'slaSettings',
+                    'slaOverview',
+                    'slaReminders',
+                    'sidebarNotifications',
+                ],
+            });
+        } catch (error) {
+            if (isAxiosError(error)) {
+                const errorData = error.response?.data as
+                    | { errors?: Record<string, string>; message?: string }
+                    | undefined;
+                const message = errorData?.errors
+                    ? getFirstErrorMessage(errorData.errors)
+                    : errorData?.message;
+                toast.error(message || 'Gagal menyimpan konfigurasi SLA.');
+            } else {
+                toast.error('Gagal menyimpan konfigurasi SLA.');
+            }
+        } finally {
+            setIsSavingSLA(false);
+        }
+    };
+
+    const normalizedRole = String(auth?.user?.role ?? '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+    const isSuperAdminRole =
+        normalizedRole === 'super admin' || normalizedRole === 'superadmin';
     const isHumanCapitalAdmin =
         auth?.user?.role === 'Admin' &&
         typeof auth?.user?.division === 'string' &&
@@ -757,7 +879,148 @@ export default function KelolaRekrutmenIndex({
                     </TabsList>
 
                     <TabsContent value="applicants">
-                        <div className="mb-5">
+                        <div className="mb-5 grid gap-4 xl:grid-cols-2">
+                            <Card className="h-full space-y-4 p-4 md:p-5">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-900">SLA Tracker & Reminder</p>
+                                        <p className="text-xs leading-relaxed text-slate-600">
+                                            Pantau target durasi tiap stage dan prioritas follow-up kandidat.
+                                        </p>
+                                    </div>
+                                    <BellRing className="h-4 w-4 text-amber-600" />
+                                </div>
+
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                        <p className="text-[11px] text-slate-500">Aktif</p>
+                                        <p className="text-lg font-semibold text-slate-900">
+                                            {slaOverviewState.active_applications}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                                        <p className="text-[11px] text-emerald-700">On Track</p>
+                                        <p className="text-lg font-semibold text-emerald-700">
+                                            {slaOverviewState.on_track_count}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                                        <p className="text-[11px] text-amber-700">Mendekati SLA</p>
+                                        <p className="text-lg font-semibold text-amber-700">
+                                            {slaOverviewState.warning_count}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                                        <p className="text-[11px] text-rose-700">Overdue</p>
+                                        <p className="text-lg font-semibold text-rose-700">
+                                            {slaOverviewState.overdue_count}
+                                        </p>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-600">
+                                    Compliance rate:{' '}
+                                    <span className="font-semibold text-slate-900">
+                                        {Number(slaOverviewState.compliance_rate || 0).toFixed(1)}%
+                                    </span>
+                                </p>
+
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-slate-500">Applied (hari)</p>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={30}
+                                            value={slaSettingsForm.Applied}
+                                            onChange={(event) => handleSLASettingChange('Applied', event.target.value)}
+                                            className="h-9"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-slate-500">Screening (hari)</p>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={30}
+                                            value={slaSettingsForm.Screening}
+                                            onChange={(event) => handleSLASettingChange('Screening', event.target.value)}
+                                            className="h-9"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-slate-500">Interview (hari)</p>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={30}
+                                            value={slaSettingsForm.Interview}
+                                            onChange={(event) => handleSLASettingChange('Interview', event.target.value)}
+                                            className="h-9"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-slate-500">Offering (hari)</p>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            max={30}
+                                            value={slaSettingsForm.Offering}
+                                            onChange={(event) => handleSLASettingChange('Offering', event.target.value)}
+                                            className="h-9"
+                                        />
+                                    </div>
+                                </div>
+
+                                <Button
+                                    variant="outline"
+                                    onClick={handleSaveSLASettings}
+                                    disabled={isSavingSLA}
+                                    className="justify-start border-slate-300"
+                                >
+                                    <Save className="mr-2 h-4 w-4" />
+                                    {isSavingSLA ? 'Menyimpan SLA...' : 'Simpan Konfigurasi SLA'}
+                                </Button>
+
+                                <div className="space-y-2">
+                                    <p className="text-xs font-medium text-slate-700">Reminder Prioritas</p>
+                                    {slaReminderRows.length === 0 ? (
+                                        <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                            Tidak ada kandidat yang overdue atau mendekati SLA.
+                                        </p>
+                                    ) : (
+                                        <div className="max-h-36 space-y-2 overflow-y-auto pr-1">
+                                            {slaReminderRows.map((item) => (
+                                                <div
+                                                    key={item.application_id}
+                                                    className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                                                >
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-xs font-semibold text-slate-900">
+                                                                {item.name}
+                                                            </p>
+                                                            <p className="truncate text-[11px] text-slate-500">
+                                                                {item.position} · {item.stage}
+                                                            </p>
+                                                        </div>
+                                                        {item.state === 'overdue' ? (
+                                                            <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700">
+                                                                <AlertTriangle className="mr-1 h-3 w-3" />
+                                                                Overdue {item.overdue_days} hari
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                                                <Clock3 className="mr-1 h-3 w-3" />
+                                                                Sisa {item.remaining_days} hari
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </Card>
                             <Card className="h-full space-y-4 p-4 md:p-5">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>

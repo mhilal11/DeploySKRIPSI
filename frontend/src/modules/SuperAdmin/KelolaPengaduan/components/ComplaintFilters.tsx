@@ -1,5 +1,5 @@
 ﻿import { Search } from 'lucide-react';
-import { ChangeEvent } from 'react';
+import { ChangeEvent, useMemo } from 'react';
 
 import { Input } from '@/shared/components/ui/input';
 import {
@@ -97,6 +97,20 @@ function FilterSelect({
     options,
     emptyLabel,
 }: FilterSelectProps) {
+    const safeOptions = useMemo(() => {
+        const seen = new Set<string>();
+        const deduped: Option[] = [];
+        for (const option of options) {
+            const optionValue = (option.value ?? '').trim();
+            if (optionValue === '' || optionValue === 'all' || seen.has(optionValue)) {
+                continue;
+            }
+            seen.add(optionValue);
+            deduped.push(option);
+        }
+        return deduped;
+    }, [options]);
+
     return (
         <Select value={value} onValueChange={onChange}>
             <SelectTrigger className="w-full min-w-0 md:min-w-[105px] lg:w-40 h-9 md:h-10 text-xs md:text-sm">
@@ -104,7 +118,7 @@ function FilterSelect({
             </SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">{emptyLabel}</SelectItem>
-                {options.map((option) => (
+                {safeOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                         {option.label}
                     </SelectItem>

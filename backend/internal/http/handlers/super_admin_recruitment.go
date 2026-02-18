@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,16 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 
 	apps := []models.Application{}
 	_ = db.Select(&apps, "SELECT * FROM applications ORDER BY submitted_at DESC")
+	slaSettings := loadRecruitmentSLASettings(db)
+	now := time.Now()
+	slaOverview := map[string]any{
+		"active_applications": 0,
+		"on_track_count":      0,
+		"warning_count":       0,
+		"overdue_count":       0,
+		"compliance_rate":     100.0,
+	}
+	slaReminders := make([]map[string]any, 0)
 
 	// preload profiles
 	profileByUser := map[int64]*models.ApplicantProfile{}
@@ -92,6 +103,67 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 		educationSummary := summarizeEducation(educations)
 		experienceSummary := summarizeExperience(experiences)
 		recruitmentScore, hasRecruitmentScore := scoreByApplicationID[app.ID]
+		var slaIndicator map[string]any
+		if isRecruitmentSLAStage(app.Status) {
+			startAt := applicationStageStartedAt(app)
+			if startAt != nil {
+				targetDays := slaSettings[app.Status]
+				if targetDays < 1 {
+					targetDays = defaultRecruitmentSLASettings()[app.Status]
+				}
+				daysInStage := calculateElapsedDays(*startAt, now)
+				dueAt := startAt.AddDate(0, 0, targetDays)
+				remainingDays := calculateRemainingDays(dueAt, now)
+				overdueDays := 0
+				slaState := "on_track"
+				if dueAt.Before(now) {
+					overdueDays = calculateElapsedDays(dueAt, now)
+					if overdueDays < 1 {
+						overdueDays = 1
+					}
+					slaState = "overdue"
+				} else if remainingDays <= 1 {
+					slaState = "warning"
+				}
+
+				slaIndicator = map[string]any{
+					"stage":          app.Status,
+					"target_days":    targetDays,
+					"days_in_stage":  daysInStage,
+					"due_date":       dueAt.Format("2006-01-02"),
+					"remaining_days": remainingDays,
+					"overdue_days":   overdueDays,
+					"state":          slaState,
+					"is_overdue":     slaState == "overdue",
+				}
+
+				slaOverview["active_applications"] = slaOverview["active_applications"].(int) + 1
+				switch slaState {
+				case "overdue":
+					slaOverview["overdue_count"] = slaOverview["overdue_count"].(int) + 1
+				case "warning":
+					slaOverview["warning_count"] = slaOverview["warning_count"].(int) + 1
+				default:
+					slaOverview["on_track_count"] = slaOverview["on_track_count"].(int) + 1
+				}
+
+				if slaState == "overdue" || slaState == "warning" {
+					slaReminders = append(slaReminders, map[string]any{
+						"application_id": app.ID,
+						"name":           profileFullName,
+						"position":       app.Position,
+						"division":       app.Division,
+						"stage":          app.Status,
+						"days_in_stage":  daysInStage,
+						"target_days":    targetDays,
+						"due_date":       dueAt.Format("2006-01-02"),
+						"remaining_days": remainingDays,
+						"overdue_days":   overdueDays,
+						"state":          slaState,
+					})
+				}
+			}
+		}
 
 		applications = append(applications, map[string]any{
 			"id":                     app.ID,
@@ -141,6 +213,7 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 				}
 				return nil
 			}(),
+			"sla": slaIndicator,
 		})
 
 		if app.Status == "Interview" {
@@ -194,11 +267,40 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 		}
 	}
 
+	activeSLA := slaOverview["active_applications"].(int)
+	if activeSLA > 0 {
+		overdue := slaOverview["overdue_count"].(int)
+		slaOverview["compliance_rate"] = float64(activeSLA-overdue) / float64(activeSLA) * 100
+	}
+	sort.SliceStable(slaReminders, func(i, j int) bool {
+		left := slaReminders[i]
+		right := slaReminders[j]
+		leftState, _ := left["state"].(string)
+		rightState, _ := right["state"].(string)
+		if leftState != rightState {
+			return leftState == "overdue"
+		}
+		leftOverdue, _ := left["overdue_days"].(int)
+		rightOverdue, _ := right["overdue_days"].(int)
+		if leftOverdue != rightOverdue {
+			return leftOverdue > rightOverdue
+		}
+		leftRemain, _ := left["remaining_days"].(int)
+		rightRemain, _ := right["remaining_days"].(int)
+		return leftRemain < rightRemain
+	})
+	if len(slaReminders) > 12 {
+		slaReminders = slaReminders[:12]
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"applications":         applications,
 		"statusOptions":        models.ApplicationStatuses,
 		"interviews":           interviews,
 		"onboarding":           onboarding,
+		"slaSettings":          slaSettings,
+		"slaOverview":          slaOverview,
+		"slaReminders":         slaReminders,
 		"scoringAudits":        scoringAudits,
 		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
 	})
@@ -217,6 +319,93 @@ func SuperAdminRecruitmentAnalyticsIndex(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"scoringAudits":        scoringAudits,
 		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+	})
+}
+
+func SuperAdminRecruitmentUpdateSLASettings(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || user.Role != models.RoleSuperAdmin {
+		JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	defaults := defaultRecruitmentSLASettings()
+	payload := map[string]int{
+		"Applied":   defaults["Applied"],
+		"Screening": defaults["Screening"],
+		"Interview": defaults["Interview"],
+		"Offering":  defaults["Offering"],
+	}
+
+	stageAliases := map[string]string{
+		"applied":        "Applied",
+		"applied_days":   "Applied",
+		"screening":      "Screening",
+		"screening_days": "Screening",
+		"interview":      "Interview",
+		"interview_days": "Interview",
+		"offering":       "Offering",
+		"offering_days":  "Offering",
+	}
+
+	for formKey, stage := range stageAliases {
+		raw := strings.TrimSpace(c.PostForm(formKey))
+		if raw == "" {
+			continue
+		}
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			ValidationErrors(c, FieldErrors{strings.ToLower(stage): "Nilai SLA harus berupa angka."})
+			return
+		}
+		payload[stage] = value
+	}
+
+	var jsonPayload map[string]any
+	if err := c.ShouldBindJSON(&jsonPayload); err == nil {
+		for key, value := range jsonPayload {
+			stage, ok := stageAliases[strings.ToLower(strings.TrimSpace(key))]
+			if !ok {
+				continue
+			}
+			intValue, hasValue := toInt(value)
+			if !hasValue {
+				ValidationErrors(c, FieldErrors{strings.ToLower(stage): "Nilai SLA harus berupa angka."})
+				return
+			}
+			payload[stage] = intValue
+		}
+	}
+
+	errs := FieldErrors{}
+	for _, stage := range []string{"Applied", "Screening", "Interview", "Offering"} {
+		value := payload[stage]
+		if value < 1 || value > 30 {
+			errs[strings.ToLower(stage)] = "SLA harus antara 1 sampai 30 hari."
+		}
+	}
+	if len(errs) > 0 {
+		ValidationErrors(c, errs)
+		return
+	}
+
+	db := middleware.GetDB(c)
+	now := time.Now()
+	for stage, target := range payload {
+		_, err := db.Exec(`
+			INSERT INTO recruitment_sla_settings (stage, target_days, created_at, updated_at)
+			VALUES (?, ?, ?, ?)
+			ON DUPLICATE KEY UPDATE target_days = VALUES(target_days), updated_at = VALUES(updated_at)
+		`, stage, target, now, now)
+		if err != nil {
+			JSONError(c, http.StatusInternalServerError, "Gagal menyimpan SLA. Pastikan migrasi terbaru sudah dijalankan.")
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":   "SLA recruitment berhasil diperbarui.",
+		"settings": payload,
 	})
 }
 
@@ -632,6 +821,93 @@ func chooseString(primary *string, fallback *string) string {
 		return *fallback
 	}
 	return ""
+}
+
+func defaultRecruitmentSLASettings() map[string]int {
+	return map[string]int{
+		"Applied":   2,
+		"Screening": 3,
+		"Interview": 2,
+		"Offering":  2,
+	}
+}
+
+func loadRecruitmentSLASettings(db *sqlx.DB) map[string]int {
+	settings := defaultRecruitmentSLASettings()
+	rows := []struct {
+		Stage      string `db:"stage"`
+		TargetDays int    `db:"target_days"`
+	}{}
+	if err := db.Select(&rows, "SELECT stage, target_days FROM recruitment_sla_settings"); err != nil {
+		return settings
+	}
+
+	for _, row := range rows {
+		stage := strings.TrimSpace(row.Stage)
+		if _, ok := settings[stage]; !ok {
+			continue
+		}
+		if row.TargetDays > 0 {
+			settings[stage] = row.TargetDays
+		}
+	}
+	return settings
+}
+
+func isRecruitmentSLAStage(status string) bool {
+	switch status {
+	case "Applied", "Screening", "Interview", "Offering":
+		return true
+	default:
+		return false
+	}
+}
+
+func applicationStageStartedAt(app models.Application) *time.Time {
+	switch app.Status {
+	case "Applied":
+		return app.SubmittedAt
+	case "Screening":
+		if app.ScreeningAt != nil && !app.ScreeningAt.IsZero() {
+			return app.ScreeningAt
+		}
+		return app.SubmittedAt
+	case "Interview":
+		if app.InterviewAt != nil && !app.InterviewAt.IsZero() {
+			return app.InterviewAt
+		}
+		if app.ScreeningAt != nil && !app.ScreeningAt.IsZero() {
+			return app.ScreeningAt
+		}
+		return app.SubmittedAt
+	case "Offering":
+		if app.OfferingAt != nil && !app.OfferingAt.IsZero() {
+			return app.OfferingAt
+		}
+		if app.InterviewAt != nil && !app.InterviewAt.IsZero() {
+			return app.InterviewAt
+		}
+		if app.ScreeningAt != nil && !app.ScreeningAt.IsZero() {
+			return app.ScreeningAt
+		}
+		return app.SubmittedAt
+	default:
+		return nil
+	}
+}
+
+func calculateElapsedDays(start, end time.Time) int {
+	if end.Before(start) {
+		return 0
+	}
+	return int(end.Sub(start).Hours() / 24)
+}
+
+func calculateRemainingDays(dueAt, now time.Time) int {
+	if now.After(dueAt) {
+		return 0
+	}
+	return int(dueAt.Sub(now).Hours() / 24)
 }
 
 func loadChecklist(db *sqlx.DB, applicationID int64) models.OnboardingChecklist {

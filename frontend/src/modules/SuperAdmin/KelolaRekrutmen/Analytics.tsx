@@ -42,6 +42,12 @@ const TOP_K_MAX = 20;
 const MINIMUM_SCORE_MIN = 0;
 const MINIMUM_SCORE_MAX = 100;
 
+const TARGET_PRECISION_INTERVIEW = 60;
+const TARGET_PRECISION_HIRED = 40;
+const TARGET_RECALL_INTERVIEW = 70;
+const TARGET_RECALL_HIRED = 70;
+const TARGET_MAX_FAIRNESS_GAP = 20;
+
 const formatPercent = (value?: number | null) => `${Number(value ?? 0).toFixed(1)}%`;
 const formatDecimal = (value?: number | null) => Number(value ?? 0).toFixed(2);
 const truncateLabel = (value: string, max = 16) =>
@@ -77,6 +83,18 @@ const parseMinimumScore = (value: string) => {
     const numeric = Number(value);
     if (Number.isNaN(numeric)) return MINIMUM_SCORE_MIN;
     return Math.max(MINIMUM_SCORE_MIN, Math.min(MINIMUM_SCORE_MAX, numeric));
+};
+
+const normalizeScore = (value: number, target: number) => {
+    if (target <= 0) return 100;
+    const score = (value / target) * 100;
+    return Math.max(0, Math.min(100, score));
+};
+
+const scoreStatus = (value: number) => {
+    if (value >= 85) return 'Lulus';
+    if (value >= 70) return 'Perlu Kalibrasi';
+    return 'Belum Lulus';
 };
 
 const TrendingValueIcon = ({ positive }: { positive: boolean }) => (
@@ -353,6 +371,101 @@ export default function RecruitmentAnalyticsPage({
         });
     }, []);
 
+    const readinessReport = useMemo(() => {
+        const summary = scoringEvaluation?.summary;
+
+        const precisionInterview = Number(summary?.precision_at_k_interview ?? 0);
+        const precisionHired = Number(summary?.precision_at_k_hired ?? 0);
+        const recallInterview = Number(summary?.recall_shortlist_vs_interview ?? 0);
+        const recallHired = Number(summary?.recall_shortlist_vs_hired ?? 0);
+
+        const modelScore =
+            (normalizeScore(precisionInterview, TARGET_PRECISION_INTERVIEW) +
+                normalizeScore(precisionHired, TARGET_PRECISION_HIRED) +
+                normalizeScore(recallInterview, TARGET_RECALL_INTERVIEW) +
+                normalizeScore(recallHired, TARGET_RECALL_HIRED)) / 4;
+
+        const fairnessCount = fairnessRows.length;
+        const fairnessWaspadaCount = fairnessRows.filter((row) => row.fairness_flag === 'Waspada').length;
+        const maxFairnessGap = fairnessRows.reduce(
+            (maxValue, row) => Math.max(maxValue, Math.abs(Number(row.score_gap_from_global ?? 0))),
+            0,
+        );
+        const fairnessWaspadaScore =
+            fairnessCount === 0 ? 0 : ((fairnessCount - fairnessWaspadaCount) / fairnessCount) * 100;
+        const fairnessGapScore = maxFairnessGap <= TARGET_MAX_FAIRNESS_GAP
+            ? 100
+            : Math.max(0, 100 - (maxFairnessGap - TARGET_MAX_FAIRNESS_GAP) * 5);
+        const fairnessScore = fairnessCount === 0
+            ? 0
+            : fairnessWaspadaScore * 0.7 + fairnessGapScore * 0.3;
+
+        const driftCount = driftRows.length;
+        const driftHighCount = driftRows.filter((row) => row.drift_level === 'Tinggi').length;
+        const driftMediumCount = driftRows.filter((row) => row.drift_level === 'Sedang').length;
+        const driftScore = driftCount === 0
+            ? 0
+            : Math.max(0, 100 - (driftHighCount / driftCount) * 100 - (driftMediumCount / driftCount) * 40);
+
+        const auditScore = Math.min(100, (scoringAuditRows.length / 10) * 100);
+
+        const overallScore =
+            modelScore * 0.45 +
+            fairnessScore * 0.25 +
+            driftScore * 0.2 +
+            auditScore * 0.1;
+
+        const roundedOverall = Number(overallScore.toFixed(1));
+
+        const checklist = [
+            {
+                key: 'model',
+                label: 'Kualitas Model',
+                score: Number(modelScore.toFixed(1)),
+                detail: `P@K Intv ${formatPercent(precisionInterview)} | P@K Hired ${formatPercent(precisionHired)} | Recall Intv ${formatPercent(recallInterview)} | Recall Hired ${formatPercent(recallHired)}`,
+            },
+            {
+                key: 'fairness',
+                label: 'Fairness Divisi',
+                score: Number(fairnessScore.toFixed(1)),
+                detail: `Waspada ${fairnessWaspadaCount}/${fairnessCount} | Max Gap ${formatDecimal(maxFairnessGap)} (target <= ${TARGET_MAX_FAIRNESS_GAP})`,
+            },
+            {
+                key: 'drift',
+                label: 'Stabilitas Drift',
+                score: Number(driftScore.toFixed(1)),
+                detail: `Periode Tinggi ${driftHighCount}/${driftCount} | Sedang ${driftMediumCount}/${driftCount}`,
+            },
+            {
+                key: 'audit',
+                label: 'Kelengkapan Audit',
+                score: Number(auditScore.toFixed(1)),
+                detail: `${scoringAuditRows.length} aktivitas audit tercatat`,
+            },
+        ];
+
+        const recommendations: string[] = [];
+        if (modelScore < 70) {
+            recommendations.push('Kalibrasi bobot/threshold scoring dan evaluasi ulang precision-recall per lowongan.');
+        }
+        if (fairnessScore < 70) {
+            recommendations.push('Review kriteria antar divisi yang menghasilkan gap tinggi atau banyak status Waspada.');
+        }
+        if (driftScore < 70) {
+            recommendations.push('Lakukan rekalibrasi periodik karena drift Sedang/Tinggi masih dominan.');
+        }
+        if (auditScore < 70) {
+            recommendations.push('Perbanyak jejak audit konfigurasi, shortlist, dan export untuk pembuktian sidang.');
+        }
+
+        return {
+            overallScore: roundedOverall,
+            overallStatus: scoreStatus(roundedOverall),
+            checklist,
+            recommendations,
+        };
+    }, [driftRows, fairnessRows, scoringAuditRows.length, scoringEvaluation?.summary]);
+
     return (
         <>
             <Head title="Analytics Rekrutmen" />
@@ -510,6 +623,70 @@ export default function RecruitmentAnalyticsPage({
                         )}
                     </Card>
                 </div>
+
+                <Card className="space-y-4 p-4 md:p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <p className="text-sm font-semibold text-slate-900">Rubrik Otomatis Status Siap Sidang</p>
+                            <p className="text-xs text-slate-600">
+                                Skor komposit dari kualitas model, fairness, drift, dan kelengkapan audit (berdasarkan filter aktif).
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[11px] text-slate-500">Skor Akhir</p>
+                            <p className="text-2xl font-bold text-slate-900">{formatDecimal(readinessReport.overallScore)}/100</p>
+                            <span
+                                className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${readinessReport.overallStatus === 'Lulus'
+                                    ? 'bg-emerald-100 text-emerald-700'
+                                    : readinessReport.overallStatus === 'Perlu Kalibrasi'
+                                        ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-red-100 text-red-700'
+                                    }`}
+                            >
+                                {readinessReport.overallStatus}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        {readinessReport.checklist.map((item) => (
+                            <div key={item.key} className="space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs font-semibold text-slate-800">{item.label}</p>
+                                    <span
+                                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${item.score >= 85
+                                            ? 'bg-emerald-100 text-emerald-700'
+                                            : item.score >= 70
+                                                ? 'bg-amber-100 text-amber-700'
+                                                : 'bg-red-100 text-red-700'
+                                            }`}
+                                    >
+                                        {scoreStatus(item.score)}
+                                    </span>
+                                </div>
+                                <p className="text-lg font-bold text-slate-900">{formatDecimal(item.score)}</p>
+                                <p className="text-[11px] text-slate-500">{item.detail}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="space-y-1 rounded-lg border border-slate-200 bg-white p-3">
+                        <p className="text-xs font-semibold text-slate-800">Rekomendasi Prioritas</p>
+                        {readinessReport.recommendations.length === 0 ? (
+                            <p className="text-xs text-emerald-700">
+                                Semua indikator utama sudah stabil. Sistem siap dipresentasikan pada sidang.
+                            </p>
+                        ) : (
+                            <div className="space-y-1">
+                                {readinessReport.recommendations.map((item, index) => (
+                                    <p key={`${item}-${index}`} className="text-xs text-slate-600">
+                                        {index + 1}. {item}
+                                    </p>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </Card>
 
                 <div className="space-y-4">
                     <Card className="space-y-3 p-4 md:p-5">

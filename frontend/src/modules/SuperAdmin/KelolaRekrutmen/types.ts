@@ -55,6 +55,47 @@ export interface ApplicantRecord {
     profile_photo_url?: string | null;
     rejection_reason?: string | null;
     recruitment_score?: RecruitmentScore | null;
+    sla?: RecruitmentSLAIndicator | null;
+}
+
+export interface RecruitmentSLAIndicator {
+    stage: ApplicantStatus;
+    target_days: number;
+    days_in_stage: number;
+    due_date?: string | null;
+    remaining_days: number;
+    overdue_days: number;
+    state: 'on_track' | 'warning' | 'overdue' | string;
+    is_overdue?: boolean;
+}
+
+export interface RecruitmentSLASettings {
+    Applied: number;
+    Screening: number;
+    Interview: number;
+    Offering: number;
+}
+
+export interface RecruitmentSLAOverview {
+    active_applications: number;
+    on_track_count: number;
+    warning_count: number;
+    overdue_count: number;
+    compliance_rate: number;
+}
+
+export interface RecruitmentSLAReminder {
+    application_id: number;
+    name: string;
+    division?: string | null;
+    position: string;
+    stage: ApplicantStatus;
+    days_in_stage: number;
+    target_days: number;
+    due_date?: string | null;
+    remaining_days: number;
+    overdue_days: number;
+    state: 'on_track' | 'warning' | 'overdue' | string;
 }
 
 export interface RecruitmentScoreBreakdown {
@@ -237,6 +278,9 @@ export type RecruitmentPageProps = PageProps<{
     statusOptions: string[];
     interviews: InterviewSchedule[];
     onboarding: OnboardingItem[];
+    slaSettings?: RecruitmentSLASettings;
+    slaOverview?: RecruitmentSLAOverview;
+    slaReminders?: RecruitmentSLAReminder[];
     scoringAudits?: RecruitmentScoringAudit[];
     scoringEvaluation?: RecruitmentScoringEvaluation | null;
     scoringAnalytics?: RecruitmentScoringAnalytics | null;
