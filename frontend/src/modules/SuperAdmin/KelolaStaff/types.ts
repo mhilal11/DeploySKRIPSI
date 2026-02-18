@@ -30,6 +30,13 @@ export interface InactiveEmployeeRecord {
     type: 'Resign' | 'PHK' | 'Pensiun' | string;
 }
 
+export interface StaffOptionRecord {
+    id: number;
+    employeeCode: string;
+    name: string;
+    division?: string | null;
+}
+
 export type KelolaStaffPageProps = PageProps<{
     stats: {
         newRequests: number;
@@ -42,6 +49,7 @@ export type KelolaStaffPageProps = PageProps<{
         archive: TerminationRecord[];
     };
     inactiveEmployees: InactiveEmployeeRecord[];
+    staffOptions: StaffOptionRecord[];
     checklistTemplate: string[];
 }>;
 

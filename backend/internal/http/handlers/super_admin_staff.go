@@ -42,6 +42,38 @@ func SuperAdminStaffIndex(c *gin.Context) {
 		"archived":           len(terminations),
 	}
 
+	type staffPickerRow struct {
+		ID           int64   `db:"id"`
+		EmployeeCode string  `db:"employee_code"`
+		Name         string  `db:"name"`
+		Division     *string `db:"division"`
+	}
+	staffRows := []staffPickerRow{}
+	_ = db.Select(&staffRows, `
+		SELECT u.id, u.employee_code, u.name, u.division
+		FROM users u
+		WHERE u.role = ?
+		  AND u.status = 'Active'
+		  AND u.employee_code IS NOT NULL
+		  AND u.employee_code <> ''
+		  AND NOT EXISTS (
+			  SELECT 1
+			  FROM staff_terminations st
+			  WHERE st.user_id = u.id
+			    AND st.status IN ('Diajukan', 'Proses')
+		  )
+		ORDER BY u.name ASC
+	`, models.RoleStaff)
+	staffOptions := make([]map[string]any, 0, len(staffRows))
+	for _, row := range staffRows {
+		staffOptions = append(staffOptions, map[string]any{
+			"id":           row.ID,
+			"employeeCode": row.EmployeeCode,
+			"name":         row.Name,
+			"division":     row.Division,
+		})
+	}
+
 	inactiveEmployees := []map[string]any{}
 	for i, t := range archive {
 		if i >= 10 {
@@ -82,6 +114,7 @@ func SuperAdminStaffIndex(c *gin.Context) {
 			"archive": transformTerminations(archive),
 		},
 		"inactiveEmployees":    inactiveEmployees,
+		"staffOptions":         staffOptions,
 		"checklistTemplate":    checklistTemplate,
 		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
 	})

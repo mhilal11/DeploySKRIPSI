@@ -26,6 +26,7 @@ export default function KelolaStaffIndex() {
         archive: [],
     };
     const inactiveEmployees = page.props?.inactiveEmployees ?? [];
+    const staffOptions = page.props?.staffOptions ?? [];
     const checklistTemplate = page.props?.checklistTemplate ?? [];
 
     const isHumanCapitalAdmin =
@@ -59,7 +60,7 @@ export default function KelolaStaffIndex() {
             title='Termination & Offboarding'
             description='Kelola proses resign, PHK, dan offboarding karyawan'
             breadcrumbs={breadcrumbs}
-            actions={<TerminationDialog />}
+            actions={<TerminationDialog staffOptions={staffOptions} />}
         >
             <Head title='Kelola Staff' />
 
