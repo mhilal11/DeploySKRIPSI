@@ -1,5 +1,17 @@
 import { Activity, BarChart3, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import {
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Legend,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 import { toast } from 'sonner';
 
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
@@ -7,6 +19,13 @@ import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Input } from '@/shared/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/shared/components/ui/select';
 import { api, apiUrl } from '@/shared/lib/api';
 import { Head } from '@/shared/lib/inertia';
 import { route } from '@/shared/lib/route';
@@ -24,6 +43,9 @@ const MINIMUM_SCORE_MIN = 0;
 const MINIMUM_SCORE_MAX = 100;
 
 const formatPercent = (value?: number | null) => `${Number(value ?? 0).toFixed(1)}%`;
+const formatDecimal = (value?: number | null) => Number(value ?? 0).toFixed(2);
+const truncateLabel = (value: string, max = 16) =>
+    value.length > max ? `${value.slice(0, max - 1)}...` : value;
 
 const sanitizeTopKInput = (value: string) => {
     const digitsOnly = value.replace(/\D/g, '');
@@ -76,6 +98,9 @@ export default function RecruitmentAnalyticsPage({
     const [minimumScore, setMinimumScore] = useState(String(initialScoringEvaluation?.config?.min_score ?? 70));
     const [eligibleOnly, setEligibleOnly] = useState(initialScoringEvaluation?.config?.eligible_only ?? true);
     const [isLoadingScoringInsights, setIsLoadingScoringInsights] = useState(false);
+    const [selectedDivisions, setSelectedDivisions] = useState<string[]>([]);
+    const [periodFrom, setPeriodFrom] = useState('all');
+    const [periodTo, setPeriodTo] = useState('all');
 
     useEffect(() => {
         setScoringAuditRows(initialScoringAudits);
@@ -159,6 +184,144 @@ export default function RecruitmentAnalyticsPage({
         [isHumanCapitalAdmin],
     );
 
+    const evaluationChartData = useMemo(() => {
+        if (!scoringEvaluation?.summary) return [];
+
+        return [
+            {
+                metric: 'Precision Interview+',
+                value: Number(scoringEvaluation.summary.precision_at_k_interview ?? 0),
+            },
+            {
+                metric: 'Precision Hired',
+                value: Number(scoringEvaluation.summary.precision_at_k_hired ?? 0),
+            },
+            {
+                metric: 'Recall Interview+',
+                value: Number(scoringEvaluation.summary.recall_shortlist_vs_interview ?? 0),
+            },
+            {
+                metric: 'Recall Hired',
+                value: Number(scoringEvaluation.summary.recall_shortlist_vs_hired ?? 0),
+            },
+        ];
+    }, [scoringEvaluation]);
+
+    const divisionFilterOptions = useMemo(() => {
+        const fromDivisionAnalytics = (scoringAnalytics?.by_division ?? [])
+            .map((row) => row.division)
+            .filter((value): value is string => Boolean(value && value.trim()));
+        const fromVacancyEvaluation = (scoringEvaluation?.by_vacancy ?? [])
+            .map((row) => row.division)
+            .filter((value): value is string => Boolean(value && value.trim()));
+
+        return Array.from(new Set([...fromDivisionAnalytics, ...fromVacancyEvaluation]))
+            .sort((a, b) => a.localeCompare(b));
+    }, [scoringAnalytics, scoringEvaluation]);
+
+    const periodFilterOptions = useMemo(() => {
+        return (scoringAnalytics?.by_period ?? [])
+            .slice()
+            .sort((a, b) => String(a.period ?? '').localeCompare(String(b.period ?? '')))
+            .map((row) => ({
+                value: row.period,
+                label: row.period_label,
+            }));
+    }, [scoringAnalytics]);
+
+    useEffect(() => {
+        const optionSet = new Set(divisionFilterOptions);
+        setSelectedDivisions((previous) => {
+            if (previous.length === 0) return previous;
+            const next = previous.filter((division) => optionSet.has(division));
+            return next.length === previous.length ? previous : next;
+        });
+    }, [divisionFilterOptions]);
+
+    useEffect(() => {
+        if (periodFrom !== 'all' && !periodFilterOptions.some((item) => item.value === periodFrom)) {
+            setPeriodFrom('all');
+        }
+        if (periodTo !== 'all' && !periodFilterOptions.some((item) => item.value === periodTo)) {
+            setPeriodTo('all');
+        }
+    }, [periodFilterOptions, periodFrom, periodTo]);
+
+    useEffect(() => {
+        if (periodFrom === 'all' || periodTo === 'all') return;
+        if (periodFrom > periodTo) {
+            setPeriodTo(periodFrom);
+        }
+    }, [periodFrom, periodTo]);
+
+    const vacancyEvaluationRows = useMemo(() => {
+        const rows = scoringEvaluation?.by_vacancy ?? [];
+        if (selectedDivisions.length === 0) return rows;
+        return rows.filter((row) => selectedDivisions.includes(row.division));
+    }, [scoringEvaluation, selectedDivisions]);
+
+    const vacancyEvaluationChartData = useMemo(() => {
+        return vacancyEvaluationRows
+            .slice()
+            .sort((a, b) => Number(b.total_candidates ?? 0) - Number(a.total_candidates ?? 0))
+            .slice(0, 8)
+            .map((row, index) => ({
+                key: row.group_key || `${row.division}-${row.position}-${index}`,
+                label: truncateLabel(row.position || '-', 18),
+                position: row.position || '-',
+                division: row.division || '-',
+                candidates: Number(row.total_candidates ?? 0),
+                precisionInterview: Number(row.precision_at_k_interview ?? 0),
+                precisionHired: Number(row.precision_at_k_hired ?? 0),
+            }));
+    }, [vacancyEvaluationRows]);
+
+    const fairnessRows = useMemo(() => {
+        const rows = scoringAnalytics?.by_division ?? [];
+        if (selectedDivisions.length === 0) return rows;
+        return rows.filter((row) => selectedDivisions.includes(row.division));
+    }, [scoringAnalytics, selectedDivisions]);
+
+    const fairnessChartData = useMemo(() => {
+        return fairnessRows
+            .slice()
+            .sort((a, b) => Number(b.applications_count ?? 0) - Number(a.applications_count ?? 0))
+            .slice(0, 8)
+            .map((row) => ({
+                division: row.division,
+                label: truncateLabel(row.division || '-', 18),
+                avgScore: Number(row.avg_score ?? 0),
+                eligibleRate: Number(row.eligible_rate ?? 0),
+                hiredRate: Number(row.hired_rate ?? 0),
+                candidates: Number(row.applications_count ?? 0),
+            }));
+    }, [fairnessRows]);
+
+    const driftRows = useMemo(() => {
+        const rows = scoringAnalytics?.by_period ?? [];
+        return rows.filter((row) => {
+            const period = String(row.period ?? '');
+            if (periodFrom !== 'all' && period < periodFrom) return false;
+            if (periodTo !== 'all' && period > periodTo) return false;
+            return true;
+        });
+    }, [periodFrom, periodTo, scoringAnalytics]);
+
+    const driftChartData = useMemo(() => {
+        return driftRows
+            .slice()
+            .sort((a, b) => String(a.period ?? '').localeCompare(String(b.period ?? '')))
+            .map((row) => ({
+                period: row.period,
+                periodLabel: row.period_label,
+                avgScore: Number(row.avg_score ?? 0),
+                medianScore: Number(row.median_score ?? 0),
+                driftDelta: Number(row.drift_score_delta ?? 0),
+                eligibleRate: Number(row.eligible_rate ?? 0),
+                candidates: Number(row.applications_count ?? 0),
+            }));
+    }, [driftRows]);
+
     const handleTopKChange = (event: ChangeEvent<HTMLInputElement>) => {
         setTopK(sanitizeTopKInput(event.target.value));
     };
@@ -180,6 +343,15 @@ export default function RecruitmentAnalyticsPage({
             return normalized === '' ? String(MINIMUM_SCORE_MIN) : normalized;
         });
     };
+
+    const toggleDivisionSelection = useCallback((division: string) => {
+        setSelectedDivisions((previous) => {
+            if (previous.includes(division)) {
+                return previous.filter((item) => item !== division);
+            }
+            return [...previous, division];
+        });
+    }, []);
 
     return (
         <>
@@ -297,6 +469,19 @@ export default function RecruitmentAnalyticsPage({
                                 <p className="text-[11px] text-slate-500">
                                     Konfigurasi: K={scoringEvaluation.config?.top_k ?? '-'} | Eligible only: {scoringEvaluation.config?.eligible_only ? 'Ya' : 'Tidak'} | Min score: {scoringEvaluation.config?.min_score ?? '-'}
                                 </p>
+                                {evaluationChartData.length > 0 && (
+                                    <div className="h-52 rounded-lg border border-slate-200 p-2">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={evaluationChartData} margin={{ top: 10, right: 6, left: 6, bottom: 10 }}>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis dataKey="metric" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={50} />
+                                                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(value) => `${value}%`} />
+                                                <Tooltip formatter={(value: number) => `${Number(value).toFixed(1)}%`} />
+                                                <Bar dataKey="value" fill="#4f46e5" radius={[6, 6, 0, 0]} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </Card>
@@ -330,6 +515,93 @@ export default function RecruitmentAnalyticsPage({
                     <Card className="space-y-3 p-4 md:p-5">
                         <div className="flex items-start justify-between gap-2">
                             <div>
+                                <p className="text-sm font-semibold text-slate-900">Filter Visual Analytics</p>
+                                <p className="text-xs text-slate-600">
+                                    Filter ini mempengaruhi chart fairness, drift, dan performa lowongan.
+                                </p>
+                            </div>
+                            <BarChart3 className="h-4 w-4 text-indigo-600" />
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-xs text-slate-500">Divisi (multi-select)</p>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className="h-7 px-2 text-[11px] text-slate-600"
+                                        onClick={() => setSelectedDivisions([])}
+                                        disabled={selectedDivisions.length === 0}
+                                    >
+                                        Reset Divisi
+                                    </Button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedDivisions([])}
+                                        className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${selectedDivisions.length === 0
+                                            ? 'border-blue-600 bg-blue-600 text-white'
+                                            : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        Semua Divisi
+                                    </button>
+                                    {divisionFilterOptions.map((division) => {
+                                        const isActive = selectedDivisions.includes(division);
+                                        return (
+                                            <button
+                                                key={division}
+                                                type="button"
+                                                onClick={() => toggleDivisionSelection(division)}
+                                                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${isActive
+                                                    ? 'border-blue-600 bg-blue-600 text-white'
+                                                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                                    }`}
+                                            >
+                                                {division}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <p className="text-xs text-slate-500">Rentang Periode Drift</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Select value={periodFrom} onValueChange={setPeriodFrom}>
+                                        <SelectTrigger className="h-9 bg-white">
+                                            <SelectValue placeholder="Dari" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">Awal (Semua)</SelectItem>
+                                            {periodFilterOptions.map((period) => (
+                                                <SelectItem key={`from-${period.value}`} value={period.value}>
+                                                    {period.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Select value={periodTo} onValueChange={setPeriodTo}>
+                                        <SelectTrigger className="h-9 bg-white">
+                                            <SelectValue placeholder="Sampai" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">Akhir (Semua)</SelectItem>
+                                            {periodFilterOptions.map((period) => (
+                                                <SelectItem key={`to-${period.value}`} value={period.value}>
+                                                    {period.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+
+                    <Card className="space-y-3 p-4 md:p-5">
+                        <div className="flex items-start justify-between gap-2">
+                            <div>
                                 <p className="text-sm font-semibold text-slate-900">Fairness & Drift Analytics</p>
                                 <p className="text-xs text-slate-600">
                                     Monitoring fairness antar divisi dan drift skor antar periode.
@@ -343,31 +615,133 @@ export default function RecruitmentAnalyticsPage({
                                 {isLoadingScoringInsights ? 'Memuat analytics...' : 'Data analytics belum tersedia.'}
                             </p>
                         ) : (
-                            <div className="grid gap-3 md:grid-cols-4">
-                                <div className="rounded-lg border border-slate-200 p-3">
-                                    <p className="text-[11px] text-slate-500">Global Avg Score</p>
-                                    <p className="text-base font-semibold text-slate-900">
-                                        {Number(scoringAnalytics.summary?.global_avg_score ?? 0).toFixed(2)}
-                                    </p>
+                            <div className="space-y-4">
+                                <div className="grid gap-3 md:grid-cols-4">
+                                    <div className="rounded-lg border border-slate-200 p-3">
+                                        <p className="text-[11px] text-slate-500">Global Avg Score</p>
+                                        <p className="text-base font-semibold text-slate-900">
+                                            {Number(scoringAnalytics.summary?.global_avg_score ?? 0).toFixed(2)}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 p-3">
+                                        <p className="text-[11px] text-slate-500">Global Eligible Rate</p>
+                                        <p className="text-base font-semibold text-slate-900">
+                                            {formatPercent(scoringAnalytics.summary?.global_eligible_rate)}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 p-3">
+                                        <p className="text-[11px] text-slate-500">Interview+ Rate</p>
+                                        <p className="text-base font-semibold text-slate-900">
+                                            {formatPercent(scoringAnalytics.summary?.global_interview_positive_rate)}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 p-3">
+                                        <p className="text-[11px] text-slate-500">Hired Rate</p>
+                                        <p className="text-base font-semibold text-slate-900">
+                                            {formatPercent(scoringAnalytics.summary?.global_hired_rate)}
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="rounded-lg border border-slate-200 p-3">
-                                    <p className="text-[11px] text-slate-500">Global Eligible Rate</p>
-                                    <p className="text-base font-semibold text-slate-900">
-                                        {formatPercent(scoringAnalytics.summary?.global_eligible_rate)}
-                                    </p>
+
+                                <div className="grid gap-4 xl:grid-cols-2">
+                                    <div className="rounded-lg border border-slate-200 p-3">
+                                        <p className="mb-2 text-xs font-semibold text-slate-700">Fairness per Divisi (Top 8)</p>
+                                        {fairnessChartData.length === 0 ? (
+                                            <p className="text-xs text-slate-500">Belum ada data chart fairness.</p>
+                                        ) : (
+                                            <div className="h-64">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={fairnessChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                                                        <YAxis yAxisId="left" domain={[0, 100]} tick={{ fontSize: 11 }} />
+                                                        <YAxis
+                                                            yAxisId="right"
+                                                            orientation="right"
+                                                            domain={[0, 100]}
+                                                            tick={{ fontSize: 11 }}
+                                                            tickFormatter={(value) => `${value}%`}
+                                                        />
+                                                        <Tooltip
+                                                            formatter={(value: number, name) => {
+                                                                if (name === 'Rata-rata Skor') return formatDecimal(value);
+                                                                return `${Number(value).toFixed(1)}%`;
+                                                            }}
+                                                            labelFormatter={(_, payload) => payload?.[0]?.payload?.division ?? '-'}
+                                                        />
+                                                        <Legend />
+                                                        <Bar yAxisId="left" dataKey="avgScore" name="Rata-rata Skor" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                                                        <Bar yAxisId="right" dataKey="hiredRate" name="Hired Rate (%)" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="rounded-lg border border-slate-200 p-3">
+                                        <p className="mb-2 text-xs font-semibold text-slate-700">Drift Skor per Periode</p>
+                                        {driftChartData.length === 0 ? (
+                                            <p className="text-xs text-slate-500">Belum ada data chart drift.</p>
+                                        ) : (
+                                            <div className="h-64">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={driftChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                        <XAxis dataKey="periodLabel" tick={{ fontSize: 11 }} />
+                                                        <YAxis yAxisId="left" domain={[0, 100]} tick={{ fontSize: 11 }} />
+                                                        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+                                                        <Tooltip
+                                                            formatter={(value: number, name) => {
+                                                                if (name === 'Drift Delta') return formatDecimal(value);
+                                                                return formatDecimal(value);
+                                                            }}
+                                                        />
+                                                        <Legend />
+                                                        <Line yAxisId="left" type="monotone" dataKey="avgScore" name="Avg Score" stroke="#4f46e5" strokeWidth={2} dot={{ r: 2 }} />
+                                                        <Line yAxisId="left" type="monotone" dataKey="medianScore" name="Median Score" stroke="#0ea5e9" strokeWidth={2} dot={{ r: 2 }} />
+                                                        <Line yAxisId="right" type="monotone" dataKey="driftDelta" name="Drift Delta" stroke="#f97316" strokeWidth={2} dot={{ r: 2 }} />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="rounded-lg border border-slate-200 p-3">
-                                    <p className="text-[11px] text-slate-500">Interview+ Rate</p>
-                                    <p className="text-base font-semibold text-slate-900">
-                                        {formatPercent(scoringAnalytics.summary?.global_interview_positive_rate)}
-                                    </p>
-                                </div>
-                                <div className="rounded-lg border border-slate-200 p-3">
-                                    <p className="text-[11px] text-slate-500">Hired Rate</p>
-                                    <p className="text-base font-semibold text-slate-900">
-                                        {formatPercent(scoringAnalytics.summary?.global_hired_rate)}
-                                    </p>
-                                </div>
+                            </div>
+                        )}
+                    </Card>
+
+                    <Card className="space-y-3 p-4 md:p-5">
+                        <p className="text-sm font-semibold text-slate-900">Performa Shortlist per Lowongan</p>
+                        <p className="text-xs text-slate-600">
+                            Perbandingan Precision@K interview+ dan hired pada lowongan dengan kandidat terbanyak.
+                        </p>
+                        {selectedDivisions.length > 0 && (
+                            <p className="text-[11px] text-slate-500">
+                                Menampilkan lowongan pada divisi: <span className="font-semibold text-slate-700">{selectedDivisions.join(', ')}</span>
+                            </p>
+                        )}
+                        {vacancyEvaluationChartData.length === 0 ? (
+                            <p className="text-xs text-slate-500">Belum ada data lowongan untuk divisualisasikan.</p>
+                        ) : (
+                            <div className="h-72 rounded-lg border border-slate-200 p-2">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={vacancyEvaluationChartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                                        <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(value) => `${value}%`} />
+                                        <Tooltip
+                                            formatter={(value: number) => `${Number(value).toFixed(1)}%`}
+                                            labelFormatter={(_, payload) => {
+                                                const row = payload?.[0]?.payload;
+                                                if (!row) return '-';
+                                                return `${row.division} | ${row.position}`;
+                                            }}
+                                        />
+                                        <Legend />
+                                        <Bar dataKey="precisionInterview" name="Precision Interview+ (%)" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="precisionHired" name="Precision Hired (%)" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
                             </div>
                         )}
                     </Card>
@@ -375,11 +749,11 @@ export default function RecruitmentAnalyticsPage({
                     <div className="grid gap-4 xl:grid-cols-2">
                         <Card className="space-y-3 p-4 md:p-5">
                             <p className="text-sm font-semibold text-slate-900">Fairness per Divisi</p>
-                            {!scoringAnalytics?.by_division?.length ? (
+                            {!fairnessRows.length ? (
                                 <p className="text-xs text-slate-500">Belum ada data divisi.</p>
                             ) : (
                                 <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                                    {scoringAnalytics.by_division.map((row) => {
+                                    {fairnessRows.map((row) => {
                                         const badgeClass =
                                             row.fairness_flag === 'Waspada'
                                                 ? 'bg-red-100 text-red-700'
@@ -409,11 +783,14 @@ export default function RecruitmentAnalyticsPage({
 
                         <Card className="space-y-3 p-4 md:p-5">
                             <p className="text-sm font-semibold text-slate-900">Drift Skor per Periode</p>
-                            {!scoringAnalytics?.by_period?.length ? (
+                            {!driftRows.length ? (
                                 <p className="text-xs text-slate-500">Belum ada data periode.</p>
                             ) : (
                                 <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                                    {scoringAnalytics.by_period.map((row) => {
+                                    {driftRows
+                                        .slice()
+                                        .sort((a, b) => String(a.period ?? '').localeCompare(String(b.period ?? '')))
+                                        .map((row) => {
                                         const isUp = Number(row.drift_score_delta ?? 0) >= 0;
                                         const driftClass =
                                             row.drift_level === 'Tinggi'
