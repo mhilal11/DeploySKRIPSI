@@ -9,6 +9,7 @@ import (
 
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
+	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -881,16 +882,10 @@ func totalExperienceYears(raw models.JSON) float64 {
 }
 
 func divisionSummaries(db *sqlx.DB) []map[string]any {
-	for _, name := range models.UserDivisions {
-		var count int
-		_ = db.Get(&count, "SELECT COUNT(*) FROM division_profiles WHERE name = ?", name)
-		if count == 0 {
-			_, _ = db.Exec("INSERT INTO division_profiles (name, capacity, is_hiring) VALUES (?, 0, 0)", name)
-		}
+	profiles, err := services.EnsureDivisionProfiles(db)
+	if err != nil {
+		return []map[string]any{}
 	}
-
-	profiles := []models.DivisionProfile{}
-	_ = db.Select(&profiles, "SELECT * FROM division_profiles ORDER BY name")
 
 	result := []map[string]any{}
 	for _, profile := range profiles {

@@ -24,7 +24,9 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 
 	rg.GET("/super-admin/kelola-divisi", SuperAdminDivisionsIndex)
 	rg.GET("/super-admin/references/education", SuperAdminEducationReferences)
+	rg.POST("/super-admin/kelola-divisi", SuperAdminDivisionsStore)
 	rg.PATCH("/super-admin/kelola-divisi/:id", SuperAdminDivisionsUpdate)
+	rg.DELETE("/super-admin/kelola-divisi/:id", SuperAdminDivisionsDelete)
 	rg.POST("/super-admin/kelola-divisi/:id/open-job", SuperAdminDivisionsOpenJob)
 	rg.DELETE("/super-admin/kelola-divisi/:id/open-job", SuperAdminDivisionsCloseJob)
 

@@ -58,6 +58,8 @@ type DivisionTabsProps = {
     onEditDivision: (division: DivisionRecord) => void;
     onOpenJobDialog: (division: DivisionRecord) => void;
     onCloseJob: (division: DivisionRecord) => void;
+    onDeleteDivision: (division: DivisionRecord) => void;
+    deletingDivisionId: number | null;
 };
 
 export function DivisionTabs({
@@ -67,12 +69,14 @@ export function DivisionTabs({
     onEditDivision,
     onOpenJobDialog,
     onCloseJob,
+    onDeleteDivision,
+    deletingDivisionId,
 }: DivisionTabsProps) {
     return (
         <Tabs value={activeDivisionId} onValueChange={onTabChange}>
-            <TabsList className="w-full justify-start overflow-x-auto flex-nowrap bg-transparent p-0 gap-2">
-                {divisions.map((division) => (
-                    (() => {
+            <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <TabsList className="h-auto min-w-max justify-start gap-2 rounded-none bg-transparent p-0">
+                    {divisions.map((division) => {
                         const isHiringActive = division.is_hiring && Boolean(division.job_title);
                         const isHiringButFull = isHiringActive && division.available_slots <= 0;
                         const triggerClass = isHiringButFull
@@ -82,20 +86,20 @@ export function DivisionTabs({
                                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 data-[state=active]:bg-blue-900 data-[state=active]:text-white data-[state=active]:border-blue-900';
 
                         return (
-                    <TabsTrigger
-                        key={division.id}
-                        value={division.id.toString()}
-                        className={`rounded-full px-4 py-2 text-sm font-medium border transition-all shadow-sm ${triggerClass}`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4" />
-                            <span>{division.name}</span>
-                        </div>
-                    </TabsTrigger>
+                            <TabsTrigger
+                                key={division.id}
+                                value={division.id.toString()}
+                                className={`h-auto flex-none rounded-full border px-4 py-2 text-sm font-medium shadow-sm transition-all ${triggerClass}`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Building2 className="h-4 w-4" />
+                                    <span>{division.name}</span>
+                                </div>
+                            </TabsTrigger>
                         );
-                    })()
-                ))}
-            </TabsList>
+                    })}
+                </TabsList>
+            </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-1 text-green-800">
                     <span className="h-2 w-2 rounded-full bg-green-600" />
@@ -113,7 +117,12 @@ export function DivisionTabs({
 
             {divisions.map((division) => (
                 <TabsContent key={division.id} value={division.id.toString()} className="space-y-6 pt-6">
-                    <DivisionHeader division={division} onEdit={() => onEditDivision(division)} />
+                    <DivisionHeader
+                        division={division}
+                        onEdit={() => onEditDivision(division)}
+                        onDelete={() => onDeleteDivision(division)}
+                        isDeleting={deletingDivisionId === division.id}
+                    />
                     <DivisionOverview division={division} />
                     <DivisionStaffTable staff={division.staff} />
                     <DivisionVacancySection
@@ -127,7 +136,20 @@ export function DivisionTabs({
     );
 }
 
-function DivisionHeader({ division, onEdit }: { division: DivisionRecord; onEdit: () => void }) {
+function DivisionHeader({
+    division,
+    onEdit,
+    onDelete,
+    isDeleting,
+}: {
+    division: DivisionRecord;
+    onEdit: () => void;
+    onDelete: () => void;
+    isDeleting: boolean;
+}) {
+    const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+    const hasStaff = division.current_staff > 0;
+
     return (
         <div className="rounded-xl border bg-gradient-to-r from-blue-50 to-cyan-50 p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -151,11 +173,48 @@ function DivisionHeader({ division, onEdit }: { division: DivisionRecord; onEdit
                         </span>
                     </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={onEdit}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Pengaturan
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={onEdit}>
+                        <Settings className="mr-2 h-4 w-4" />
+                        Pengaturan
+                    </Button>
+                    <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
+                        <AlertDialogTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                disabled={hasStaff || isDeleting}
+                            >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Hapus Divisi
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="bg-white">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Hapus Divisi?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Divisi yang dihapus tidak akan muncul lagi pada konfigurasi divisi.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Batal</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={onDelete}
+                                    className="bg-red-600 text-white hover:bg-red-700"
+                                >
+                                    Hapus
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
             </div>
+            {hasStaff && (
+                <p className="mt-3 text-xs text-red-600">
+                    Divisi ini tidak dapat dihapus karena masih memiliki {division.current_staff} staff/admin aktif.
+                </p>
+            )}
         </div>
     );
 }

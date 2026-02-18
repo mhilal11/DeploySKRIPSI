@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -19,6 +20,13 @@ type OpenJobRequest struct {
 	JobDescription         string                 `json:"job_description" form:"job_description"`
 	JobRequirements        []string               `json:"job_requirements" form:"job_requirements"`
 	JobEligibilityCriteria map[string]interface{} `json:"job_eligibility_criteria" form:"job_eligibility_criteria"`
+}
+
+type CreateDivisionRequest struct {
+	Name        string  `json:"name" form:"name"`
+	Description *string `json:"description" form:"description"`
+	ManagerName *string `json:"manager_name" form:"manager_name"`
+	Capacity    *int    `json:"capacity" form:"capacity"`
 }
 
 type UpdateDivisionRequest struct {
@@ -94,6 +102,105 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 		"stats":                stats,
 		"flash":                gin.H{"success": "", "error": ""},
 		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+	})
+}
+
+func SuperAdminDivisionsStore(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+		JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	var req CreateDivisionRequest
+	_ = c.ShouldBind(&req)
+
+	if req.Name == "" {
+		if value, ok := c.GetPostForm("name"); ok {
+			req.Name = value
+		}
+	}
+	if req.Description == nil {
+		if value, ok := c.GetPostForm("description"); ok {
+			req.Description = &value
+		}
+	}
+	if req.ManagerName == nil {
+		if value, ok := c.GetPostForm("manager_name"); ok {
+			req.ManagerName = &value
+		}
+	}
+	if req.Capacity == nil {
+		if rawCapacity, ok := c.GetPostForm("capacity"); ok {
+			rawCapacity = strings.TrimSpace(rawCapacity)
+			if rawCapacity != "" {
+				if parsedCapacity, parseErr := strconv.Atoi(rawCapacity); parseErr == nil {
+					req.Capacity = &parsedCapacity
+				}
+			}
+		}
+	}
+
+	name := services.NormalizeDivisionName(req.Name)
+	descriptionValue := normalizeOptionalText(req.Description)
+	managerValue := normalizeOptionalText(req.ManagerName)
+	capacity := 0
+	if req.Capacity != nil {
+		capacity = *req.Capacity
+	}
+
+	errors := FieldErrors{}
+	if name == "" {
+		errors["name"] = "Nama divisi wajib diisi."
+	}
+	if capacity < 0 {
+		errors["capacity"] = "Kapasitas divisi tidak boleh kurang dari 0."
+	}
+	if len(errors) > 0 {
+		ValidationErrors(c, errors)
+		return
+	}
+
+	db := middleware.GetDB(c)
+	var existingID int64
+	checkErr := db.Get(&existingID, "SELECT id FROM division_profiles WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1", name)
+	if checkErr == nil {
+		ValidationErrors(c, FieldErrors{"name": "Nama divisi sudah digunakan."})
+		return
+	}
+	if checkErr != sql.ErrNoRows {
+		JSONError(c, http.StatusInternalServerError, "Gagal memvalidasi nama divisi")
+		return
+	}
+
+	now := time.Now()
+	result, err := db.Exec(
+		"INSERT INTO division_profiles (name, description, manager_name, capacity, is_hiring, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?)",
+		name,
+		descriptionValue,
+		managerValue,
+		capacity,
+		now,
+		now,
+	)
+	if err != nil {
+		JSONError(c, http.StatusInternalServerError, "Gagal menambahkan divisi")
+		return
+	}
+	id, _ := result.LastInsertId()
+
+	var departemenCount int
+	_ = db.Get(&departemenCount, "SELECT COUNT(*) FROM departemen WHERE LOWER(TRIM(nama)) = LOWER(TRIM(?))", name)
+	if departemenCount == 0 {
+		code := services.DivisionCodeFromName(name)
+		if code != "" {
+			_, _ = db.Exec("INSERT INTO departemen (nama, kode, created_at, updated_at) VALUES (?, ?, ?, ?)", name, code, now, now)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"flash":    gin.H{"success": "Divisi berhasil ditambahkan."},
+		"division": gin.H{"id": id, "name": name},
 	})
 }
 
@@ -185,6 +292,39 @@ func SuperAdminDivisionsUpdate(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"flash": gin.H{"success": "Divisi berhasil diperbarui."},
+	})
+}
+
+func SuperAdminDivisionsDelete(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+		JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	id := c.Param("id")
+	db := middleware.GetDB(c)
+
+	var profile models.DivisionProfile
+	if err := db.Get(&profile, "SELECT * FROM division_profiles WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "Divisi tidak ditemukan")
+		return
+	}
+
+	var currentStaff int
+	_ = db.Get(&currentStaff, "SELECT COUNT(*) FROM users WHERE division = ? AND role IN (?, ?)", profile.Name, models.RoleAdmin, models.RoleStaff)
+	if currentStaff > 0 {
+		ValidationErrors(c, FieldErrors{"division": "Divisi masih memiliki staff/admin aktif sehingga tidak dapat dihapus."})
+		return
+	}
+
+	if _, err := db.Exec("DELETE FROM division_profiles WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusInternalServerError, "Gagal menghapus divisi")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"flash": gin.H{"success": "Divisi berhasil dihapus."},
 	})
 }
 
@@ -313,9 +453,6 @@ func SuperAdminDivisionsCloseJob(c *gin.Context) {
 		"flash": gin.H{"success": "Lowongan pekerjaan telah ditutup."},
 	})
 }
-
-// avoid unused
-var _ = services.DivisionCodeFromName
 
 func sanitizeEligibilityCriteria(input map[string]interface{}) map[string]interface{} {
 	out := make(map[string]interface{})
@@ -451,6 +588,17 @@ func sanitizeEligibilityCriteria(input map[string]interface{}) map[string]interf
 	}
 
 	return out
+}
+
+func normalizeOptionalText(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	clean := strings.TrimSpace(*value)
+	if clean == "" {
+		return nil
+	}
+	return &clean
 }
 
 func rawToString(value interface{}) string {

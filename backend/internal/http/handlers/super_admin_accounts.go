@@ -14,6 +14,7 @@ import (
 	"hris-backend/internal/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -145,7 +146,7 @@ func SuperAdminAccountsIndex(c *gin.Context) {
 		"stats":                stats,
 		"roleOptions":          models.UserRoles,
 		"statusOptions":        models.UserStatuses,
-		"divisionOptions":      models.UserDivisions,
+		"divisionOptions":      accountDivisionOptions(db),
 		"flash":                gin.H{"success": ""},
 		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
 	})
@@ -163,7 +164,7 @@ func SuperAdminAccountsCreate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"roleOptions":           models.UserRoles,
 		"statusOptions":         models.UserStatuses,
-		"divisionOptions":       models.UserDivisions,
+		"divisionOptions":       accountDivisionOptions(db),
 		"religionOptions":       models.StaffReligions,
 		"genderOptions":         models.StaffGenders,
 		"educationLevelOptions": models.StaffEducationLevels,
@@ -207,7 +208,7 @@ func SuperAdminAccountsEdit(c *gin.Context) {
 		},
 		"roleOptions":           models.UserRoles,
 		"statusOptions":         models.UserStatuses,
-		"divisionOptions":       models.UserDivisions,
+		"divisionOptions":       accountDivisionOptions(db),
 		"religionOptions":       models.StaffReligions,
 		"genderOptions":         models.StaffGenders,
 		"educationLevelOptions": models.StaffEducationLevels,
@@ -235,7 +236,7 @@ func SuperAdminAccountsStore(c *gin.Context) {
 	name = strings.TrimSpace(name)
 	email = strings.TrimSpace(email)
 	role = strings.TrimSpace(role)
-	division = strings.TrimSpace(division)
+	division = services.NormalizeDivisionName(division)
 	status = strings.TrimSpace(status)
 	registeredAt = strings.TrimSpace(registeredAt)
 	inactiveAt = strings.TrimSpace(inactiveAt)
@@ -264,9 +265,15 @@ func SuperAdminAccountsStore(c *gin.Context) {
 	if password != "" && passwordConfirmation != "" && password != passwordConfirmation {
 		fieldErrors["password_confirmation"] = "Konfirmasi password tidak sama."
 	}
+	db := middleware.GetDB(c)
 	if role == models.RoleAdmin || role == models.RoleStaff {
 		if division == "" {
 			fieldErrors["division"] = "Divisi wajib dipilih."
+		} else if exists, err := services.DivisionExists(db, division); err != nil {
+			JSONError(c, http.StatusInternalServerError, "Gagal memvalidasi divisi")
+			return
+		} else if !exists {
+			fieldErrors["division"] = "Divisi tidak ditemukan. Tambahkan divisi terlebih dahulu."
 		}
 	}
 	if role == models.RoleStaff {
@@ -284,8 +291,6 @@ func SuperAdminAccountsStore(c *gin.Context) {
 		ValidationErrors(c, fieldErrors)
 		return
 	}
-
-	db := middleware.GetDB(c)
 
 	var exists int
 	_ = db.Get(&exists, "SELECT COUNT(*) FROM users WHERE email = ?", email)
@@ -346,7 +351,7 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 	name = strings.TrimSpace(name)
 	email = strings.TrimSpace(email)
 	role = strings.TrimSpace(role)
-	division = strings.TrimSpace(division)
+	division = services.NormalizeDivisionName(division)
 	status = strings.TrimSpace(status)
 	registeredAt = strings.TrimSpace(registeredAt)
 	inactiveAt = strings.TrimSpace(inactiveAt)
@@ -365,9 +370,15 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 	if status == "" {
 		fieldErrors["status"] = "Status wajib dipilih."
 	}
+	db := middleware.GetDB(c)
 	if role == models.RoleAdmin || role == models.RoleStaff {
 		if division == "" {
 			fieldErrors["division"] = "Divisi wajib dipilih."
+		} else if exists, err := services.DivisionExists(db, division); err != nil {
+			JSONError(c, http.StatusInternalServerError, "Gagal memvalidasi divisi")
+			return
+		} else if !exists {
+			fieldErrors["division"] = "Divisi tidak ditemukan. Tambahkan divisi terlebih dahulu."
 		}
 	}
 	if role == models.RoleStaff {
@@ -385,8 +396,6 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		ValidationErrors(c, fieldErrors)
 		return
 	}
-
-	db := middleware.GetDB(c)
 
 	var exists int
 	_ = db.Get(&exists, "SELECT COUNT(*) FROM users WHERE email = ? AND id != ?", email, id)
@@ -543,4 +552,12 @@ func pageURL(basePath string, page int, filters map[string]string, last int) any
 		return basePath
 	}
 	return basePath + "?" + values.Encode()
+}
+
+func accountDivisionOptions(db *sqlx.DB) []string {
+	options, err := services.DivisionNames(db)
+	if err != nil {
+		return []string{}
+	}
+	return options
 }

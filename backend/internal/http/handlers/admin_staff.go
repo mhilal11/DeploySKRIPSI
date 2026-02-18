@@ -429,10 +429,9 @@ func recentRecruitments(db *sqlx.DB) []map[string]any {
 }
 
 func divisionOptions(db *sqlx.DB) []string {
-	divisions := []string{}
-	_ = db.Select(&divisions, "SELECT DISTINCT division FROM users WHERE division IS NOT NULL AND division != ''")
-	if len(divisions) == 0 {
-		divisions = models.UserDivisions
+	divisions, err := services.DivisionNames(db)
+	if err != nil {
+		return []string{}
 	}
 	return divisions
 }

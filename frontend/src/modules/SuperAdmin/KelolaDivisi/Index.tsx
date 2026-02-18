@@ -1,13 +1,15 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { api, apiUrl } from '@/shared/lib/api';
+import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
 import { Head, useForm } from '@/shared/lib/inertia';
 
 import { DivisionTabs } from './components/DivisionTabs';
 import { SummaryCards } from './components/SummaryCards';
+import CreateDivisionDialog, { CreateDivisionFormFields } from './Create';
 import EditDivisionDialog, { EditFormFields } from './Edit';
 import JobDialog, { JobFormFields } from './JobDialog';
 import { DivisionRecord, KelolaDivisiPageProps, StatsSummary } from './types';
@@ -22,8 +24,17 @@ export default function KelolaDivisiIndex({
     const [activeDivisionId, setActiveDivisionId] = useState(
         initialDivisions.length ? initialDivisions[0].id.toString() : '',
     );
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [deletingDivisionId, setDeletingDivisionId] = useState<number | null>(null);
     const [editDivision, setEditDivision] = useState<DivisionRecord | null>(null);
     const [jobDivision, setJobDivision] = useState<DivisionRecord | null>(null);
+
+    const createForm = useForm<CreateDivisionFormFields>({
+        name: '',
+        description: '',
+        manager_name: '',
+        capacity: 0,
+    });
 
     const editForm = useForm<EditFormFields>({
         description: '',
@@ -38,10 +49,15 @@ export default function KelolaDivisiIndex({
         job_eligibility_criteria: {},
     });
 
-    // Sync with props when they change (e.g. initial navigation)
     useEffect(() => {
         setDivisions(initialDivisions);
         setStats(initialStats);
+        setActiveDivisionId((previous) => {
+            if (previous && initialDivisions.some((division) => division.id.toString() === previous)) {
+                return previous;
+            }
+            return initialDivisions.length ? initialDivisions[0].id.toString() : '';
+        });
     }, [initialDivisions, initialStats]);
 
     useEffect(() => {
@@ -53,26 +69,88 @@ export default function KelolaDivisiIndex({
         }
     }, [flash?.success, flash?.error]);
 
-    const refreshData = useCallback(async () => {
+    const refreshData = useCallback(async (preferredActiveDivisionId?: string) => {
         try {
             const response = await api.get(apiUrl('/super-admin/kelola-divisi'));
             if (response.data) {
-                setDivisions(response.data.divisions);
-                setStats(response.data.stats);
+                const nextDivisions = Array.isArray(response.data.divisions)
+                    ? (response.data.divisions as DivisionRecord[])
+                    : [];
+                setDivisions(nextDivisions);
+                setStats(response.data.stats as StatsSummary);
+                setActiveDivisionId((previous) => {
+                    if (
+                        preferredActiveDivisionId &&
+                        nextDivisions.some((division) => division.id.toString() === preferredActiveDivisionId)
+                    ) {
+                        return preferredActiveDivisionId;
+                    }
+                    if (previous && nextDivisions.some((division) => division.id.toString() === previous)) {
+                        return previous;
+                    }
+                    return nextDivisions.length ? nextDivisions[0].id.toString() : '';
+                });
             }
         } catch {
             // silently ignore refresh errors
         }
     }, []);
 
+    const openCreateDialog = () => {
+        setIsCreateDialogOpen(true);
+        createForm.reset();
+        createForm.clearErrors();
+        createForm.setData({
+            name: '',
+            description: '',
+            manager_name: '',
+            capacity: 0,
+        });
+    };
+
+    const handleCloseCreateDialog = () => {
+        setIsCreateDialogOpen(false);
+        createForm.reset();
+        createForm.clearErrors();
+    };
+
+    const submitCreateForm = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        createForm.transform((data) => ({
+            ...data,
+            name: data.name.trim(),
+            description: data.description.trim(),
+            manager_name: data.manager_name.trim(),
+        }));
+
+        createForm.post('/super-admin/kelola-divisi', {
+            preserveScroll: true,
+            onSuccess: (responseData: any) => {
+                const newDivisionId = responseData?.division?.id ? String(responseData.division.id) : undefined;
+                setIsCreateDialogOpen(false);
+                createForm.reset();
+                createForm.clearErrors();
+                toast.success(responseData?.flash?.success || 'Divisi berhasil ditambahkan.');
+                refreshData(newDivisionId);
+            },
+            onError: (errors: Record<string, string>) => {
+                toast.error(
+                    errors?.name ||
+                        errors?.capacity ||
+                        errors?._form ||
+                        'Gagal menambahkan divisi.',
+                );
+            },
+        });
+    };
+
     const openEditDialog = (division: DivisionRecord) => {
         setEditDivision(division);
-        
-        // Reset form completely first to clear any stale state
+
         editForm.reset();
         editForm.clearErrors();
-        
-        // Then set new data
+
         editForm.setData({
             description: division.description ?? '',
             manager_name: division.manager_name ?? '',
@@ -82,18 +160,15 @@ export default function KelolaDivisiIndex({
 
     const openJobDialog = (division: DivisionRecord) => {
         setJobDivision(division);
-        
-        // Reset form completely first to clear any stale state
+
         jobForm.reset();
         jobForm.clearErrors();
-        
-        // Clean requirements array - filter out null/undefined values
-        const cleanRequirements = 
+
+        const cleanRequirements =
             division.job_requirements && division.job_requirements.length > 0
-                ? division.job_requirements.filter(req => req != null && req.trim() !== '')
+                ? division.job_requirements.filter((req) => req != null && req.trim() !== '')
                 : [];
-        
-        // Then set new data
+
         jobForm.setData({
             job_title: division.job_title ?? '',
             job_description: division.job_description ?? '',
@@ -111,7 +186,6 @@ export default function KelolaDivisiIndex({
             forceFormData: true,
             onSuccess: (responseData: any) => {
                 setEditDivision(null);
-                // Reset form to clear stale state
                 editForm.reset();
                 editForm.clearErrors();
                 toast.success(responseData?.flash?.success || 'Divisi berhasil diperbarui.');
@@ -120,10 +194,10 @@ export default function KelolaDivisiIndex({
             onError: (errors: Record<string, string>) => {
                 toast.error(
                     errors?.capacity ||
-                    errors?._form ||
-                    errors?.description ||
-                    errors?.manager_name ||
-                    'Gagal menyimpan perubahan divisi.',
+                        errors?._form ||
+                        errors?.description ||
+                        errors?.manager_name ||
+                        'Gagal menyimpan perubahan divisi.',
                 );
             },
         });
@@ -133,12 +207,11 @@ export default function KelolaDivisiIndex({
         event.preventDefault();
         if (!jobDivision) return;
 
-        // Set transform to clean requirements before sending
         jobForm.transform((data) => ({
             ...data,
             job_requirements: data.job_requirements
-                .filter(req => req && req.trim() !== '')
-                .map(req => req.trim()),
+                .filter((req) => req && req.trim() !== '')
+                .map((req) => req.trim()),
             job_eligibility_criteria: {
                 ...(data.job_eligibility_criteria ?? {}),
                 program_studies: (data.job_eligibility_criteria?.program_studies ?? [])
@@ -151,7 +224,6 @@ export default function KelolaDivisiIndex({
             preserveScroll: true,
             onSuccess: (responseData: any) => {
                 setJobDivision(null);
-                // Reset form to clear stale state
                 jobForm.reset();
                 jobForm.clearErrors();
                 toast.success(responseData?.flash?.success || 'Lowongan pekerjaan berhasil dipublikasikan.');
@@ -160,10 +232,10 @@ export default function KelolaDivisiIndex({
             onError: (errors: Record<string, string>) => {
                 toast.error(
                     errors?.job_requirements ||
-                    errors?._form ||
-                    errors?.job_title ||
-                    errors?.job_description ||
-                    'Gagal menyimpan lowongan. Periksa kembali data yang diisi.',
+                        errors?._form ||
+                        errors?.job_title ||
+                        errors?.job_description ||
+                        'Gagal menyimpan lowongan. Periksa kembali data yang diisi.',
                 );
             },
         });
@@ -179,16 +251,38 @@ export default function KelolaDivisiIndex({
         });
     };
 
+    const deleteDivision = async (division: DivisionRecord) => {
+        if (deletingDivisionId !== null) return;
+
+        setDeletingDivisionId(division.id);
+        try {
+            const response = await api.delete(apiUrl(`/super-admin/kelola-divisi/${division.id}`));
+            toast.success(response.data?.flash?.success || 'Divisi berhasil dihapus.');
+            await refreshData();
+        } catch (error) {
+            if (isAxiosError(error)) {
+                const payload = error.response?.data as any;
+                const message =
+                    payload?.errors?.division ||
+                    payload?.errors?.name ||
+                    payload?.message;
+                toast.error(message || 'Gagal menghapus divisi.');
+            } else {
+                toast.error('Gagal menghapus divisi.');
+            }
+        } finally {
+            setDeletingDivisionId(null);
+        }
+    };
+
     const handleCloseJobDialog = () => {
         setJobDivision(null);
-        // Reset form when dialog is closed
         jobForm.reset();
         jobForm.clearErrors();
     };
 
     const handleCloseEditDialog = () => {
         setEditDivision(null);
-        // Reset form when dialog is closed
         editForm.reset();
         editForm.clearErrors();
     };
@@ -208,12 +302,24 @@ export default function KelolaDivisiIndex({
 
             <Card className="mt-4 md:mt-6">
                 <CardHeader className="p-3 md:p-6">
-                    <CardTitle className="text-sm md:text-xl">Divisi & Staff</CardTitle>
-                    <CardDescription className="text-[10px] md:text-sm">
-                        Lihat kapasitas tim, detail staff, dan kelola lowongan pekerjaan.
-                    </CardDescription>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <CardTitle className="text-sm md:text-xl">Divisi & Staff</CardTitle>
+                            <CardDescription className="text-[10px] md:text-sm">
+                                Lihat kapasitas tim, detail staff, dan kelola lowongan pekerjaan.
+                            </CardDescription>
+                        </div>
+                        <button
+                            type="button"
+                            className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-700 md:text-sm"
+                            onClick={openCreateDialog}
+                        >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Tambah Divisi
+                        </button>
+                    </div>
                 </CardHeader>
-                <CardContent className="p-3 md:p-6 pt-0 md:pt-0">
+                <CardContent className="p-3 pt-0 md:p-6 md:pt-0">
                     {divisions.length === 0 ? (
                         <div className="rounded-lg border border-dashed p-8 text-center text-slate-500">
                             Belum ada konfigurasi divisi.
@@ -226,10 +332,18 @@ export default function KelolaDivisiIndex({
                             onEditDivision={openEditDialog}
                             onOpenJobDialog={openJobDialog}
                             onCloseJob={closeJob}
+                            onDeleteDivision={deleteDivision}
+                            deletingDivisionId={deletingDivisionId}
                         />
                     )}
                 </CardContent>
             </Card>
+            <CreateDivisionDialog
+                open={isCreateDialogOpen}
+                form={createForm}
+                onClose={handleCloseCreateDialog}
+                onSubmit={submitCreateForm}
+            />
             <EditDivisionDialog
                 division={editDivision}
                 form={editForm}

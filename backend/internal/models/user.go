@@ -32,16 +32,6 @@ const (
 
 var UserRoles = []string{RoleSuperAdmin, RoleAdmin, RoleStaff, RolePelamar}
 
-var UserDivisions = []string{
-	"Finance",
-	"Corporate",
-	"Government and Partner",
-	"Human Capital/HR",
-	"Infra and Backbone",
-	"IPrime",
-	"NOC",
-}
-
 var UserStatuses = []string{"Active", "Inactive"}
 
 func (u User) IsHumanCapitalAdmin() bool {

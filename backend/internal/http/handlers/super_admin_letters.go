@@ -427,10 +427,9 @@ func sanitizeFilename(name string) string {
 }
 
 func hrDivisionOptions(db *sqlx.DB) []string {
-	divisions := []string{}
-	_ = db.Select(&divisions, "SELECT DISTINCT division FROM users WHERE role = ? AND division IS NOT NULL AND division != ''", models.RoleAdmin)
-	if len(divisions) == 0 {
-		divisions = models.UserDivisions
+	divisions, err := services.DivisionNames(db)
+	if err != nil {
+		return []string{}
 	}
 	return divisions
 }
