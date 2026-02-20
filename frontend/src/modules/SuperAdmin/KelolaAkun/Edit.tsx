@@ -96,8 +96,12 @@ export default function Edit({
                         ? responseData.status
                         : DEFAULT_SUCCESS_MESSAGE;
 
-                // Save to sessionStorage  Index will display the toast
-                // after the page transition is complete.
+                // Show feedback immediately on edit page.
+                // The toaster lives in SuperAdminShell, so it persists across navigation.
+                toast.success(message);
+
+                // Keep queued toast as fallback in case the destination page
+                // needs to re-show feedback after transition.
                 if (typeof window !== 'undefined') {
                     sessionStorage.setItem(ACCOUNT_TOAST_STORAGE_KEY, message);
                 }

@@ -200,16 +200,16 @@ func SuperAdminDashboard(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"stats":                 stats,
-		"statChanges":           statChanges,
-		"userDistribution":      userDistribution,
-		"activityData":          activityData,
-		"staffStats":            staffStats,
-		"religionData":          religionData,
-		"genderData":            genderData,
-		"educationData":         educationData,
-		"divisionApplicants":    divisionApplicants,
-		"sidebarNotifications":  computeSuperAdminSidebarNotifications(db),
+		"stats":                stats,
+		"statChanges":          statChanges,
+		"userDistribution":     userDistribution,
+		"activityData":         activityData,
+		"staffStats":           staffStats,
+		"religionData":         religionData,
+		"genderData":           genderData,
+		"educationData":        educationData,
+		"divisionApplicants":   divisionApplicants,
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 
@@ -307,12 +307,12 @@ func SuperAdminAdminHrDashboard(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"stats":                 stats,
-		"recruitmentData":       recruitmentData,
-		"turnoverData":          turnoverData,
-		"recentActivities":      recentActivities,
-		"upcomingInterviews":    upcomingInterviews,
-		"sidebarNotifications":  computeSuperAdminSidebarNotifications(db),
+		"stats":                stats,
+		"recruitmentData":      recruitmentData,
+		"turnoverData":         turnoverData,
+		"recentActivities":     recentActivities,
+		"upcomingInterviews":   upcomingInterviews,
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 

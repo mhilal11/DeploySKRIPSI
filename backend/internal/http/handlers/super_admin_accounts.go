@@ -148,7 +148,7 @@ func SuperAdminAccountsIndex(c *gin.Context) {
 		"statusOptions":        models.UserStatuses,
 		"divisionOptions":      accountDivisionOptions(db),
 		"flash":                gin.H{"success": ""},
-		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 
@@ -168,7 +168,7 @@ func SuperAdminAccountsCreate(c *gin.Context) {
 		"religionOptions":       models.StaffReligions,
 		"genderOptions":         models.StaffGenders,
 		"educationLevelOptions": models.StaffEducationLevels,
-		"sidebarNotifications":  computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications":  computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 
@@ -212,7 +212,7 @@ func SuperAdminAccountsEdit(c *gin.Context) {
 		"religionOptions":       models.StaffReligions,
 		"genderOptions":         models.StaffGenders,
 		"educationLevelOptions": models.StaffEducationLevels,
-		"sidebarNotifications":  computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications":  computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 
@@ -328,6 +328,24 @@ func SuperAdminAccountsStore(c *gin.Context) {
 			userID, religion, gender, education, now, now)
 	}
 
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Accounts",
+		Action:      "CREATE_ACCOUNT",
+		EntityType:  "user",
+		EntityID:    strconv.FormatInt(userID, 10),
+		Description: "Membuat akun baru.",
+		NewValues: map[string]any{
+			"id":            userID,
+			"name":          name,
+			"email":         email,
+			"role":          role,
+			"division":      nullIfBlank(division),
+			"status":        status,
+			"registered_at": registeredAt,
+			"inactive_at":   nullIfBlank(inactiveAt),
+		},
+	})
+
 	c.JSON(http.StatusOK, gin.H{"status": "Akun baru berhasil dibuat."})
 }
 
@@ -404,6 +422,12 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		return
 	}
 
+	var existingUser models.User
+	if err := db.Get(&existingUser, "SELECT * FROM users WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
+
 	if status == "Inactive" && inactiveAt == "" {
 		inactiveAt = time.Now().Format("2006-01-02")
 	}
@@ -432,6 +456,33 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		_, _ = db.Exec("DELETE FROM staff_profiles WHERE user_id = ?", id)
 	}
 
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Accounts",
+		Action:      "UPDATE_ACCOUNT",
+		EntityType:  "user",
+		EntityID:    id,
+		Description: "Memperbarui data akun.",
+		OldValues: map[string]any{
+			"name":          existingUser.Name,
+			"email":         existingUser.Email,
+			"role":          existingUser.Role,
+			"division":      existingUser.Division,
+			"status":        existingUser.Status,
+			"registered_at": formatDateISO(existingUser.RegisteredAt),
+			"inactive_at":   formatDateISO(existingUser.InactiveAt),
+		},
+		NewValues: map[string]any{
+			"name":           name,
+			"email":          email,
+			"role":           role,
+			"division":       nullIfBlank(division),
+			"status":         status,
+			"registered_at":  nullIfBlank(registeredAt),
+			"inactive_at":    nullIfBlank(inactiveAt),
+			"password_reset": password != "",
+		},
+	})
+
 	c.JSON(http.StatusOK, gin.H{"status": "Akun berhasil diperbarui."})
 }
 
@@ -444,7 +495,28 @@ func SuperAdminAccountsDelete(c *gin.Context) {
 
 	id := c.Param("id")
 	db := middleware.GetDB(c)
+	var existingUser models.User
+	if err := db.Get(&existingUser, "SELECT * FROM users WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
 	_, _ = db.Exec("DELETE FROM users WHERE id = ?", id)
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Accounts",
+		Action:      "DELETE_ACCOUNT",
+		EntityType:  "user",
+		EntityID:    id,
+		Description: "Menghapus akun.",
+		OldValues: map[string]any{
+			"name":     existingUser.Name,
+			"email":    existingUser.Email,
+			"role":     existingUser.Role,
+			"division": existingUser.Division,
+			"status":   existingUser.Status,
+		},
+	})
+
 	c.JSON(http.StatusOK, gin.H{"status": "Akun berhasil dihapus."})
 }
 
@@ -457,8 +529,12 @@ func SuperAdminAccountsToggleStatus(c *gin.Context) {
 
 	id := c.Param("id")
 	db := middleware.GetDB(c)
-	var status string
-	_ = db.Get(&status, "SELECT status FROM users WHERE id = ?", id)
+	var existingUser models.User
+	if err := db.Get(&existingUser, "SELECT * FROM users WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
+	status := existingUser.Status
 	newStatus := "Active"
 	inactiveAt := sql.NullString{}
 	if status == "Active" {
@@ -467,6 +543,23 @@ func SuperAdminAccountsToggleStatus(c *gin.Context) {
 		inactiveAt.String = time.Now().Format("2006-01-02")
 	}
 	_, _ = db.Exec("UPDATE users SET status = ?, inactive_at = ? WHERE id = ?", newStatus, inactiveAt, id)
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Accounts",
+		Action:      "TOGGLE_ACCOUNT_STATUS",
+		EntityType:  "user",
+		EntityID:    id,
+		Description: "Mengubah status aktif/inaktif akun.",
+		OldValues: map[string]any{
+			"status":      status,
+			"inactive_at": formatDateISO(existingUser.InactiveAt),
+		},
+		NewValues: map[string]any{
+			"status":      newStatus,
+			"inactive_at": nullIfBlank(inactiveAt.String),
+		},
+	})
+
 	c.JSON(http.StatusOK, gin.H{"status": "Status akun telah diperbarui."})
 }
 
@@ -484,7 +577,27 @@ func SuperAdminAccountsResetPassword(c *gin.Context) {
 	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
 	db := middleware.GetDB(c)
+	var existingUser models.User
+	if err := db.Get(&existingUser, "SELECT * FROM users WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "User tidak ditemukan")
+		return
+	}
 	_, _ = db.Exec("UPDATE users SET password = ? WHERE id = ?", string(hash), id)
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Accounts",
+		Action:      "RESET_ACCOUNT_PASSWORD",
+		EntityType:  "user",
+		EntityID:    id,
+		Description: "Mereset password akun pengguna.",
+		OldValues: map[string]any{
+			"email": existingUser.Email,
+			"role":  existingUser.Role,
+		},
+		NewValues: map[string]any{
+			"password_reset": true,
+		},
+	})
 
 	c.JSON(http.StatusOK, gin.H{"status": "Password baru berhasil dibuat.", "generated_password": plain})
 }

@@ -117,7 +117,7 @@ func SuperAdminLettersIndex(c *gin.Context) {
 			"divisions":   hrDivisionOptions(db),
 		},
 		"nextLetterNumber":     nextNumber,
-		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 

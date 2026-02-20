@@ -7,6 +7,7 @@ import QuickActions from '@/modules/SuperAdmin/components/QuickActions';
 import Sidebar from '@/modules/SuperAdmin/components/Sidebar';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
+import { api, apiUrl } from '@/shared/lib/api';
 import { usePage } from '@/shared/lib/inertia';
 import { cn } from '@/shared/lib/utils';
 import { PageProps } from '@/shared/types';
@@ -55,6 +56,68 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
             return hasChanges ? sidebarNotifications : prev;
         });
     }, [sidebarNotifications]);
+
+    useEffect(() => {
+        if (!user) {
+            return;
+        }
+
+        const isSuperAdmin = user.role === 'Super Admin' || user.role === 'SuperAdmin';
+        const isHumanCapitalAdmin =
+            user.role === 'Admin' &&
+            typeof user.division === 'string' &&
+            /human\s+(capital|resources)/i.test(user.division);
+
+        if (!isSuperAdmin && !isHumanCapitalAdmin) {
+            return;
+        }
+
+        let active = true;
+        const refreshSidebarNotifications = async () => {
+            try {
+                const { data } = await api.get(apiUrl('/super-admin/notifications'), {
+                    params: { page: 1 },
+                });
+                if (!active) {
+                    return;
+                }
+                if (data?.sidebarNotifications && typeof data.sidebarNotifications === 'object') {
+                    const next = data.sidebarNotifications as Record<string, number>;
+                    setLiveNotifications((prev) => {
+                        const prevKeys = Object.keys(prev);
+                        const nextKeys = Object.keys(next);
+                        if (prevKeys.length !== nextKeys.length) {
+                            return next;
+                        }
+                        for (const key of nextKeys) {
+                            if ((prev[key] ?? 0) !== (next[key] ?? 0)) {
+                                return next;
+                            }
+                        }
+                        return prev;
+                    });
+                }
+            } catch {
+                // ignore polling errors
+            }
+        };
+
+        void refreshSidebarNotifications();
+        const intervalId = window.setInterval(() => {
+            void refreshSidebarNotifications();
+        }, 10000);
+
+        const handleFocus = () => {
+            void refreshSidebarNotifications();
+        };
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            active = false;
+            window.clearInterval(intervalId);
+            window.removeEventListener('focus', handleFocus);
+        };
+    }, [user]);
 
     //  Responsive helper 
     useEffect(() => {

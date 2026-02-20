@@ -5,6 +5,7 @@ import {
     MessageSquare,
     UserPlus,
     Mail,
+    ClipboardList,
     Building2,
     ChevronDown,
     ChevronLeft,
@@ -102,6 +103,14 @@ const defaultNavItems: NavItem[] = [
         routeName: 'super-admin.complaints.index',
         pattern: 'super-admin.complaints.*',
         badgeKey: 'super-admin.complaints.index',
+    },
+    {
+        label: 'Audit Log',
+        icon: ClipboardList,
+        href: '/super-admin/audit-log',
+        pattern: 'super-admin.audit-log',
+        superAdminOnly: true,
+        badgeKey: 'super-admin.audit-log',
     },
 ];
 

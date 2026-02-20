@@ -23,7 +23,7 @@ import {
     SelectValue,
 } from '@/shared/components/ui/select';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { useForm } from '@/shared/lib/inertia';
+import { router, useForm } from '@/shared/lib/inertia';
 
 import type { StaffOptionRecord } from '../types';
 
@@ -78,6 +78,11 @@ export default function TerminationDialog({
                 setOpen(false);
                 setPickerOpen(false);
                 setSearchQuery('');
+                void router.reload({
+                    only: ['stats', 'terminations', 'inactiveEmployees', 'staffOptions', 'sidebarNotifications'],
+                    preserveScroll: true,
+                    replace: true,
+                });
             },
             onError: () => toast.error('Gagal menyimpan data, periksa input Anda'),
         });

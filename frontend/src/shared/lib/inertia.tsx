@@ -251,6 +251,7 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
           'super-admin.recruitment': 0,
           'super-admin.staff.index': 0,
           'super-admin.complaints.index': 0,
+          'super-admin.audit-log': 0,
         };
 
         // Prefer server-side aggregated sidebar counts to avoid
@@ -281,6 +282,9 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
                 break;
               case 'complaint':
                 counts['super-admin.complaints.index'] += 1;
+                break;
+              case 'audit':
+                counts['super-admin.audit-log'] += 1;
                 break;
               default:
                 break;

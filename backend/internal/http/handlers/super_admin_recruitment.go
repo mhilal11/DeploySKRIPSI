@@ -302,7 +302,7 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 		"slaOverview":          slaOverview,
 		"slaReminders":         slaReminders,
 		"scoringAudits":        scoringAudits,
-		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 
@@ -318,7 +318,7 @@ func SuperAdminRecruitmentAnalyticsIndex(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"scoringAudits":        scoringAudits,
-		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 
@@ -390,6 +390,7 @@ func SuperAdminRecruitmentUpdateSLASettings(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	previousSettings := loadRecruitmentSLASettings(db)
 	now := time.Now()
 	for stage, target := range payload {
 		_, err := db.Exec(`
@@ -402,6 +403,16 @@ func SuperAdminRecruitmentUpdateSLASettings(c *gin.Context) {
 			return
 		}
 	}
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Recruitment",
+		Action:      "UPDATE_SLA_SETTINGS",
+		EntityType:  "recruitment_sla_settings",
+		EntityID:    "global",
+		Description: "Memperbarui konfigurasi SLA recruitment.",
+		OldValues:   previousSettings,
+		NewValues:   payload,
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":   "SLA recruitment berhasil diperbarui.",
@@ -486,6 +497,18 @@ func SuperAdminRecruitmentUpdateStatus(c *gin.Context) {
 	db := middleware.GetDB(c)
 	now := time.Now()
 
+	var previousState struct {
+		ID              int64   `db:"id"`
+		Status          string  `db:"status"`
+		RejectionReason *string `db:"rejection_reason"`
+		Position        string  `db:"position"`
+		Division        *string `db:"division"`
+	}
+	if err := db.Get(&previousState, "SELECT id, status, rejection_reason, position, division FROM applications WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "Lamaran tidak ditemukan")
+		return
+	}
+
 	updateFields := []string{"status = ?", "updated_at = ?"}
 	args := []any{status, now}
 
@@ -519,6 +542,26 @@ func SuperAdminRecruitmentUpdateStatus(c *gin.Context) {
 	query := "UPDATE applications SET " + strings.Join(updateFields, ", ") + " WHERE id = ?"
 	_, _ = db.Exec(query, args...)
 
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Recruitment",
+		Action:      "UPDATE_APPLICATION_STATUS",
+		EntityType:  "application",
+		EntityID:    id,
+		Description: "Memperbarui status pelamar pada proses recruitment.",
+		OldValues: map[string]any{
+			"status":           previousState.Status,
+			"rejection_reason": previousState.RejectionReason,
+			"position":         previousState.Position,
+			"division":         previousState.Division,
+		},
+		NewValues: map[string]any{
+			"status":           status,
+			"rejection_reason": nullIfBlank(rejection),
+			"position":         previousState.Position,
+			"division":         previousState.Division,
+		},
+	})
+
 	c.JSON(http.StatusOK, gin.H{"status": "Status pelamar berhasil diperbarui."})
 }
 
@@ -545,7 +588,31 @@ func SuperAdminRecruitmentReject(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	var previousState struct {
+		Status          string  `db:"status"`
+		RejectionReason *string `db:"rejection_reason"`
+	}
+	if err := db.Get(&previousState, "SELECT status, rejection_reason FROM applications WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "Lamaran tidak ditemukan")
+		return
+	}
 	_, _ = db.Exec("UPDATE applications SET status = 'Rejected', rejection_reason = ?, rejected_at = ?, updated_at = ? WHERE id = ?", rejection, time.Now(), time.Now(), id)
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Recruitment",
+		Action:      "REJECT_APPLICATION",
+		EntityType:  "application",
+		EntityID:    id,
+		Description: "Menolak pelamar pada proses recruitment.",
+		OldValues: map[string]any{
+			"status":           previousState.Status,
+			"rejection_reason": previousState.RejectionReason,
+		},
+		NewValues: map[string]any{
+			"status":           "Rejected",
+			"rejection_reason": rejection,
+		},
+	})
 
 	c.JSON(http.StatusOK, gin.H{"status": "Pelamar berhasil ditolak."})
 }
@@ -657,8 +724,47 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	var previousSchedule struct {
+		InterviewDate   *time.Time `db:"interview_date"`
+		InterviewTime   *string    `db:"interview_time"`
+		InterviewEnd    *string    `db:"interview_end_time"`
+		InterviewMode   *string    `db:"interview_mode"`
+		InterviewerName *string    `db:"interviewer_name"`
+		MeetingLink     *string    `db:"meeting_link"`
+		InterviewNotes  *string    `db:"interview_notes"`
+	}
+	if err := db.Get(&previousSchedule, "SELECT interview_date, interview_time, interview_end_time, interview_mode, interviewer_name, meeting_link, interview_notes FROM applications WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "Lamaran tidak ditemukan")
+		return
+	}
 	_, _ = db.Exec(`UPDATE applications SET interview_date=?, interview_time=?, interview_end_time=?, interview_mode=?, interviewer_name=?, meeting_link=?, interview_notes=?, interview_at=?, status='Interview', updated_at=? WHERE id = ?`,
 		date, timeStart, timeEnd, mode, interviewer, meetingLink, notes, time.Now(), time.Now(), id)
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Recruitment",
+		Action:      "SCHEDULE_INTERVIEW",
+		EntityType:  "application",
+		EntityID:    id,
+		Description: "Menjadwalkan atau memperbarui jadwal interview kandidat.",
+		OldValues: map[string]any{
+			"interview_date":     formatDateISO(previousSchedule.InterviewDate),
+			"interview_time":     previousSchedule.InterviewTime,
+			"interview_end_time": previousSchedule.InterviewEnd,
+			"interview_mode":     previousSchedule.InterviewMode,
+			"interviewer_name":   previousSchedule.InterviewerName,
+			"meeting_link":       previousSchedule.MeetingLink,
+			"interview_notes":    previousSchedule.InterviewNotes,
+		},
+		NewValues: map[string]any{
+			"interview_date":     date,
+			"interview_time":     timeStart,
+			"interview_end_time": timeEnd,
+			"interview_mode":     mode,
+			"interviewer_name":   interviewer,
+			"meeting_link":       nullIfBlank(meetingLink),
+			"interview_notes":    nullIfBlank(notes),
+		},
+	})
 
 	c.JSON(http.StatusOK, gin.H{"status": "Jadwal interview berhasil disimpan."})
 }
@@ -672,7 +778,33 @@ func SuperAdminRecruitmentDelete(c *gin.Context) {
 
 	id := c.Param("id")
 	db := middleware.GetDB(c)
+	var existing struct {
+		ID       int64   `db:"id"`
+		FullName string  `db:"full_name"`
+		Position string  `db:"position"`
+		Division *string `db:"division"`
+		Status   string  `db:"status"`
+	}
+	if err := db.Get(&existing, "SELECT id, full_name, position, division, status FROM applications WHERE id = ?", id); err != nil {
+		JSONError(c, http.StatusNotFound, "Lamaran tidak ditemukan")
+		return
+	}
 	_, _ = db.Exec("DELETE FROM applications WHERE id = ?", id)
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Recruitment",
+		Action:      "DELETE_APPLICATION",
+		EntityType:  "application",
+		EntityID:    id,
+		Description: "Menghapus data lamaran kandidat.",
+		OldValues: map[string]any{
+			"id":       existing.ID,
+			"name":     existing.FullName,
+			"position": existing.Position,
+			"division": existing.Division,
+			"status":   existing.Status,
+		},
+	})
 	c.JSON(http.StatusOK, gin.H{"status": "Lamaran berhasil dihapus."})
 }
 
@@ -689,6 +821,7 @@ func SuperAdminOnboardingUpdateChecklist(c *gin.Context) {
 	training := c.PostForm("training_orientation")
 
 	db := middleware.GetDB(c)
+	previousChecklist := loadChecklist(db, toInt64(id))
 
 	_, err := db.Exec(`INSERT INTO onboarding_checklists (application_id, contract_signed, inventory_handover, training_orientation, created_at, updated_at)
         VALUES (?, ?, ?, ?, NOW(), NOW())
@@ -698,6 +831,24 @@ func SuperAdminOnboardingUpdateChecklist(c *gin.Context) {
 		JSONError(c, http.StatusInternalServerError, "Gagal memperbarui checklist")
 		return
 	}
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Onboarding",
+		Action:      "UPDATE_CHECKLIST",
+		EntityType:  "onboarding_checklist",
+		EntityID:    id,
+		Description: "Memperbarui checklist onboarding kandidat.",
+		OldValues: map[string]any{
+			"contract_signed":      previousChecklist.ContractSigned,
+			"inventory_handover":   previousChecklist.InventoryHandover,
+			"training_orientation": previousChecklist.TrainingOrientation,
+		},
+		NewValues: map[string]any{
+			"contract_signed":      parseBool(contract) == 1,
+			"inventory_handover":   parseBool(inventory) == 1,
+			"training_orientation": parseBool(training) == 1,
+		},
+	})
 
 	c.JSON(http.StatusOK, gin.H{"status": "Progress onboarding berhasil disimpan."})
 }
@@ -757,7 +908,32 @@ func SuperAdminOnboardingConvertToStaff(c *gin.Context) {
 			userModel.ID, profile.Religion, profile.Gender, educationLevel)
 	}
 
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Onboarding",
+		Action:      "CONVERT_TO_STAFF",
+		EntityType:  "user",
+		EntityID:    strconv.FormatInt(userModel.ID, 10),
+		Description: "Mengubah pelamar hired menjadi staff.",
+		OldValues: map[string]any{
+			"role":          userModel.Role,
+			"employee_code": userModel.EmployeeCode,
+		},
+		NewValues: map[string]any{
+			"role":          models.RoleStaff,
+			"employee_code": employeeCode,
+			"division":      app.Division,
+		},
+	})
+
 	c.JSON(http.StatusOK, gin.H{"status": "Akun berhasil diubah menjadi Staff."})
+}
+
+func toInt64(value string) int64 {
+	parsed, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return parsed
 }
 
 // helpers

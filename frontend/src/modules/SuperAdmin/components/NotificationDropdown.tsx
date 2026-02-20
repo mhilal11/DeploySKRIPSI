@@ -1,8 +1,9 @@
-﻿import {
+import {
   Mail,
   UserPlus,
   UserMinus,
   MessageCircle,
+  ClipboardList,
   ChevronLeft,
   ChevronRight,
   Loader2
@@ -22,7 +23,7 @@ import { cn } from '@/shared/lib/utils';
 
 interface NotificationItem {
   id: string;
-  type: 'letter' | 'application' | 'termination' | 'complaint';
+  type: 'letter' | 'application' | 'termination' | 'complaint' | 'audit';
   title: string;
   description: string;
   timestamp: string;
@@ -47,6 +48,7 @@ const iconMap: Record<string, React.ElementType> = {
   application: UserPlus,
   termination: UserMinus,
   complaint: MessageCircle,
+  audit: ClipboardList,
 };
 
 const colorMap: Record<string, string> = {
@@ -54,6 +56,7 @@ const colorMap: Record<string, string> = {
   application: 'bg-purple-100 text-purple-600',
   termination: 'bg-orange-100 text-orange-600',
   complaint: 'bg-rose-100 text-rose-600',
+  audit: 'bg-amber-100 text-amber-700',
 };
 
 export default function NotificationDropdown({
@@ -220,6 +223,7 @@ export default function NotificationDropdown({
     </Popover>
   );
 }
+
 
 
 

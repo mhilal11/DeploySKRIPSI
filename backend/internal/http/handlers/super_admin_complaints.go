@@ -161,7 +161,7 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		"categoryOptions":      categories,
 		"regulations":          []any{},
 		"announcements":        []any{},
-		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 

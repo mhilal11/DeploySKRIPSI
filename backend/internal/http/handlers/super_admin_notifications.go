@@ -32,6 +32,7 @@ func SuperAdminNotifications(c *gin.Context) {
 		"super-admin.recruitment":      0,
 		"super-admin.staff.index":      0,
 		"super-admin.complaints.index": 0,
+		"super-admin.audit-log":        0,
 	}
 
 	letters := []models.Surat{}
@@ -108,6 +109,39 @@ func SuperAdminNotifications(c *gin.Context) {
 			"timestamp":   diffForHumans(complaint.CreatedAt),
 			"url":         "/super-admin/kelola-pengaduan",
 			"created_at":  complaint.CreatedAt,
+		})
+	}
+
+	auditLogs := []models.AuditLog{}
+	_ = db.Select(&auditLogs, `
+		SELECT id, module, action, entity_type, entity_id, description, created_at
+		FROM audit_logs
+		WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+		  AND id NOT IN (
+			SELECT audit_log_id
+			FROM audit_log_views
+			WHERE user_id = ?
+		  )
+		ORDER BY created_at DESC
+	`, user.ID)
+	sidebarNotifications["super-admin.audit-log"] = len(auditLogs)
+	for _, audit := range auditLogs {
+		description := "Aktivitas audit baru tercatat."
+		if audit.Description != nil && *audit.Description != "" {
+			description = *audit.Description
+		}
+		title := "Aktivitas Audit Baru"
+		if audit.Action != "" {
+			title = "Audit: " + audit.Action
+		}
+		notifications = append(notifications, map[string]any{
+			"id":          "audit-" + strconv.FormatInt(audit.ID, 10),
+			"type":        "audit",
+			"title":       title,
+			"description": description,
+			"timestamp":   diffForHumans(audit.CreatedAt),
+			"url":         "/super-admin/audit-log",
+			"created_at":  audit.CreatedAt,
 		})
 	}
 

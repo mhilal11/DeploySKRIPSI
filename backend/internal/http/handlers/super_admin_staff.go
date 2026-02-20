@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"hris-backend/internal/http/middleware"
@@ -116,7 +117,7 @@ func SuperAdminStaffIndex(c *gin.Context) {
 		"inactiveEmployees":    inactiveEmployees,
 		"staffOptions":         staffOptions,
 		"checklistTemplate":    checklistTemplate,
-		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 
@@ -127,7 +128,16 @@ func SuperAdminStaffStore(c *gin.Context) {
 		return
 	}
 
-	employeeCode := c.PostForm("employee_code")
+	var payload struct {
+		EmployeeCode  string `form:"employee_code" json:"employee_code"`
+		Type          string `form:"type" json:"type"`
+		EffectiveDate string `form:"effective_date" json:"effective_date"`
+		Reason        string `form:"reason" json:"reason"`
+		Suggestion    string `form:"suggestion" json:"suggestion"`
+	}
+	_ = c.ShouldBind(&payload)
+
+	employeeCode := strings.TrimSpace(payload.EmployeeCode)
 	if employeeCode == "" {
 		ValidationErrors(c, FieldErrors{"employee_code": "ID Karyawan wajib diisi."})
 		return
@@ -151,7 +161,7 @@ func SuperAdminStaffStore(c *gin.Context) {
 	now := time.Now()
 	_, _ = db.Exec(`INSERT INTO staff_terminations (reference, user_id, requested_by, employee_code, employee_name, division, position, type, reason, suggestion, request_date, effective_date, status, progress, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Diajukan', 0, ?, ?)`,
-		reference, employee.ID, user.ID, employee.EmployeeCode, employee.Name, employee.Division, employee.Role, c.PostForm("type"), c.PostForm("reason"), c.PostForm("suggestion"), now.Format("2006-01-02"), c.PostForm("effective_date"), now, now)
+		reference, employee.ID, user.ID, employee.EmployeeCode, employee.Name, employee.Division, employee.Role, payload.Type, payload.Reason, payload.Suggestion, now.Format("2006-01-02"), payload.EffectiveDate, now, now)
 
 	c.JSON(http.StatusOK, gin.H{"status": "Pengajuan termination berhasil dibuat."})
 }

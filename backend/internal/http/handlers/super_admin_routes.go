@@ -6,6 +6,8 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 	rg.GET("/super-admin/dashboard", SuperAdminDashboard)
 	rg.GET("/super-admin/admin-hr/dashboard", SuperAdminAdminHrDashboard)
 	rg.GET("/super-admin/notifications", SuperAdminNotifications)
+	rg.GET("/super-admin/audit-log", SuperAdminAuditLogsIndex)
+	rg.POST("/super-admin/audit-log/mark-viewed", SuperAdminAuditLogsMarkViewed)
 
 	rg.GET("/super-admin/recruitment", SuperAdminRecruitmentIndex)
 	rg.GET("/super-admin/recruitment/analytics", SuperAdminRecruitmentAnalyticsIndex)

@@ -101,7 +101,7 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 		"divisions":            divisions,
 		"stats":                stats,
 		"flash":                gin.H{"success": "", "error": ""},
-		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 
@@ -198,6 +198,21 @@ func SuperAdminDivisionsStore(c *gin.Context) {
 		}
 	}
 
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Divisions",
+		Action:      "CREATE_DIVISION",
+		EntityType:  "division_profile",
+		EntityID:    strconv.FormatInt(id, 10),
+		Description: "Menambahkan divisi baru.",
+		NewValues: map[string]any{
+			"id":          id,
+			"name":        name,
+			"description": descriptionValue,
+			"manager":     managerValue,
+			"capacity":    capacity,
+		},
+	})
+
 	c.JSON(http.StatusOK, gin.H{
 		"flash":    gin.H{"success": "Divisi berhasil ditambahkan."},
 		"division": gin.H{"id": id, "name": name},
@@ -290,6 +305,24 @@ func SuperAdminDivisionsUpdate(c *gin.Context) {
 		return
 	}
 
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Divisions",
+		Action:      "UPDATE_DIVISION",
+		EntityType:  "division_profile",
+		EntityID:    id,
+		Description: "Memperbarui data divisi.",
+		OldValues: map[string]any{
+			"description": profile.Description,
+			"manager":     profile.ManagerName,
+			"capacity":    profile.Capacity,
+		},
+		NewValues: map[string]any{
+			"description": descriptionValue,
+			"manager":     managerValue,
+			"capacity":    capacity,
+		},
+	})
+
 	c.JSON(http.StatusOK, gin.H{
 		"flash": gin.H{"success": "Divisi berhasil diperbarui."},
 	})
@@ -322,6 +355,20 @@ func SuperAdminDivisionsDelete(c *gin.Context) {
 		JSONError(c, http.StatusInternalServerError, "Gagal menghapus divisi")
 		return
 	}
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Divisions",
+		Action:      "DELETE_DIVISION",
+		EntityType:  "division_profile",
+		EntityID:    id,
+		Description: "Menghapus divisi.",
+		OldValues: map[string]any{
+			"name":        profile.Name,
+			"description": profile.Description,
+			"manager":     profile.ManagerName,
+			"capacity":    profile.Capacity,
+		},
+	})
 
 	c.JSON(http.StatusOK, gin.H{
 		"flash": gin.H{"success": "Divisi berhasil dihapus."},
@@ -434,6 +481,23 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 		},
 	)
 
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Divisions",
+		Action:      "OPEN_JOB",
+		EntityType:  "division_profile",
+		EntityID:    id,
+		Description: "Membuka lowongan pada divisi.",
+		NewValues: map[string]any{
+			"division_name":       profile.Name,
+			"job_title":           req.JobTitle,
+			"job_description":     req.JobDescription,
+			"job_requirements":    cleaned,
+			"eligibility":         criteriaForAudit,
+			"is_hiring":           true,
+			"available_slots_now": availableSlots,
+		},
+	})
+
 	c.JSON(http.StatusOK, gin.H{
 		"flash": gin.H{"success": "Lowongan pekerjaan berhasil dipublikasikan."},
 	})
@@ -448,7 +512,28 @@ func SuperAdminDivisionsCloseJob(c *gin.Context) {
 
 	id := c.Param("id")
 	db := middleware.GetDB(c)
+	var profile models.DivisionProfile
+	_ = db.Get(&profile, "SELECT * FROM division_profiles WHERE id = ?", id)
 	_, _ = db.Exec(`UPDATE division_profiles SET is_hiring = 0, job_title = NULL, job_description = NULL, job_requirements = NULL, hiring_opened_at = NULL WHERE id = ?`, id)
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "Divisions",
+		Action:      "CLOSE_JOB",
+		EntityType:  "division_profile",
+		EntityID:    id,
+		Description: "Menutup lowongan divisi.",
+		OldValues: map[string]any{
+			"division_name":    profile.Name,
+			"job_title":        profile.JobTitle,
+			"job_description":  profile.JobDescription,
+			"job_requirements": decodeJSONStringArray(profile.JobRequirements),
+			"is_hiring":        profile.IsHiring,
+		},
+		NewValues: map[string]any{
+			"is_hiring": false,
+		},
+	})
+
 	c.JSON(http.StatusOK, gin.H{
 		"flash": gin.H{"success": "Lowongan pekerjaan telah ditutup."},
 	})

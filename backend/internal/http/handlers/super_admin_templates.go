@@ -42,7 +42,7 @@ func SuperAdminTemplatesList(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"templates":            payload,
-		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 
@@ -129,7 +129,7 @@ func SuperAdminTemplatesIndex(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"templates":            payload,
 		"placeholders":         placeholders,
-		"sidebarNotifications": computeSuperAdminSidebarNotifications(db),
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
 

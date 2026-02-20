@@ -104,8 +104,9 @@ func itoa(value int) string {
 	return fmt.Sprintf("%d", value)
 }
 
-// computeSuperAdminSidebarNotifications calculates badge counts for SuperAdmin sidebar
-func computeSuperAdminSidebarNotifications(db any) map[string]int {
+// computeSuperAdminSidebarNotifications calculates badge counts for SuperAdmin sidebar.
+// Pass userID to get personalized unread audit-log count.
+func computeSuperAdminSidebarNotifications(db any, userID ...int64) map[string]int {
 	type Querier interface {
 		Get(dest interface{}, query string, args ...interface{}) error
 	}
@@ -149,6 +150,26 @@ func computeSuperAdminSidebarNotifications(db any) map[string]int {
 		WHERE LOWER(status) IN ('new', 'baru')
 	`)
 	notifications["super-admin.complaints.index"] = complaintsCount
+
+	// Audit log: unread activity in the last 24 hours (per user when userID is provided).
+	var auditCount int
+	if len(userID) > 0 && userID[0] > 0 {
+		_ = q.Get(&auditCount, `
+			SELECT COUNT(*)
+			FROM audit_logs al
+			LEFT JOIN audit_log_views av
+			  ON av.audit_log_id = al.id
+			 AND av.user_id = ?
+			WHERE al.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+			  AND av.id IS NULL
+		`, userID[0])
+	} else {
+		_ = q.Get(&auditCount, `
+			SELECT COUNT(*) FROM audit_logs
+			WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+		`)
+	}
+	notifications["super-admin.audit-log"] = auditCount
 
 	return notifications
 }

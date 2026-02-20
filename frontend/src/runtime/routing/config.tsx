@@ -34,6 +34,7 @@ const loadSuperAdminDivisions = () => import('@/modules/SuperAdmin/KelolaDivisi/
 const loadSuperAdminLetters = () => import('@/modules/SuperAdmin/KelolaSurat/Index');
 const loadSuperAdminStaff = () => import('@/modules/SuperAdmin/KelolaStaff/Index');
 const loadSuperAdminComplaints = () => import('@/modules/SuperAdmin/KelolaPengaduan/Index');
+const loadSuperAdminAuditLog = () => import('@/modules/SuperAdmin/AuditLog/Index');
 const loadSuperAdminAccountsIndex = () => import('@/modules/SuperAdmin/KelolaAkun/Index');
 const loadSuperAdminAccountsCreate = () => import('@/modules/SuperAdmin/KelolaAkun/Create');
 const loadSuperAdminAccountsEdit = () => import('@/modules/SuperAdmin/KelolaAkun/Edit');
@@ -70,6 +71,7 @@ const SuperAdminDivisions = lazy(loadSuperAdminDivisions);
 const SuperAdminLetters = lazy(loadSuperAdminLetters);
 const SuperAdminStaff = lazy(loadSuperAdminStaff);
 const SuperAdminComplaints = lazy(loadSuperAdminComplaints);
+const SuperAdminAuditLog = lazy(loadSuperAdminAuditLog);
 const SuperAdminAccountsIndex = lazy(loadSuperAdminAccountsIndex);
 const SuperAdminAccountsCreate = lazy(loadSuperAdminAccountsCreate);
 const SuperAdminAccountsEdit = lazy(loadSuperAdminAccountsEdit);
@@ -253,6 +255,12 @@ export const ROUTES: RouteConfig[] = [
     api: '/super-admin/kelola-pengaduan',
   },
   {
+    path: '/super-admin/audit-log',
+    name: 'super-admin.audit-log',
+    component: SuperAdminAuditLog,
+    api: '/super-admin/audit-log',
+  },
+  {
     path: '/super-admin/accounts',
     name: 'super-admin.accounts.index',
     component: SuperAdminAccountsIndex,
@@ -290,6 +298,7 @@ export function getWarmupLoaders(user: any): Array<() => Promise<unknown>> {
       loadSuperAdminRecruitmentAnalytics,
       loadSuperAdminLetters,
       loadSuperAdminStaff,
+      loadSuperAdminAuditLog,
     );
   } else if (user.role === 'Admin') {
     const isHumanCapitalAdmin = isHumanCapitalDivision(user.division);
@@ -324,6 +333,7 @@ export function getWarmupApiEndpoints(user: any): string[] {
       '/super-admin/kelola-surat',
       '/super-admin/kelola-staff',
       '/super-admin/kelola-pengaduan',
+      '/super-admin/audit-log',
       '/super-admin/accounts',
     );
   } else if (user.role === 'Admin') {
