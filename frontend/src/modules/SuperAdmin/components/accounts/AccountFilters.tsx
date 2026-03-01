@@ -149,9 +149,14 @@ export default function AccountFilters({
                     <Search className="absolute left-3 md:left-4 h-4 w-4 md:h-5 md:w-5 text-slate-400 transition-colors duration-300 group-hover:text-blue-500" />
                     <input
                         ref={inputRef}
-                        placeholder=" Cari nama, email, atau ID..."
+                        placeholder=" Cari nama..."
                         value={search}
-                        onChange={(event) => onSearchChange(event.target.value)}
+                        onChange={(event) => {
+                            const value = event.target.value;
+                            if (value === '' || /^[A-Za-z\s'\-]+$/.test(value)) {
+                                onSearchChange(value);
+                            }
+                        }}
                         className="h-11 md:h-14 w-full rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/50 pl-10 md:pl-12 pr-4 md:pr-6 text-xs md:text-sm font-medium text-slate-700 shadow-sm outline-none transition-all duration-300 placeholder:text-slate-400 focus:border-blue-400 focus:shadow-lg focus:ring-4 focus:ring-blue-500/10 focus:from-blue-50/50 focus:to-white hover:border-slate-300"
                     />
                 </div>
