@@ -105,7 +105,7 @@ const defaultNavItems: NavItem[] = [
         badgeKey: 'super-admin.complaints.index',
     },
     {
-        label: 'Audit Log',
+        label: 'Log Aktivitas',
         icon: ClipboardList,
         href: '/super-admin/audit-log',
         pattern: 'super-admin.audit-log',
