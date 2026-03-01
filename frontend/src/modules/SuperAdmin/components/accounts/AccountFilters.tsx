@@ -10,6 +10,7 @@ interface AccountFiltersProps {
     onStatusChange: (value: string) => void;
     roleOptions: string[];
     statusOptions: string[];
+    inputRef?: React.RefObject<HTMLInputElement>;
 }
 
 interface CustomSelectProps {
@@ -137,6 +138,7 @@ export default function AccountFilters({
     onStatusChange,
     roleOptions,
     statusOptions,
+    inputRef,
 }: AccountFiltersProps) {
     return (
         <div className="space-y-3 md:space-y-4">
@@ -146,6 +148,7 @@ export default function AccountFilters({
                 <div className="relative flex items-center">
                     <Search className="absolute left-3 md:left-4 h-4 w-4 md:h-5 md:w-5 text-slate-400 transition-colors duration-300 group-hover:text-blue-500" />
                     <input
+                        ref={inputRef}
                         placeholder=" Cari nama, email, atau ID..."
                         value={search}
                         onChange={(event) => onSearchChange(event.target.value)}

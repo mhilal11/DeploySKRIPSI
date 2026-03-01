@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import AccountDetailDialog from '@/modules/SuperAdmin/components/accounts/AccountDetailDialog';
@@ -10,6 +10,7 @@ import {
     PaginatedAccounts,
 } from '@/modules/SuperAdmin/components/accounts/types';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
+import { api, apiUrl } from '@/shared/lib/api';
 import { Head, Link, router } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
 
@@ -30,31 +31,31 @@ type IndexPageProps = PageProps<{
     roleOptions: string[];
     statusOptions: string[];
     divisionOptions: string[];
-	flash?: {
-		success?: string;
-	};
+    flash?: {
+        success?: string;
+    };
 }>;
 
 const ACCOUNT_TOAST_ID = 'super-admin.accounts.feedback';
 const ACCOUNT_TOAST_STORAGE_KEY = 'super-admin.accounts.toast';
 
 const EMPTY_USERS: PaginatedAccounts = {
-	data: [],
-	links: [],
-	current_page: 1,
-	last_page: 1,
-	per_page: 10,
-	total: 0,
-	from: null,
-	to: null,
+    data: [],
+    links: [],
+    current_page: 1,
+    last_page: 1,
+    per_page: 10,
+    total: 0,
+    from: null,
+    to: null,
 };
 
 const EMPTY_STATS = {
-	total: 0,
-	super_admin: 0,
-	admin: 0,
-	staff: 0,
-	pelamar: 0,
+    total: 0,
+    super_admin: 0,
+    admin: 0,
+    staff: 0,
+    pelamar: 0,
 };
 
 function decrementStatsByRole(stats: typeof EMPTY_STATS, role: string) {
@@ -90,23 +91,27 @@ interface UserLoggedInPayload {
 }
 
 export default function Index(props: IndexPageProps) {
-	const users = props.users ?? EMPTY_USERS;
-	const filters = props.filters ?? {};
-	const stats = props.stats ?? EMPTY_STATS;
-	const roleOptions = props.roleOptions ?? [];
-	const statusOptions = props.statusOptions ?? [];
-	const flash = props.flash;
+    const users = props.users ?? EMPTY_USERS;
+    const filters = props.filters ?? {};
+    const stats = props.stats ?? EMPTY_STATS;
+    const roleOptions = props.roleOptions ?? [];
+    const statusOptions = props.statusOptions ?? [];
+    const flash = props.flash;
 
-    const [search, setSearch] = useState('');
-    const [roleFilter, setRoleFilter] = useState('all');
-    const [statusFilter, setStatusFilter] = useState('all');
-	const [allUsers, setAllUsers] = useState<AccountRecord[]>(users.data ?? []);
-	const [paginationLinks, setPaginationLinks] = useState(users.links ?? []);
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [roleFilter, setRoleFilter] = useState(filters.role ?? 'all');
+    const [statusFilter, setStatusFilter] = useState(filters.status ?? 'all');
+    const [allUsers, setAllUsers] = useState<AccountRecord[]>(users.data ?? []);
+    const [paginationLinks, setPaginationLinks] = useState(users.links ?? []);
     const [currentStats, setCurrentStats] = useState(stats);
+    const [currentFrom, setCurrentFrom] = useState(users.from ?? 1);
     const [selectedUser, setSelectedUser] = useState<AccountRecord | null>(
         null,
     );
     const [detailOpen, setDetailOpen] = useState(false);
+
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isFirstRender = useRef(true);
 
     // Show queued toast from sessionStorage after page transition settles
     useEffect(() => {
@@ -117,8 +122,6 @@ export default function Index(props: IndexPageProps) {
         const queuedToast = sessionStorage.getItem(ACCOUNT_TOAST_STORAGE_KEY);
         if (queuedToast) {
             sessionStorage.removeItem(ACCOUNT_TOAST_STORAGE_KEY);
-            // Delay to ensure the page transition (DOM reconciliation) is
-            // fully complete so the toast is not dismissed mid-transition.
             const timer = window.setTimeout(() => {
                 toast.success(queuedToast, {
                     id: ACCOUNT_TOAST_ID,
@@ -128,7 +131,6 @@ export default function Index(props: IndexPageProps) {
             return () => window.clearTimeout(timer);
         }
 
-        // Handle flash message from server response
         if (flash?.success) {
             toast.success(flash.success, {
                 id: ACCOUNT_TOAST_ID,
@@ -137,38 +139,51 @@ export default function Index(props: IndexPageProps) {
         }
     }, [flash?.success]);
 
-    // Client-side filtering - no server request, no URL change
-    const accountRows = useMemo(() => {
-        let filtered = allUsers;
-
-        // Filter by search
-        if (search) {
-            const searchLower = search.toLowerCase();
-            filtered = filtered.filter(
-                (user) =>
-                    user.id.toString().includes(searchLower) ||
-                    user.name.toLowerCase().includes(searchLower) ||
-                    user.email.toLowerCase().includes(searchLower),
-            );
+    // Server-side search & filter via direct API call (bukan router.visit)
+    // sehingga tidak ada navigasi Inertia dan fokus input TIDAK hilang.
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
         }
-
-        // Filter by role
-        if (roleFilter !== 'all') {
-            filtered = filtered.filter((user) => user.role === roleFilter);
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
         }
+        debounceRef.current = setTimeout(() => {
+            const params: Record<string, string> = {};
+            if (search) params.search = search;
+            if (roleFilter !== 'all') params.role = roleFilter;
+            if (statusFilter !== 'all') params.status = statusFilter;
 
-        // Filter by status
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter((user) => user.status === statusFilter);
-        }
+            api.get(apiUrl('/super-admin/accounts'), { params })
+                .then(({ data }) => {
+                    if (data.users) {
+                        setAllUsers(data.users.data ?? []);
+                        setPaginationLinks(data.users.links ?? []);
+                        setCurrentFrom(data.users.from ?? 1);
+                    }
+                    if (data.stats) {
+                        setCurrentStats(data.stats);
+                    }
+                })
+                .catch(() => {
+                    // Silently ignore search errors
+                });
+        }, 350);
 
-        return filtered;
-    }, [allUsers, search, roleFilter, statusFilter]);
+        return () => {
+            if (debounceRef.current) {
+                clearTimeout(debounceRef.current);
+            }
+        };
+    }, [search, roleFilter, statusFilter]);
 
-	useEffect(() => {
-		setAllUsers(users.data ?? []);
-		setPaginationLinks(users.links ?? []);
-	}, [users.data, users.links]);
+    // Sync data saat props berubah dari navigasi pagination (Link click)
+    useEffect(() => {
+        setAllUsers(users.data ?? []);
+        setPaginationLinks(users.links ?? []);
+        setCurrentFrom(users.from ?? 1);
+    }, [users.data, users.links, users.from]);
 
     useEffect(() => {
         setCurrentStats(stats);
@@ -348,9 +363,9 @@ export default function Index(props: IndexPageProps) {
                     />
 
                     <AccountTable
-                        users={accountRows}
+                        users={allUsers}
                         links={paginationLinks}
-                        from={users.from ?? 1}
+                        from={currentFrom}
                         onView={openDetail}
                         onEdit={(user) =>
                             router.visit(
