@@ -403,7 +403,6 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
     const [activeDetail, setActiveDetail] = useState<AuditDetailState | null>(null);
     const [locallyViewed, setLocallyViewed] = useState<Record<number, boolean>>({});
-    const viewedIdsRef = useRef<Set<number>>(new Set());
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const initialRender = useRef(true);
@@ -470,10 +469,9 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
     };
 
     const markAuditLogViewed = async (id: number) => {
-        if (viewedIdsRef.current.has(id)) {
+        if (locallyViewed[id]) {
             return;
         }
-        viewedIdsRef.current.add(id);
 
         try {
             const { data } = await api.post(apiUrl('/super-admin/audit-log/mark-viewed'), {
@@ -483,7 +481,12 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                 setSidebarNotifications(data.sidebarNotifications as Record<string, number>);
             }
         } catch {
-            viewedIdsRef.current.delete(id);
+            // revert on failure
+            setLocallyViewed((prev) => {
+                const next = { ...prev };
+                delete next[id];
+                return next;
+            });
         }
     };
 
@@ -503,14 +506,14 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
 
     return (
         <SuperAdminLayout
-            title="Audit Log"
+            title="Log Aktivitas"
             description="Riwayat aktivitas perubahan data untuk kebutuhan monitoring dan audit."
             breadcrumbs={[
                 { label: 'Super Admin', href: '/super-admin/dashboard' },
-                { label: 'Audit Log' },
+                { label: 'Log Aktivitas' },
             ]}
         >
-            <Head title="Audit Log" />
+            <Head title="Log Aktivitas" />
 
             <Card className="space-y-4 p-4 md:p-6">
                 <div className="grid gap-3 md:grid-cols-5">
@@ -563,7 +566,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                 <div className="space-y-3 md:hidden">
                     {auditLogs.data.length === 0 && (
                         <div className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
-                            Belum ada data audit log.
+                            Belum ada data log aktivitas.
                         </div>
                     )}
                     {auditLogs.data.map((item) => {
@@ -572,11 +575,10 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                         return (
                             <div
                                 key={`mobile-${item.id}`}
-                                className={`rounded-xl border p-3 shadow-sm ${
-                                    viewed
-                                        ? 'border-slate-200 bg-white'
-                                        : 'border-amber-200 bg-amber-50/40'
-                                }`}
+                                className={`rounded-xl border p-3 shadow-sm ${viewed
+                                    ? 'border-slate-200 bg-white'
+                                    : 'border-amber-200 bg-amber-50/40'
+                                    }`}
                             >
                                 <div className="mb-2 flex items-start justify-between gap-2">
                                     <div>
@@ -631,7 +633,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                             {auditLogs.data.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
-                                        Belum ada data audit log.
+                                        Belum ada data log aktivitas.
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -711,7 +713,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                     {activeDetail && (
                         <>
                             <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4 text-left">
-                                <DialogTitle>Detail Perubahan Audit Log</DialogTitle>
+                                <DialogTitle>Detail Perubahan Log Aktivitas</DialogTitle>
                                 <DialogDescription className="space-y-1">
                                     <span className="block text-xs text-slate-500">
                                         {activeDetail.item.created_at}
