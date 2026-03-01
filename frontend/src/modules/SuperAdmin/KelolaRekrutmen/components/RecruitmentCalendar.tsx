@@ -6,7 +6,7 @@
     MapPin,
     Video,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { Avatar, AvatarFallback } from '@/shared/components/ui/avatar';
 import { Badge } from '@/shared/components/ui/badge';
@@ -42,6 +42,7 @@ interface NormalizedInterview {
     interviewerRole?: string | null;
     type: InterviewType;
     status: InterviewStatus;
+    applicantStatus?: string | null;
     location?: string | null;
     link?: string | null;
     notes?: string | null;
@@ -57,7 +58,20 @@ export function RecruitmentCalendar({
 }: RecruitmentCalendarProps) {
     const embeddedMode = isEmbedded || embedded || false;
 
-    const normalizeInterview = (item: InterviewSchedule): NormalizedInterview | null => {
+    const mapInterviewStatus = (applicantStatus?: string | null): InterviewStatus => {
+        if (!applicantStatus) return 'scheduled';
+        switch (applicantStatus) {
+            case 'Offering':
+            case 'Hired':
+            case 'Rejected':
+                return 'completed';
+            case 'Interview':
+            default:
+                return 'scheduled';
+        }
+    };
+
+    const normalizeInterview = useCallback((item: InterviewSchedule): NormalizedInterview | null => {
         const rawDate = item.date_value || item.date;
         const parsedDate = rawDate ? new Date(rawDate) : null;
         if (!parsedDate || Number.isNaN(parsedDate.getTime())) return null;
@@ -73,17 +87,18 @@ export function RecruitmentCalendar({
             interviewer: item.interviewer,
             interviewerRole: null,
             type: item.mode === 'Offline' ? 'offline' : 'online',
-            status: 'scheduled',
+            status: mapInterviewStatus(item.status),
+            applicantStatus: item.status ?? null,
             location: item.mode === 'Offline' ? 'Office / Meeting Room' : item.meeting_link ?? null,
             link: item.mode === 'Online' ? item.meeting_link ?? null : null,
             notes: item.interview_notes ?? '',
             rawDate: rawDate ?? null,
         };
-    };
+    }, []);
 
     const normalizedInterviews = useMemo(
         () => interviews.map(normalizeInterview).filter(Boolean) as NormalizedInterview[],
-        [interviews],
+        [interviews, normalizeInterview],
     );
 
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -112,13 +127,13 @@ export function RecruitmentCalendar({
     const getStatusBadge = (status: InterviewStatus) => {
         switch (status) {
             case 'scheduled':
-                return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Scheduled</Badge>;
+                return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Dijadwalkan</Badge>;
             case 'completed':
-                return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Completed</Badge>;
+                return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Selesai</Badge>;
             case 'cancelled':
-                return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Cancelled</Badge>;
+                return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Dibatalkan</Badge>;
             case 'rescheduled':
-                return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Rescheduled</Badge>;
+                return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Dijadwalkan Ulang</Badge>;
             default:
                 return null;
         }
@@ -173,8 +188,8 @@ export function RecruitmentCalendar({
                                     setDetailApplicant(toApplicantRecord(interview));
                                 }}
                                 className={`text-[10px] p-1.5 rounded border border-l-2 truncate cursor-pointer hover:opacity-80 ${interview.status === 'completed'
-                                        ? 'bg-green-50 border-green-200 border-l-green-500 text-green-700'
-                                        : ''
+                                    ? 'bg-green-50 border-green-200 border-l-green-500 text-green-700'
+                                    : ''
                                     } ${interview.status === 'cancelled'
                                         ? 'bg-red-50 border-red-200 border-l-red-500 text-red-700'
                                         : ''
@@ -203,9 +218,12 @@ export function RecruitmentCalendar({
         return days;
     };
 
-    const sidebarInterviews = selectedDate
+    const sidebarAllForDate = selectedDate
         ? getInterviewsForDate(selectedDate)
-        : normalizedInterviews.filter((i) => i.status === 'scheduled').slice(0, 8);
+        : normalizedInterviews;
+    const sidebarUpcoming = sidebarAllForDate.filter((i) => i.status === 'scheduled');
+    const sidebarCompleted = sidebarAllForDate.filter((i) => i.status === 'completed');
+    const sidebarInterviews = selectedDate ? sidebarAllForDate : sidebarUpcoming;
     const totalSidebarPages = Math.max(1, Math.ceil(sidebarInterviews.length / SIDEBAR_PAGE_SIZE));
     const sidebarItems = sidebarInterviews.slice(
         (sidebarPage - 1) * SIDEBAR_PAGE_SIZE,
@@ -223,7 +241,7 @@ export function RecruitmentCalendar({
         id: interview.applicationId ?? (Number.parseInt(interview.id, 10) || 0),
         name: interview.candidateName,
         position: interview.role,
-        status: 'Interview' as any,
+        status: (interview.applicantStatus ?? 'Interview') as any,
         date: interview.rawDate ?? interview.date.toISOString(),
         submitted_date: interview.rawDate ?? interview.date.toISOString(),
         email: '',
@@ -296,79 +314,90 @@ export function RecruitmentCalendar({
                         <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                             <Clock className="w-4 h-4" />
                             {selectedDate
-                                ? `Schedule for ${selectedDate.toLocaleDateString('en-US', {
-                                    month: 'short',
+                                ? `Jadwal ${selectedDate.toLocaleDateString('id-ID', {
                                     day: 'numeric',
+                                    month: 'short',
                                 })}`
-                                : 'Upcoming Interviews'}
+                                : 'Jadwal Interview'}
                         </h3>
 
                         <ScrollArea className="flex-1 pr-4">
                             <div className="space-y-3">
-                                {sidebarItems.map((interview) => (
-                                    <div
-                                        key={interview.id}
-                                        onClick={() => setDetailApplicant(toApplicantRecord(interview))}
-                                        className="p-3 rounded-lg border hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-all group bg-white"
-                                    >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-                                                {interview.startTime}
-                                                {interview.endTime ? ` - ${interview.endTime}` : ''}
-                                            </span>
-                                            {getStatusBadge(interview.status)}
-                                        </div>
-                                        <h4 className="font-medium text-gray-900 text-sm group-hover:text-blue-700">
-                                            {interview.candidateName}
-                                        </h4>
-                                        <p className="text-xs text-gray-500 mb-2">{interview.role}</p>
+                                {/* Akan Datang */}
+                                {sidebarUpcoming.length > 0 && (
+                                    <>
+                                        {!selectedDate && (
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 mb-1">Akan Datang</p>
+                                        )}
+                                        {(selectedDate ? sidebarUpcoming : sidebarUpcoming.slice(0, 4)).map((interview) => (
+                                            <div
+                                                key={interview.id}
+                                                onClick={() => setDetailApplicant(toApplicantRecord(interview))}
+                                                className="p-3 rounded-lg border hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-all group bg-white"
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                                                        {interview.startTime}
+                                                        {interview.endTime ? ` - ${interview.endTime}` : ''}
+                                                    </span>
+                                                    {getStatusBadge(interview.status)}
+                                                </div>
+                                                <h4 className="font-medium text-gray-900 text-sm group-hover:text-blue-700">
+                                                    {interview.candidateName}
+                                                </h4>
+                                                <p className="text-xs text-gray-500 mb-2">{interview.role}</p>
+                                                <div className="flex items-center gap-2 text-xs text-gray-500 border-t pt-2 mt-2">
+                                                    <Avatar className="w-5 h-5">
+                                                        <AvatarFallback className="text-[9px] bg-blue-100 text-blue-700">
+                                                            {interview.interviewer.charAt(0)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="truncate">{interview.interviewer}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
 
-                                        <div className="flex items-center gap-2 text-xs text-gray-500 border-t pt-2 mt-2">
-                                            <Avatar className="w-5 h-5">
-                                                <AvatarFallback className="text-[9px] bg-blue-100 text-blue-700">
-                                                    {interview.interviewer.charAt(0)}
-                                                </AvatarFallback>
-                                            </Avatar>
-                                            <span className="truncate">{interview.interviewer}</span>
-                                        </div>
-                                    </div>
-                                ))}
+                                {/* Sudah Selesai */}
+                                {sidebarCompleted.length > 0 && (
+                                    <>
+                                        <div className="border-t my-3" />
+                                        <p className="text-xs font-semibold uppercase tracking-wider text-green-600 mb-1">Sudah Selesai</p>
+                                        {(selectedDate ? sidebarCompleted : sidebarCompleted.slice(0, 4)).map((interview) => (
+                                            <div
+                                                key={`done-${interview.id}`}
+                                                onClick={() => setDetailApplicant(toApplicantRecord(interview))}
+                                                className="p-3 rounded-lg border border-green-200 bg-green-50/50 hover:border-green-400 hover:bg-green-50 cursor-pointer transition-all group"
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                                                        {interview.startTime}
+                                                        {interview.endTime ? ` - ${interview.endTime}` : ''}
+                                                    </span>
+                                                    {getStatusBadge(interview.status)}
+                                                </div>
+                                                <h4 className="font-medium text-gray-700 text-sm group-hover:text-green-800">
+                                                    {interview.candidateName}
+                                                </h4>
+                                                <p className="text-xs text-gray-500 mb-2">{interview.role}</p>
+                                                <div className="flex items-center gap-2 text-xs text-gray-500 border-t border-green-200 pt-2 mt-2">
+                                                    <Avatar className="w-5 h-5">
+                                                        <AvatarFallback className="text-[9px] bg-green-100 text-green-700">
+                                                            {interview.interviewer.charAt(0)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="truncate">{interview.interviewer}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
 
-                                {sidebarInterviews.length === 0 && (
+                                {sidebarUpcoming.length === 0 && sidebarCompleted.length === 0 && (
                                     <div className="text-center py-8 text-gray-400">
                                         <CalendarIcon className="w-10 h-10 mx-auto mb-2 opacity-20" />
-                                        <p className="text-sm">No interviews scheduled</p>
-                                    </div>
-                                )}
-                                {sidebarInterviews.length > SIDEBAR_PAGE_SIZE && (
-                                    <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-                                        <span>
-                                            Page {sidebarPage} of {totalSidebarPages}
-                                        </span>
-                                        <div className="flex gap-1">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-8 px-2"
-                                                onClick={() => setSidebarPage((p) => Math.max(1, p - 1))}
-                                                disabled={sidebarPage === 1}
-                                            >
-                                                Prev
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="h-8 px-2"
-                                                onClick={() =>
-                                                    setSidebarPage((p) =>
-                                                        Math.min(totalSidebarPages, p + 1),
-                                                    )
-                                                }
-                                                disabled={sidebarPage === totalSidebarPages}
-                                            >
-                                                Next
-                                            </Button>
-                                        </div>
+                                        <p className="text-sm">Belum ada jadwal interview</p>
                                     </div>
                                 )}
                             </div>

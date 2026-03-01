@@ -257,6 +257,7 @@ export interface InterviewSchedule {
     interviewer: string;
     meeting_link?: string | null;
     interview_notes?: string | null;
+    status?: string | null;
 }
 
 export interface OnboardingItem {

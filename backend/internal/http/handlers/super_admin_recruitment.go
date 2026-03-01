@@ -216,7 +216,7 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 			"sla": slaIndicator,
 		})
 
-		if app.Status == "Interview" {
+		if hasInterview {
 			endTime := interviewEndTime
 			if endTime == nil && interviewTime != nil {
 				if t, err := time.Parse("15:04", *interviewTime); err == nil {
@@ -236,6 +236,7 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 				"mode":           firstString(app.InterviewMode, "-"),
 				"interviewer":    firstString(app.InterviewerName, "-"),
 				"meeting_link":   app.MeetingLink,
+				"status":         app.Status,
 			})
 		}
 

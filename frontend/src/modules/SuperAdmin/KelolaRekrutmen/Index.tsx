@@ -160,18 +160,18 @@ const buildOnboardingSteps = (
     inventoryHandover: boolean,
     trainingOrientation: boolean,
 ) => [
-    { label: onboardingStepLabels[0], complete: contractSigned },
-    {
-        label: onboardingStepLabels[1],
-        complete: inventoryHandover,
-        pending: !inventoryHandover && contractSigned,
-    },
-    {
-        label: onboardingStepLabels[2],
-        complete: trainingOrientation,
-        pending: !trainingOrientation && inventoryHandover,
-    },
-];
+        { label: onboardingStepLabels[0], complete: contractSigned },
+        {
+            label: onboardingStepLabels[1],
+            complete: inventoryHandover,
+            pending: !inventoryHandover && contractSigned,
+        },
+        {
+            label: onboardingStepLabels[2],
+            complete: trainingOrientation,
+            pending: !trainingOrientation && inventoryHandover,
+        },
+    ];
 
 const buildInterviewRow = (application: ApplicantRecord): InterviewSchedule => {
     const dateValue = application.interview_date ?? '';
@@ -410,18 +410,20 @@ export default function KelolaRekrutmenIndex({
 
     const syncRelatedRows = (application: ApplicantRecord) => {
         setInterviewRows((prev) => {
-            if (application.status !== 'Interview') {
-                return prev.filter((item) => item.application_id !== application.id);
+            // Jika status masih Interview, tambahkan atau update data interview
+            if (application.status === 'Interview') {
+                const interviewRow = buildInterviewRow(application);
+                const exists = prev.some((item) => item.application_id === application.id);
+                if (!exists) {
+                    return [interviewRow, ...prev];
+                }
+                return prev.map((item) =>
+                    item.application_id === application.id ? interviewRow : item,
+                );
             }
-
-            const interviewRow = buildInterviewRow(application);
-            const exists = prev.some((item) => item.application_id === application.id);
-            if (!exists) {
-                return [interviewRow, ...prev];
-            }
-            return prev.map((item) =>
-                item.application_id === application.id ? interviewRow : item,
-            );
+            // Jika status bukan Interview, tetap pertahankan riwayat interview
+            // (jangan dihapus dari list)
+            return prev;
         });
 
         setOnboardingRows((prev) => {
