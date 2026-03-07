@@ -48,7 +48,9 @@ func LandingData(c *gin.Context) {
 			"is_hiring":        profile.IsHiring && profile.JobTitle != nil,
 			"job_title":        profile.JobTitle,
 			"job_description":  profile.JobDescription,
-			"job_requirements": profile.JobRequirements,
+			"job_requirements": decodeJSONStringArray(profile.JobRequirements),
+			"job_eligibility":  decodeJSONMap(profile.JobEligibility),
+			"hiring_opened_at": formatDateISO(profile.HiringOpenedAt),
 		})
 	}
 
@@ -58,13 +60,21 @@ func LandingData(c *gin.Context) {
 			continue
 		}
 		jobs = append(jobs, map[string]any{
-			"division":       division["name"],
-			"title":          division["job_title"],
-			"description":    division["job_description"],
-			"location":       "Divisi " + division["name"].(string),
-			"type":           "Full-time",
-			"isHiring":       division["is_hiring"],
-			"availableSlots": division["available_slots"],
+			"id":                    division["id"],
+			"division":              division["name"],
+			"division_description":  division["description"],
+			"manager_name":          division["manager_name"],
+			"capacity":              division["capacity"],
+			"current_staff":         division["current_staff"],
+			"availableSlots":        division["available_slots"],
+			"isHiring":              division["is_hiring"],
+			"title":                 division["job_title"],
+			"description":           division["job_description"],
+			"requirements":          division["job_requirements"],
+			"eligibility_criteria":  division["job_eligibility"],
+			"hiring_opened_at":      division["hiring_opened_at"],
+			"location":              "Divisi " + division["name"].(string),
+			"type":                  "Full-time",
 		})
 	}
 

@@ -129,8 +129,8 @@ export default function Profile({
             edu.institution && edu.degree && edu.field_of_study && edu.start_year && edu.end_year
         );
 
-    // Experience is optional, so it's "complete" if empty or all filled
-    const isExperienceComplete = form.data.experiences.length === 0 ||
+    const hasExperienceData = form.data.experiences.length > 0;
+    const isExperienceComplete = hasExperienceData &&
         form.data.experiences.every(exp =>
             exp.company &&
             exp.position &&
@@ -139,10 +139,22 @@ export default function Profile({
             exp.description
         );
 
+    const hasCertificationData = form.data.certifications.length > 0;
+    const isCertificationComplete = hasCertificationData &&
+        form.data.certifications.every(cert =>
+            cert.name &&
+            cert.issuing_organization &&
+            cert.issue_date &&
+            cert.expiry_date
+        );
+
     // Get tab style class
-    const getTabClassName = (isComplete: boolean) => {
-        if (isComplete) {
+    const getTabClassName = (status: 'complete' | 'incomplete' | 'neutral') => {
+        if (status === 'complete') {
             return 'data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 data-[state=inactive]:bg-emerald-50 data-[state=inactive]:text-emerald-600 border border-emerald-200';
+        }
+        if (status === 'neutral') {
+            return 'data-[state=active]:bg-slate-100 data-[state=active]:text-slate-700 data-[state=inactive]:bg-slate-50 data-[state=inactive]:text-slate-600 border border-slate-200';
         }
         return 'data-[state=active]:bg-amber-100 data-[state=active]:text-amber-700 data-[state=inactive]:bg-amber-50 data-[state=inactive]:text-amber-600 border border-amber-200';
     };
@@ -272,16 +284,34 @@ export default function Profile({
 
                 <Tabs defaultValue="personal" className="space-y-6">
                     <TabsList className="grid w-full grid-cols-4 gap-1 bg-transparent">
-                        <TabsTrigger value="personal" className={getTabClassName(isPersonalComplete)}>
+                        <TabsTrigger value="personal" className={getTabClassName(isPersonalComplete ? 'complete' : 'incomplete')}>
                             Data Pribadi
                         </TabsTrigger>
-                        <TabsTrigger value="education" className={getTabClassName(isEducationComplete)}>
+                        <TabsTrigger value="education" className={getTabClassName(isEducationComplete ? 'complete' : 'incomplete')}>
                             Pendidikan
                         </TabsTrigger>
-                        <TabsTrigger value="experience" className={getTabClassName(isExperienceComplete)}>
+                        <TabsTrigger
+                            value="experience"
+                            className={getTabClassName(
+                                !hasExperienceData
+                                    ? 'neutral'
+                                    : isExperienceComplete
+                                        ? 'complete'
+                                        : 'incomplete',
+                            )}
+                        >
                             Kerja/Magang
                         </TabsTrigger>
-                        <TabsTrigger value="certification" className={getTabClassName(false)}>
+                        <TabsTrigger
+                            value="certification"
+                            className={getTabClassName(
+                                !hasCertificationData
+                                    ? 'neutral'
+                                    : isCertificationComplete
+                                        ? 'complete'
+                                        : 'incomplete',
+                            )}
+                        >
                             Sertifikasi
                         </TabsTrigger>
                     </TabsList>

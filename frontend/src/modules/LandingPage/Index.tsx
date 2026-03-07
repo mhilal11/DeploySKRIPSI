@@ -13,11 +13,19 @@ import { Navbar } from './Navbar';
 import { PricingSection } from './PricingSection';
 
 type CareerJob = {
+  id?: number;
   division: string;
+  division_description?: string | null;
+  manager_name?: string | null;
+  capacity?: number | null;
+  current_staff?: number | null;
   title?: string | null;
   location?: string | null;
   type?: string | null;
   description?: string | null;
+  requirements?: string[];
+  eligibility_criteria?: Record<string, unknown> | null;
+  hiring_opened_at?: string | null;
   isHiring: boolean;
   availableSlots?: number | null;
 };

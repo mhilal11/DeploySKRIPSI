@@ -1,18 +1,25 @@
-﻿import AOS from 'aos';
-import { MapPin, Clock, ArrowRight } from 'lucide-react';
+import AOS from 'aos';
+import { MapPin, Clock, ArrowRight, Users, ListChecks, SlidersHorizontal } from 'lucide-react';
 import { useEffect } from 'react';
 
-import { Button } from '@/shared/components/ui/button';
 import { Link } from '@/shared/lib/inertia';
 
 import { ImageWithFallback } from './figma/ImageWithFallback';
 
 type CareerJob = {
+  id?: number;
   division: string;
+  division_description?: string | null;
+  manager_name?: string | null;
+  capacity?: number | null;
+  current_staff?: number | null;
   title?: string | null;
   location?: string | null;
   type?: string | null;
   description?: string | null;
+  requirements?: string[];
+  eligibility_criteria?: Record<string, unknown> | null;
+  hiring_opened_at?: string | null;
   isHiring: boolean;
   availableSlots?: number | null;
 };
@@ -20,6 +27,97 @@ type CareerJob = {
 interface CareersSectionProps {
   jobs: CareerJob[];
 }
+
+type ScoringMap = Record<string, number | string | null | undefined>;
+
+const EDUCATION_LABELS: Record<string, string> = {
+  sma: 'SMA/SMK',
+  smk: 'SMA/SMK',
+  d3: 'D3',
+  d4: 'D4',
+  s1: 'S1',
+  s2: 'S2',
+  s3: 'S3',
+};
+
+const WEIGHT_LABELS: Record<string, string> = {
+  education: 'Pendidikan',
+  experience: 'Pengalaman',
+  skills: 'Skill Match',
+  certification: 'Sertifikasi',
+  profile: 'Profil',
+};
+
+const THRESHOLD_LABELS: Record<string, string> = {
+  priority: 'Prioritas',
+  recommended: 'Direkomendasikan',
+  consider: 'Pertimbangkan',
+};
+
+const KNOWN_CRITERIA_KEYS = new Set([
+  'min_age',
+  'max_age',
+  'gender',
+  'min_education',
+  'min_experience_years',
+  'program_studies',
+  'scoring_weights',
+  'scoring_thresholds',
+  'ineligible_penalty_per_failure',
+]);
+
+const asNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
+const asString = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+};
+
+const asStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter((item) => item !== '');
+};
+
+const formatGender = (value: string | null): string | null => {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+  if (normalized === 'male') return 'Laki-laki';
+  if (normalized === 'female') return 'Perempuan';
+  if (normalized === 'none' || normalized === 'any') return null;
+  return value;
+};
+
+const formatEducation = (value: string | null): string | null => {
+  if (!value) return null;
+  const normalized = value.toLowerCase();
+  return EDUCATION_LABELS[normalized] ?? value.toUpperCase();
+};
+
+const toScoringMap = (value: unknown): ScoringMap => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value as ScoringMap;
+};
+
+const formatDateIndo = (value?: string | null): string | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
 
 export function CareersSection({ jobs }: CareersSectionProps) {
   useEffect(() => {
@@ -40,7 +138,6 @@ export function CareersSection({ jobs }: CareersSectionProps) {
   return (
     <section id="careers" className="py-16 md:py-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        {/* Section Header */}
         <div className="grid lg:grid-cols-2 gap-8 md:gap-12 items-center mb-12 md:mb-16">
           <div data-aos="fade-right">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl text-white mb-4 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
@@ -67,7 +164,6 @@ export function CareersSection({ jobs }: CareersSectionProps) {
           </div>
         </div>
 
-        {/* Job Listings */}
         {hasJobs ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {availableJobs.map((job, index) => {
@@ -77,14 +173,52 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                 : `Belum ada lowongan di ${job.division}`;
               const location = job.location ?? job.division;
               const type = job.type ?? 'Full-time';
+              const requirements = Array.isArray(job.requirements)
+                ? job.requirements.filter((req) => req && req.trim() !== '')
+                : [];
+
+              const criteria = (job.eligibility_criteria ?? {}) as Record<string, unknown>;
+              const minAge = asNumber(criteria.min_age);
+              const maxAge = asNumber(criteria.max_age);
+              const ageRangeText =
+                minAge !== null && maxAge !== null
+                  ? `${minAge}-${maxAge}`
+                  : minAge !== null
+                    ? `>= ${minAge}`
+                    : maxAge !== null
+                      ? `<= ${maxAge}`
+                      : null;
+              const minExperience = asNumber(criteria.min_experience_years);
+              const gender = formatGender(asString(criteria.gender));
+              const minEducation = formatEducation(asString(criteria.min_education));
+              const programStudies = asStringArray(criteria.program_studies);
+              const programStudiesText =
+                programStudies.length > 0 ? programStudies.join(', ') : null;
+              const scoringWeights = toScoringMap(criteria.scoring_weights);
+              const scoringThresholds = toScoringMap(criteria.scoring_thresholds);
+              const openedAt = formatDateIndo(job.hiring_opened_at);
+
+              const additionalCriteriaEntries = Object.entries(criteria).filter(([key, value]) => {
+                if (KNOWN_CRITERIA_KEYS.has(key)) return false;
+                if (value == null) return false;
+                if (typeof value === 'string' && value.trim() === '') return false;
+                if (Array.isArray(value) && value.length === 0) return false;
+                if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value as Record<string, unknown>).length === 0) return false;
+                return true;
+              });
+
               const slots =
                 typeof job.availableSlots === 'number' && job.availableSlots > 0
                   ? `${job.availableSlots} posisi tersedia`
                   : null;
+              const teamCapacityText =
+                typeof job.current_staff === 'number' && typeof job.capacity === 'number'
+                  ? `${job.current_staff}/${job.capacity} posisi terisi`
+                  : null;
 
               return (
                 <div
-                  key={`${job.division}-${index}`}
+                  key={`${job.id ?? job.division}-${index}`}
                   data-aos="fade-up"
                   data-aos-delay={index * 50}
                   className={`relative group bg-white/15 backdrop-blur-[30px] border border-white/30 rounded-[24px] p-6 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(34,211,238,0.4)] hover:border-cyan-400/50 ${canApply ? 'hover:-translate-y-1 cursor-pointer' : 'opacity-95'
@@ -98,23 +232,20 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                     />
                   )}
                   <div className="relative z-0 space-y-4">
-                    {/* Division Badge */}
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/20 text-cyan-300 rounded-full text-sm border border-cyan-400/40">
                       <span>{job.division}</span>
                       {slots && <span className="text-xs text-cyan-200">{slots}</span>}
                     </div>
 
-                    {/* Job Title */}
                     <div>
                       <h3 className="text-xl text-white mb-2 group-hover:text-cyan-300 transition-colors">
                         {title}
                       </h3>
                       {job.description && job.isHiring && (
-                        <p className="text-sm text-white/70 line-clamp-3">{job.description}</p>
+                        <p className="text-sm text-white/70 line-clamp-4">{job.description}</p>
                       )}
                     </div>
 
-                    {/* Job Details */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-white/80">
                         <MapPin className="w-4 h-4 text-cyan-400" />
@@ -124,7 +255,99 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                         <Clock className="w-4 h-4 text-cyan-400" />
                         <span className="text-sm">{type}</span>
                       </div>
+                      {teamCapacityText && (
+                        <div className="flex items-center gap-2 text-white/80">
+                          <Users className="w-4 h-4 text-cyan-400" />
+                          <span className="text-sm">{teamCapacityText}</span>
+                        </div>
+                      )}
+                      {openedAt && (
+                        <p className="text-xs text-white/60">Dipublikasikan: {openedAt}</p>
+                      )}
                     </div>
+
+                    {requirements.length > 0 && (
+                      <div className="space-y-2 rounded-xl border border-cyan-400/20 bg-black/20 p-3">
+                        <p className="flex items-center gap-2 text-sm text-cyan-200">
+                          <ListChecks className="h-4 w-4" />
+                          Persyaratan Kandidat
+                        </p>
+                        <div className="space-y-1">
+                          {requirements.map((requirement, requirementIndex) => (
+                            <p key={`${job.id ?? job.division}-req-${requirementIndex}`} className="text-xs text-white/75">
+                              {requirementIndex + 1}. {requirement}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-2 rounded-xl border border-cyan-400/20 bg-black/20 p-3">
+                      <p className="text-sm text-cyan-200">Kriteria Kelayakan</p>
+                      <div className="flex flex-wrap gap-2">
+                        {ageRangeText && (
+                          <span className="rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
+                            Umur: {ageRangeText}
+                          </span>
+                        )}
+                        {gender && (
+                          <span className="rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
+                            Gender: {gender}
+                          </span>
+                        )}
+                        {minEducation && (
+                          <span className="rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
+                            Min Pendidikan: {minEducation}
+                          </span>
+                        )}
+                        {minExperience !== null && (
+                          <span className="rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
+                            Min Pengalaman: {minExperience} tahun
+                          </span>
+                        )}
+                        {programStudiesText && (
+                          <span className="rounded-full border border-cyan-300/30 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-100">
+                            Prodi: {programStudiesText}
+                          </span>
+                        )}
+                      </div>
+                      {additionalCriteriaEntries.length > 0 && (
+                        <div className="space-y-1 border-t border-white/10 pt-2">
+                          {additionalCriteriaEntries.map(([key, value]) => (
+                            <p key={`${job.id ?? job.division}-criteria-${key}`} className="text-[11px] text-white/65">
+                              {key}: {typeof value === 'string' ? value : JSON.stringify(value)}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {(Object.keys(scoringWeights).length > 0 || Object.keys(scoringThresholds).length > 0) && (
+                      <div className="space-y-2 rounded-xl border border-indigo-300/30 bg-indigo-500/10 p-3">
+                        <p className="flex items-center gap-2 text-sm text-indigo-100">
+                          <SlidersHorizontal className="h-4 w-4" />
+                          Konfigurasi Scoring
+                        </p>
+                        {Object.keys(scoringWeights).length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(scoringWeights).map(([key, value]) => (
+                              <span key={`${job.id ?? job.division}-weight-${key}`} className="rounded-full border border-indigo-200/30 px-2.5 py-1 text-[11px] text-indigo-100">
+                                Bobot {WEIGHT_LABELS[key] ?? key}: {asNumber(value) ?? value}%
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {Object.keys(scoringThresholds).length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(scoringThresholds).map(([key, value]) => (
+                              <span key={`${job.id ?? job.division}-threshold-${key}`} className="rounded-full border border-indigo-200/30 px-2.5 py-1 text-[11px] text-indigo-100">
+                                Threshold {THRESHOLD_LABELS[key] ?? key}: {asNumber(value) ?? value}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     <div
                       className={`flex items-center justify-between text-sm font-medium ${canApply ? 'text-cyan-300' : 'text-white/50'
@@ -150,6 +373,3 @@ export function CareersSection({ jobs }: CareersSectionProps) {
     </section>
   );
 }
-
-
-

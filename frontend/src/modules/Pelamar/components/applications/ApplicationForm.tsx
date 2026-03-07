@@ -1,5 +1,5 @@
 ﻿import { CheckCircle2, Upload } from 'lucide-react';
-import { ChangeEvent, FormEvent } from 'react';
+import { ChangeEvent, DragEvent, FormEvent, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/shared/components/ui/button';
@@ -39,6 +39,8 @@ interface ApplicationFormProps {
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
+const MAX_CV_SIZE_BYTES = 5 * 1024 * 1024;
+
 export default function ApplicationForm({
     selectedDivision,
     data,
@@ -47,6 +49,9 @@ export default function ApplicationForm({
     setData,
     onSubmit,
 }: ApplicationFormProps) {
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const [isDragActive, setIsDragActive] = useState(false);
+
     const normalizedPhone = data.phone.replace(/\D/g, '');
     const isPhoneValid =
         normalizedPhone.length >= 8 && normalizedPhone.length <= 13;
@@ -67,19 +72,18 @@ export default function ApplicationForm({
         }
     };
 
-    const handleCvChange = (event: ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0] ?? null;
-
+    const applyCvFile = (file: File | null, resetInput?: () => void) => {
         if (!file) {
             setData('cv', null);
             return;
         }
 
         const isPdf =
-            file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+            file.type === 'application/pdf' ||
+            file.name.toLowerCase().endsWith('.pdf');
 
         if (!isPdf) {
-            event.target.value = '';
+            resetInput?.();
             setData('cv', null);
             toast.error('File tidak didukung', {
                 description: 'Silakan unggah CV dalam format PDF.',
@@ -87,7 +91,51 @@ export default function ApplicationForm({
             return;
         }
 
+        if (file.size > MAX_CV_SIZE_BYTES) {
+            resetInput?.();
+            setData('cv', null);
+            toast.error('Ukuran file terlalu besar', {
+                description: 'Ukuran maksimal CV adalah 5MB.',
+            });
+            return;
+        }
+
         setData('cv', file);
+    };
+
+    const handleCvChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] ?? null;
+        applyCvFile(file, () => {
+            event.target.value = '';
+        });
+    };
+
+    const handleCvDragOver = (event: DragEvent<HTMLLabelElement>) => {
+        event.preventDefault();
+    };
+
+    const handleCvDragEnter = (event: DragEvent<HTMLLabelElement>) => {
+        event.preventDefault();
+        setIsDragActive(true);
+    };
+
+    const handleCvDragLeave = (event: DragEvent<HTMLLabelElement>) => {
+        event.preventDefault();
+        setIsDragActive(false);
+    };
+
+    const handleCvDrop = (event: DragEvent<HTMLLabelElement>) => {
+        event.preventDefault();
+        setIsDragActive(false);
+        if (processing) {
+            return;
+        }
+        const file = event.dataTransfer.files?.[0] ?? null;
+        applyCvFile(file, () => {
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        });
     };
 
     return (
@@ -200,7 +248,15 @@ export default function ApplicationForm({
                     <Label htmlFor="cv-upload">Upload CV (PDF)</Label>
                     <label
                         htmlFor="cv-upload"
-                        className="block cursor-pointer rounded-lg border-2 border-dashed border-slate-300 p-6 text-center transition hover:border-blue-500 focus-within:border-blue-500"
+                        className={`block cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition focus-within:border-blue-500 ${
+                            isDragActive
+                                ? 'border-blue-500 bg-blue-50/60'
+                                : 'border-slate-300 hover:border-blue-500'
+                        }`}
+                        onDragOver={handleCvDragOver}
+                        onDragEnter={handleCvDragEnter}
+                        onDragLeave={handleCvDragLeave}
+                        onDrop={handleCvDrop}
                     >
                         <Upload className="mx-auto mb-2 h-8 w-8 text-slate-400" aria-hidden />
                         <p className="text-sm text-slate-600">
@@ -216,10 +272,10 @@ export default function ApplicationForm({
                         )}
                         <Input
                             id="cv-upload"
+                            ref={fileInputRef}
                             type="file"
                             accept=".pdf,application/pdf"
                             className="sr-only"
-                            required
                             onChange={handleCvChange}
                             disabled={processing}
                         />
