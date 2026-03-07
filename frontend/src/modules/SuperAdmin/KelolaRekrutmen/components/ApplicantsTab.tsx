@@ -1149,10 +1149,9 @@ export default function ApplicantsTab({
                                 size="sm"
                                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
-                                className="h-8 w-8 p-0"
+                                className="h-8 px-3"
                             >
-                                <span className="sr-only">Previous</span>
-                                <span aria-hidden="true"></span>
+                                Sebelumnya
                             </Button>
                             <div className="flex items-center gap-1">
                                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -1172,10 +1171,9 @@ export default function ApplicantsTab({
                                 size="sm"
                                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                                 disabled={currentPage === totalPages}
-                                className="h-8 w-8 p-0"
+                                className="h-8 px-3"
                             >
-                                <span className="sr-only">Next</span>
-                                <span aria-hidden="true"></span>
+                                Selanjutnya
                             </Button>
                         </div>
                     </div>
