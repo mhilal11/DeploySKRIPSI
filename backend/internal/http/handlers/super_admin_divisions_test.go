@@ -14,9 +14,10 @@ func TestSanitizeEligibilityCriteria_ClampsAndNormalizes(t *testing.T) {
 		"extra_penalty_after_failed_criteria": -2,
 		"extra_penalty_score":                 "7.5",
 		"scoring_weights": map[string]interface{}{
-			"education":  40,
-			"experience": 30,
-			"skills":     30,
+			"education":    40,
+			"experience":   30,
+			"skills":       30,
+			"ai_screening": 15,
 		},
 		"scoring_thresholds": map[string]interface{}{
 			"priority":    120,
@@ -57,6 +58,10 @@ func TestSanitizeEligibilityCriteria_ClampsAndNormalizes(t *testing.T) {
 	thresholds := result["scoring_thresholds"].(map[string]float64)
 	if thresholds["priority"] != 100 || thresholds["consider"] != 0 {
 		t.Fatalf("expected thresholds clamp to [0..100], got %#v", thresholds)
+	}
+	weights := result["scoring_weights"].(map[string]float64)
+	if weights["ai_screening"] != 15 {
+		t.Fatalf("expected ai_screening weight=15, got %#v", weights["ai_screening"])
 	}
 }
 

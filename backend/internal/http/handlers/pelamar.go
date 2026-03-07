@@ -528,12 +528,16 @@ func PelamarApplicationsStore(c *gin.Context) {
 	}
 
 	now := time.Now()
-	_, err = db.Exec(`INSERT INTO applications (user_id, full_name, email, phone, skills, division, position, cv_file, status, submitted_at, created_at, updated_at)
+	insertResult, err := db.Exec(`INSERT INTO applications (user_id, full_name, email, phone, skills, division, position, cv_file, status, submitted_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Applied', ?, ?, ?)`,
 		user.ID, fullName, email, phone, skills, division.Name, *division.JobTitle, cvPath, now, now, now)
 	if err != nil {
 		JSONError(c, http.StatusInternalServerError, "Gagal mengirim lamaran")
 		return
+	}
+	applicationID, _ := insertResult.LastInsertId()
+	if applicationID > 0 {
+		triggerAutomaticRecruitmentAIScreening(db, middleware.GetConfig(c), applicationID, user.ID)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Lamaran Anda berhasil dikirim."})

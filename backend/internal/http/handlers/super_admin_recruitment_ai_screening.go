@@ -1,14 +1,17 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
+	"hris-backend/internal/config"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
 	"hris-backend/internal/services"
@@ -18,6 +21,39 @@ import (
 )
 
 const recruitmentAIScreeningPromptVersion = "cv-screening-v1"
+
+var (
+	errAIScreeningConfigIncomplete    = errors.New("konfigurasi groq belum lengkap")
+	errAIScreeningApplicationNotFound = errors.New("lamaran tidak ditemukan")
+	errAIScreeningCVUnavailable       = errors.New("cv kandidat belum tersedia")
+	errAIScreeningCVPathInvalid       = errors.New("path cv tidak valid")
+	errAIScreeningCVFileNotFound      = errors.New("file cv tidak ditemukan")
+	errAIScreeningCVUnreadable        = errors.New("cv tidak dapat diproses")
+	errAIScreeningProviderFailed      = errors.New("screening ai gagal")
+	errAIScreeningPersistFailed       = errors.New("hasil screening ai gagal disimpan")
+)
+
+type recruitmentAIScreeningRunOutput struct {
+	Application models.Application
+	Row         *models.RecruitmentAIScreening
+	ModelUsed   string
+	Result      services.CVScreeningResult
+}
+
+func triggerAutomaticRecruitmentAIScreening(db *sqlx.DB, cfg config.Config, applicationID, actorUserID int64) {
+	if db == nil || applicationID <= 0 {
+		return
+	}
+	go func() {
+		timeoutSec := cfg.GroqRequestTimeoutSec
+		if timeoutSec <= 0 {
+			timeoutSec = 60
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec+15)*time.Second)
+		defer cancel()
+		_, _ = runRecruitmentAIScreeningForApplication(ctx, db, cfg, applicationID, actorUserID)
+	}()
+}
 
 func SuperAdminRecruitmentGetAIScreening(c *gin.Context) {
 	user := middleware.CurrentUser(c)
@@ -54,6 +90,85 @@ func SuperAdminRecruitmentRunAIScreening(c *gin.Context) {
 
 	db := middleware.GetDB(c)
 	cfg := middleware.GetConfig(c)
+	applicationIDRaw := strings.TrimSpace(c.Param("id"))
+	if applicationIDRaw == "" {
+		JSONError(c, http.StatusBadRequest, "ID lamaran tidak valid")
+		return
+	}
+	applicationID, err := strconv.ParseInt(applicationIDRaw, 10, 64)
+	if err != nil || applicationID <= 0 {
+		JSONError(c, http.StatusBadRequest, "ID lamaran tidak valid")
+		return
+	}
+
+	output, err := runRecruitmentAIScreeningForApplication(c.Request.Context(), db, cfg, applicationID, user.ID)
+	if err != nil {
+		switch {
+		case errors.Is(err, errAIScreeningConfigIncomplete):
+			JSONError(c, http.StatusUnprocessableEntity, "Konfigurasi Groq belum lengkap. Periksa GROQ_API_KEY dan daftar model.")
+		case errors.Is(err, errAIScreeningApplicationNotFound):
+			JSONError(c, http.StatusNotFound, "Lamaran tidak ditemukan")
+		case errors.Is(err, errAIScreeningCVFileNotFound):
+			JSONError(c, http.StatusNotFound, "File CV tidak ditemukan di storage.")
+		case errors.Is(err, errAIScreeningCVUnavailable):
+			JSONError(c, http.StatusUnprocessableEntity, "CV kandidat belum tersedia.")
+		case errors.Is(err, errAIScreeningCVPathInvalid):
+			JSONError(c, http.StatusUnprocessableEntity, "Path file CV tidak valid.")
+		case errors.Is(err, errAIScreeningCVUnreadable):
+			JSONError(c, http.StatusUnprocessableEntity, "CV tidak dapat diproses. Pastikan format CV dapat dibaca (PDF/DOCX/TXT).")
+		case errors.Is(err, errAIScreeningProviderFailed):
+			JSONError(c, http.StatusBadGateway, "Screening AI gagal dijalankan. Semua model fallback gagal.")
+		case errors.Is(err, errAIScreeningPersistFailed):
+			JSONError(c, http.StatusInternalServerError, "Hasil screening AI gagal disimpan.")
+		default:
+			JSONError(c, http.StatusInternalServerError, "Screening AI gagal diproses.")
+		}
+		return
+	}
+
+	appendAuditLog(c, db, auditLogPayload{
+		Module:      "recruitment",
+		Action:      "AI_CV_SCREENING_RUN",
+		EntityType:  "application",
+		EntityID:    fmt.Sprintf("%d", output.Application.ID),
+		Description: fmt.Sprintf("Menjalankan AI screening CV untuk pelamar %s (%s).", output.Application.FullName, output.Application.Position),
+		NewValues: map[string]any{
+			"application_id": output.Application.ID,
+			"model_used":     output.ModelUsed,
+			"match_score":    output.Result.MatchScore,
+			"recommendation": output.Result.Recommendation,
+		},
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":         "AI screening CV berhasil dijalankan.",
+		"application_id": output.Application.ID,
+		"ai_screening":   mapAIScreeningPayload(output.Row),
+	})
+}
+
+func runRecruitmentAIScreeningForApplication(
+	ctx context.Context,
+	db *sqlx.DB,
+	cfg config.Config,
+	applicationID int64,
+	actorUserID int64,
+) (*recruitmentAIScreeningRunOutput, error) {
+	if db == nil {
+		return nil, fmt.Errorf("%w: database tidak tersedia", errAIScreeningPersistFailed)
+	}
+	if applicationID <= 0 {
+		return nil, fmt.Errorf("%w: id lamaran tidak valid", errAIScreeningApplicationNotFound)
+	}
+
+	var app models.Application
+	if err := db.Get(&app, "SELECT * FROM applications WHERE id = ?", applicationID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errAIScreeningApplicationNotFound
+		}
+		return nil, fmt.Errorf("%w: %v", errAIScreeningPersistFailed, err)
+	}
+
 	client := services.NewGroqCVScreeningClient(
 		cfg.GroqAPIKey,
 		cfg.GroqBaseURL,
@@ -61,42 +176,25 @@ func SuperAdminRecruitmentRunAIScreening(c *gin.Context) {
 		time.Duration(cfg.GroqRequestTimeoutSec)*time.Second,
 	)
 	if !client.Enabled() {
-		JSONError(c, http.StatusUnprocessableEntity, "Konfigurasi Groq belum lengkap. Periksa GROQ_API_KEY dan daftar model.")
-		return
-	}
-
-	applicationID := strings.TrimSpace(c.Param("id"))
-	if applicationID == "" {
-		JSONError(c, http.StatusBadRequest, "ID lamaran tidak valid")
-		return
-	}
-
-	var app models.Application
-	if err := db.Get(&app, "SELECT * FROM applications WHERE id = ?", applicationID); err != nil {
-		JSONError(c, http.StatusNotFound, "Lamaran tidak ditemukan")
-		return
+		return nil, errAIScreeningConfigIncomplete
 	}
 	if app.CvFile == nil || strings.TrimSpace(*app.CvFile) == "" {
-		JSONError(c, http.StatusUnprocessableEntity, "CV kandidat belum tersedia.")
-		return
+		return nil, errAIScreeningCVUnavailable
 	}
 
 	normalizedCVPath := normalizeAttachmentPath(*app.CvFile)
 	if normalizedCVPath == "" {
-		JSONError(c, http.StatusUnprocessableEntity, "Path file CV tidak valid.")
-		return
+		return nil, errAIScreeningCVPathInvalid
 	}
 	absCVPath, ok := resolveStorageFilePath(cfg.StoragePath, normalizedCVPath)
 	if !ok {
-		JSONError(c, http.StatusNotFound, "File CV tidak ditemukan di storage.")
-		return
+		return nil, errAIScreeningCVFileNotFound
 	}
 
 	cvText, err := services.ExtractCVText(absCVPath)
 	if err != nil {
-		insertRecruitmentAIScreeningFailure(db, app.ID, user.ID, normalizedCVPath, client.Models(), err.Error(), nil)
-		JSONError(c, http.StatusUnprocessableEntity, "CV tidak dapat diproses. Pastikan format CV dapat dibaca (PDF/DOCX/TXT).")
-		return
+		insertRecruitmentAIScreeningFailure(db, app.ID, actorUserID, normalizedCVPath, client.Models(), err.Error(), nil)
+		return nil, fmt.Errorf("%w: %v", errAIScreeningCVUnreadable, err)
 	}
 
 	profile := loadApplicantProfileByUserID(db, app.UserID)
@@ -128,17 +226,16 @@ func SuperAdminRecruitmentRunAIScreening(c *gin.Context) {
 		CVText:           cvText,
 	}
 
-	result, modelUsed, attempts, usage, rawResponse, screeningErr := client.ScreenCV(c.Request.Context(), input)
+	result, modelUsed, attempts, usage, rawResponse, screeningErr := client.ScreenCV(ctx, input)
 	if screeningErr != nil {
-		insertRecruitmentAIScreeningFailure(db, app.ID, user.ID, normalizedCVPath, client.Models(), screeningErr.Error(), attempts)
-		JSONError(c, http.StatusBadGateway, "Screening AI gagal dijalankan. Semua model fallback gagal.")
-		return
+		insertRecruitmentAIScreeningFailure(db, app.ID, actorUserID, normalizedCVPath, client.Models(), screeningErr.Error(), attempts)
+		return nil, fmt.Errorf("%w: %v", errAIScreeningProviderFailed, screeningErr)
 	}
 
 	row, err := insertRecruitmentAIScreeningSuccess(
 		db,
 		app.ID,
-		user.ID,
+		actorUserID,
 		normalizedCVPath,
 		len([]rune(cvText)),
 		modelUsed,
@@ -149,29 +246,15 @@ func SuperAdminRecruitmentRunAIScreening(c *gin.Context) {
 		rawResponse,
 	)
 	if err != nil {
-		JSONError(c, http.StatusInternalServerError, "Hasil screening AI gagal disimpan.")
-		return
+		return nil, fmt.Errorf("%w: %v", errAIScreeningPersistFailed, err)
 	}
 
-	appendAuditLog(c, db, auditLogPayload{
-		Module:      "recruitment",
-		Action:      "AI_CV_SCREENING_RUN",
-		EntityType:  "application",
-		EntityID:    fmt.Sprintf("%d", app.ID),
-		Description: fmt.Sprintf("Menjalankan AI screening CV untuk pelamar %s (%s).", app.FullName, app.Position),
-		NewValues: map[string]any{
-			"application_id": app.ID,
-			"model_used":     modelUsed,
-			"match_score":    result.MatchScore,
-			"recommendation": result.Recommendation,
-		},
-	})
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":         "AI screening CV berhasil dijalankan.",
-		"application_id": app.ID,
-		"ai_screening":   mapAIScreeningPayload(row),
-	})
+	return &recruitmentAIScreeningRunOutput{
+		Application: app,
+		Row:         row,
+		ModelUsed:   modelUsed,
+		Result:      result,
+	}, nil
 }
 
 func loadApplicantProfileByUserID(db *sqlx.DB, userID *int64) *models.ApplicantProfile {

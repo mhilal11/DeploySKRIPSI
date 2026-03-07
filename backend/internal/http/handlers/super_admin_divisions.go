@@ -608,6 +608,7 @@ func sanitizeEligibilityCriteria(input map[string]interface{}) map[string]interf
 			assignWeight("skills", "skills", "skill")
 			assignWeight("certification", "certification", "certifications", "cert")
 			assignWeight("profile", "profile", "profile_completeness", "completeness")
+			assignWeight("ai_screening", "ai_screening", "ai", "ai_cv", "cv_ai", "cv_screening")
 
 			if len(weights) > 0 {
 				out["scoring_weights"] = weights

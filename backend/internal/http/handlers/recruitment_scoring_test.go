@@ -257,7 +257,7 @@ func TestScoringConfigFromEligibility_NormalizesWeightsAndThresholds(t *testing.
 		},
 	})
 
-	totalWeight := config.WeightEducation + config.WeightExperience + config.WeightSkills + config.WeightCerts + config.WeightCompleteness
+	totalWeight := config.WeightEducation + config.WeightExperience + config.WeightSkills + config.WeightCerts + config.WeightCompleteness + config.WeightAIScreening
 	if totalWeight < 0.999 || totalWeight > 1.001 {
 		t.Fatalf("expected normalized total weight ~1, got %.4f", totalWeight)
 	}

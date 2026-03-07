@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"database/sql"
 	"fmt"
 	"math"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"hris-backend/internal/models"
+	"hris-backend/internal/services"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -17,11 +20,12 @@ import (
 const (
 	recruitmentScoreMethod = "Weighted Explainable Scoring v2"
 
-	defaultWeightEducation    = 0.30
-	defaultWeightExperience   = 0.30
-	defaultWeightSkills       = 0.25
+	defaultWeightEducation    = 0.25
+	defaultWeightExperience   = 0.25
+	defaultWeightSkills       = 0.20
 	defaultWeightCerts        = 0.10
 	defaultWeightCompleteness = 0.05
+	defaultWeightAIScreening  = 0.15
 
 	defaultPriorityThreshold    = 85.0
 	defaultRecommendedThreshold = 70.0
@@ -83,6 +87,7 @@ type recruitmentScoringConfig struct {
 	WeightSkills       float64
 	WeightCerts        float64
 	WeightCompleteness float64
+	WeightAIScreening  float64
 
 	PriorityThreshold    float64
 	RecommendedThreshold float64
@@ -99,6 +104,12 @@ func buildRecruitmentScoreIndex(
 	profileByUser map[int64]*models.ApplicantProfile,
 ) map[int64]recruitmentScoreResult {
 	criteriaByVacancyKey, criteriaByPosition := loadVacancyScoringCriteria(db)
+	cvTextByApplicationID := loadApplicationCVTextIndex(apps)
+	applicationIDs := make([]int64, 0, len(apps))
+	for _, app := range apps {
+		applicationIDs = append(applicationIDs, app.ID)
+	}
+	aiScoreByApplicationID := loadLatestSuccessfulAIScoresIndex(db, applicationIDs)
 
 	scored := make([]scoredRecruitmentCandidate, 0, len(apps))
 	for _, app := range apps {
@@ -106,9 +117,29 @@ func buildRecruitmentScoreIndex(
 		if app.UserID != nil {
 			profile = profileByUser[*app.UserID]
 		}
+		var aiMatchScore *float64
+		if value, ok := aiScoreByApplicationID[app.ID]; ok {
+			score := value
+			aiMatchScore = &score
+		}
+		skillSourceText := strings.TrimSpace(derefString(app.Skills))
+		if cvText, ok := cvTextByApplicationID[app.ID]; ok && strings.TrimSpace(cvText) != "" {
+			if skillSourceText == "" {
+				skillSourceText = cvText
+			} else {
+				skillSourceText = strings.TrimSpace(skillSourceText + "\n" + cvText)
+			}
+		}
+		appForScoring := app
+		if skillSourceText == "" {
+			appForScoring.Skills = nil
+		} else {
+			combinedSkillSource := skillSourceText
+			appForScoring.Skills = &combinedSkillSource
+		}
 
 		criteria := resolveVacancyScoringCriteria(app, criteriaByVacancyKey, criteriaByPosition)
-		score := evaluateRecruitmentScore(app, profile, criteria)
+		score := evaluateRecruitmentScoreWithAI(appForScoring, profile, criteria, aiMatchScore)
 
 		submittedAt := time.Time{}
 		if app.SubmittedAt != nil {
@@ -124,6 +155,58 @@ func buildRecruitmentScoreIndex(
 	}
 
 	return assignRecruitmentRanks(scored)
+}
+
+func loadApplicationCVTextIndex(apps []models.Application) map[int64]string {
+	out := make(map[int64]string, len(apps))
+	for _, app := range apps {
+		if app.CvFile == nil || strings.TrimSpace(*app.CvFile) == "" {
+			continue
+		}
+		normalized := normalizeAttachmentPath(*app.CvFile)
+		if normalized == "" {
+			continue
+		}
+		absPath, ok := resolveCVPathForScoring(normalized)
+		if !ok {
+			continue
+		}
+		text, err := services.ExtractCVText(absPath)
+		if err != nil {
+			continue
+		}
+		trimmed := strings.TrimSpace(text)
+		if trimmed == "" {
+			continue
+		}
+		const maxSkillSourceChars = 30000
+		if len([]rune(trimmed)) > maxSkillSourceChars {
+			trimmed = string([]rune(trimmed)[:maxSkillSourceChars])
+		}
+		out[app.ID] = trimmed
+	}
+	return out
+}
+
+func resolveCVPathForScoring(relativePath string) (string, bool) {
+	candidates := []string{}
+	if storageEnv := strings.TrimSpace(os.Getenv("STORAGE_PATH")); storageEnv != "" {
+		candidates = append(candidates, storageEnv)
+	}
+	candidates = append(candidates, "./storage", "storage", "backend/storage", "")
+
+	seen := map[string]struct{}{}
+	for _, storagePath := range candidates {
+		key := strings.TrimSpace(storagePath)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		if absPath, ok := resolveStorageFilePath(storagePath, relativePath); ok {
+			return absPath, true
+		}
+	}
+	return "", false
 }
 
 func assignRecruitmentRanks(scored []scoredRecruitmentCandidate) map[int64]recruitmentScoreResult {
@@ -159,6 +242,48 @@ func assignRecruitmentRanks(scored []scoredRecruitmentCandidate) map[int64]recru
 	}
 
 	return index
+}
+
+func loadLatestSuccessfulAIScoresIndex(db *sqlx.DB, applicationIDs []int64) map[int64]float64 {
+	out := make(map[int64]float64, len(applicationIDs))
+	if db == nil || len(applicationIDs) == 0 {
+		return out
+	}
+	if err := ensureRecruitmentAIScreeningTable(db); err != nil {
+		return out
+	}
+
+	query, args, err := sqlx.In(`
+		SELECT s.application_id, s.match_score
+		FROM recruitment_ai_screenings s
+		INNER JOIN (
+			SELECT application_id, MAX(id) AS latest_id
+			FROM recruitment_ai_screenings
+			WHERE status = 'success'
+			  AND match_score IS NOT NULL
+			  AND application_id IN (?)
+			GROUP BY application_id
+		) latest ON latest.latest_id = s.id
+	`, applicationIDs)
+	if err != nil {
+		return out
+	}
+	query = db.Rebind(query)
+
+	rows := []struct {
+		ApplicationID int64           `db:"application_id"`
+		MatchScore    sql.NullFloat64 `db:"match_score"`
+	}{}
+	if err := db.Select(&rows, query, args...); err != nil {
+		return out
+	}
+
+	for _, row := range rows {
+		if row.MatchScore.Valid {
+			out[row.ApplicationID] = clamp(row.MatchScore.Float64, 0, 100)
+		}
+	}
+	return out
 }
 
 func loadVacancyScoringCriteria(db *sqlx.DB) (map[string]vacancyScoringCriteria, map[string]vacancyScoringCriteria) {
@@ -234,6 +359,7 @@ func defaultRecruitmentScoringConfig() recruitmentScoringConfig {
 		WeightSkills:       defaultWeightSkills,
 		WeightCerts:        defaultWeightCerts,
 		WeightCompleteness: defaultWeightCompleteness,
+		WeightAIScreening:  defaultWeightAIScreening,
 
 		PriorityThreshold:    defaultPriorityThreshold,
 		RecommendedThreshold: defaultRecommendedThreshold,
@@ -282,15 +408,20 @@ func scoringConfigFromEligibility(criteria map[string]any) recruitmentScoringCon
 			config.WeightCompleteness = value
 			changed = true
 		}
+		if value, ok := parseWeight("ai_screening", "ai", "ai_cv", "cv_ai", "cv_screening"); ok {
+			config.WeightAIScreening = value
+			changed = true
+		}
 	}
 
-	totalWeight := config.WeightEducation + config.WeightExperience + config.WeightSkills + config.WeightCerts + config.WeightCompleteness
+	totalWeight := config.WeightEducation + config.WeightExperience + config.WeightSkills + config.WeightCerts + config.WeightCompleteness + config.WeightAIScreening
 	if totalWeight > 0 {
 		config.WeightEducation /= totalWeight
 		config.WeightExperience /= totalWeight
 		config.WeightSkills /= totalWeight
 		config.WeightCerts /= totalWeight
 		config.WeightCompleteness /= totalWeight
+		config.WeightAIScreening /= totalWeight
 	}
 
 	if thresholds := criteriaMap(criteria, "scoring_thresholds"); len(thresholds) > 0 {
@@ -348,6 +479,15 @@ func evaluateRecruitmentScore(
 	profile *models.ApplicantProfile,
 	criteria vacancyScoringCriteria,
 ) recruitmentScoreResult {
+	return evaluateRecruitmentScoreWithAI(app, profile, criteria, nil)
+}
+
+func evaluateRecruitmentScoreWithAI(
+	app models.Application,
+	profile *models.ApplicantProfile,
+	criteria vacancyScoringCriteria,
+	aiMatchScore *float64,
+) recruitmentScoreResult {
 	now := time.Now()
 	educations := []map[string]any{}
 	experiences := []map[string]any{}
@@ -388,12 +528,42 @@ func evaluateRecruitmentScore(
 	certificationScore, certificationDetail := scoreCertificationCriterion(certificationCount)
 	completenessScore, completenessDetail := scoreCompletenessCriterion(profileCompleteness)
 
+	weightEducation := scoringConfig.WeightEducation
+	weightExperience := scoringConfig.WeightExperience
+	weightSkills := scoringConfig.WeightSkills
+	weightCertifications := scoringConfig.WeightCerts
+	weightProfile := scoringConfig.WeightCompleteness
+	weightAI := scoringConfig.WeightAIScreening
+	hasAIScore := aiMatchScore != nil
+	if !hasAIScore {
+		weightAI = 0
+	}
+	totalWeight := weightEducation + weightExperience + weightSkills + weightCertifications + weightProfile + weightAI
+	if totalWeight <= 0 {
+		totalWeight = 1
+	}
+	weightEducation /= totalWeight
+	weightExperience /= totalWeight
+	weightSkills /= totalWeight
+	weightCertifications /= totalWeight
+	weightProfile /= totalWeight
+	weightAI /= totalWeight
+
 	breakdown := []recruitmentScoreBreakdown{
-		componentScore("education", "Pendidikan", scoringConfig.WeightEducation, educationScore, educationDetail),
-		componentScore("experience", "Pengalaman", scoringConfig.WeightExperience, experienceScore, experienceDetail),
-		componentScore("skills", "Kecocokan Skill", scoringConfig.WeightSkills, skillScore, skillDetail),
-		componentScore("certification", "Sertifikasi", scoringConfig.WeightCerts, certificationScore, certificationDetail),
-		componentScore("profile", "Kelengkapan Profil", scoringConfig.WeightCompleteness, completenessScore, completenessDetail),
+		componentScore("education", "Pendidikan", weightEducation, educationScore, educationDetail),
+		componentScore("experience", "Pengalaman", weightExperience, experienceScore, experienceDetail),
+		componentScore("skills", "Kecocokan Skill", weightSkills, skillScore, skillDetail),
+		componentScore("certification", "Sertifikasi", weightCertifications, certificationScore, certificationDetail),
+		componentScore("profile", "Kelengkapan Profil", weightProfile, completenessScore, completenessDetail),
+	}
+	if hasAIScore {
+		breakdown = append(breakdown, componentScore(
+			"ai_screening",
+			"AI CV Screening",
+			weightAI,
+			clamp(*aiMatchScore, 0, 100),
+			fmt.Sprintf("Skor kecocokan AI terhadap lowongan: %.1f/100.", clamp(*aiMatchScore, 0, 100)),
+		))
 	}
 
 	highlights := []string{}
@@ -440,6 +610,17 @@ func evaluateRecruitmentScore(
 
 	if profileCompleteness < 70 {
 		risks = append(risks, "Kelengkapan profil masih rendah; data kandidat bisa belum merepresentasikan kompetensi penuh.")
+	}
+	if hasAIScore {
+		normalizedAIScore := clamp(*aiMatchScore, 0, 100)
+		switch {
+		case normalizedAIScore >= 85:
+			highlights = append(highlights, fmt.Sprintf("AI CV screening menunjukkan kecocokan sangat tinggi (%.1f/100).", normalizedAIScore))
+		case normalizedAIScore >= 70:
+			highlights = append(highlights, fmt.Sprintf("AI CV screening menunjukkan kecocokan baik (%.1f/100).", normalizedAIScore))
+		case normalizedAIScore < 55:
+			risks = append(risks, fmt.Sprintf("AI CV screening menunjukkan kecocokan rendah (%.1f/100).", normalizedAIScore))
+		}
 	}
 
 	if strings.TrimSpace(requiredGender) != "" && !strings.EqualFold(requiredGender, "none") && !strings.EqualFold(requiredGender, "any") {
@@ -505,9 +686,13 @@ func evaluateRecruitmentScore(
 		breakdown[i].Score = roundTo(breakdown[i].Score, 1)
 		breakdown[i].Contribution = roundTo(breakdown[i].Contribution, 2)
 	}
+	method := scoringConfig.Method
+	if hasAIScore {
+		method += " + AI CV Screening"
+	}
 
 	return recruitmentScoreResult{
-		Method:         scoringConfig.Method,
+		Method:         method,
 		Total:          total,
 		Eligible:       eligible,
 		Recommendation: scoreRecommendation(total, eligible, scoringConfig),
