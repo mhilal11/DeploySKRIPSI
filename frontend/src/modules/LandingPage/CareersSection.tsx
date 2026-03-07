@@ -1,5 +1,5 @@
 import AOS from 'aos';
-import { MapPin, Clock, ArrowRight, Users, ListChecks, SlidersHorizontal } from 'lucide-react';
+import { MapPin, Clock, ArrowRight, Users, ListChecks } from 'lucide-react';
 import { useEffect } from 'react';
 
 import { Link } from '@/shared/lib/inertia';
@@ -28,8 +28,6 @@ interface CareersSectionProps {
   jobs: CareerJob[];
 }
 
-type ScoringMap = Record<string, number | string | null | undefined>;
-
 const EDUCATION_LABELS: Record<string, string> = {
   sma: 'SMA/SMK',
   smk: 'SMA/SMK',
@@ -38,19 +36,6 @@ const EDUCATION_LABELS: Record<string, string> = {
   s1: 'S1',
   s2: 'S2',
   s3: 'S3',
-};
-
-const WEIGHT_LABELS: Record<string, string> = {
-  education: 'Pendidikan',
-  experience: 'Pengalaman',
-  certification: 'Sertifikasi',
-  profile: 'Profil',
-};
-
-const THRESHOLD_LABELS: Record<string, string> = {
-  priority: 'Prioritas',
-  recommended: 'Direkomendasikan',
-  consider: 'Pertimbangkan',
 };
 
 const KNOWN_CRITERIA_KEYS = new Set([
@@ -100,11 +85,6 @@ const formatEducation = (value: string | null): string | null => {
   if (!value) return null;
   const normalized = value.toLowerCase();
   return EDUCATION_LABELS[normalized] ?? value.toUpperCase();
-};
-
-const toScoringMap = (value: unknown): ScoringMap => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return value as ScoringMap;
 };
 
 const formatDateIndo = (value?: string | null): string | null => {
@@ -193,11 +173,6 @@ export function CareersSection({ jobs }: CareersSectionProps) {
               const programStudies = asStringArray(criteria.program_studies);
               const programStudiesText =
                 programStudies.length > 0 ? programStudies.join(', ') : null;
-              const scoringWeights = toScoringMap(criteria.scoring_weights);
-              const scoringThresholds = toScoringMap(criteria.scoring_thresholds);
-              const scoringWeightEntries = Object.entries(scoringWeights).filter(
-                ([key]) => key !== 'skills',
-              );
               const openedAt = formatDateIndo(job.hiring_opened_at);
 
               const additionalCriteriaEntries = Object.entries(criteria).filter(([key, value]) => {
@@ -323,33 +298,6 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                         </div>
                       )}
                     </div>
-
-                    {(scoringWeightEntries.length > 0 || Object.keys(scoringThresholds).length > 0) && (
-                      <div className="space-y-2 rounded-xl border border-indigo-300/30 bg-indigo-500/10 p-3">
-                        <p className="flex items-center gap-2 text-sm text-indigo-100">
-                          <SlidersHorizontal className="h-4 w-4" />
-                          Konfigurasi Scoring
-                        </p>
-                        {scoringWeightEntries.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {scoringWeightEntries.map(([key, value]) => (
-                              <span key={`${job.id ?? job.division}-weight-${key}`} className="rounded-full border border-indigo-200/30 px-2.5 py-1 text-[11px] text-indigo-100">
-                                Bobot {WEIGHT_LABELS[key] ?? key}: {asNumber(value) ?? value}%
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {Object.keys(scoringThresholds).length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {Object.entries(scoringThresholds).map(([key, value]) => (
-                              <span key={`${job.id ?? job.division}-threshold-${key}`} className="rounded-full border border-indigo-200/30 px-2.5 py-1 text-[11px] text-indigo-100">
-                                Threshold {THRESHOLD_LABELS[key] ?? key}: {asNumber(value) ?? value}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
 
                     <div
                       className={`flex items-center justify-between text-sm font-medium ${canApply ? 'text-cyan-300' : 'text-white/50'
