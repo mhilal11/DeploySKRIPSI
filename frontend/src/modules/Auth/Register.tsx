@@ -1,6 +1,7 @@
 ﻿import { gsap } from "gsap";
 import { ArrowLeft, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { FormEventHandler, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import InputError from "@/shared/components/InputError";
 import {
@@ -84,6 +85,24 @@ export default function Register({
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
         post(route("register"), {
+            onSuccess: () => {
+                toast.success("Pendaftaran berhasil.", {
+                    description: "Akun berhasil dibuat. Silakan lanjutkan proses login.",
+                });
+            },
+            onError: (formErrors) => {
+                const firstError = Object.values(formErrors).find(
+                    (message) =>
+                        typeof message === "string" && message.trim() !== ""
+                );
+
+                toast.error("Pendaftaran gagal.", {
+                    description:
+                        typeof firstError === "string"
+                            ? firstError
+                            : "Periksa kembali data pendaftaran Anda.",
+                });
+            },
             onFinish: () => reset("password", "password_confirmation"),
         });
     };
@@ -394,6 +413,4 @@ export default function Register({
         </>
     );
 }
-
-
 

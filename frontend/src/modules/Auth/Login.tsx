@@ -1,6 +1,7 @@
 ﻿import { gsap } from 'gsap';
 import { ArrowLeft, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { FormEventHandler, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import InputError from '@/shared/components/InputError';
 import {
@@ -75,6 +76,24 @@ export default function Login({
         e.preventDefault();
 
         post(route('login'), {
+            onSuccess: () => {
+                toast.success('Login berhasil.', {
+                    description: 'Selamat datang kembali.',
+                });
+            },
+            onError: (formErrors) => {
+                const firstError = Object.values(formErrors).find(
+                    (message) =>
+                        typeof message === 'string' && message.trim() !== ''
+                );
+
+                toast.error('Login gagal.', {
+                    description:
+                        typeof firstError === 'string'
+                            ? firstError
+                            : 'Periksa kembali email dan kata sandi Anda.',
+                });
+            },
             onFinish: () => reset('password'),
         });
     };
@@ -282,6 +301,4 @@ export default function Login({
         </>
     );
 }
-
-
 

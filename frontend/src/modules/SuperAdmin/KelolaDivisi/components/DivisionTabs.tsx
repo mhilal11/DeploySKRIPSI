@@ -428,7 +428,8 @@ function DivisionVacancySection({
                 scoringWeights.experience != null ||
                 scoringWeights.skills != null ||
                 scoringWeights.certification != null ||
-                scoringWeights.profile != null
+                scoringWeights.profile != null ||
+                scoringWeights.ai_screening != null
             ),
     );
 

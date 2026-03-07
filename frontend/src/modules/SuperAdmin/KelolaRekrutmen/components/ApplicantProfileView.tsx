@@ -28,8 +28,6 @@ import RejectionModal from './RejectionModal';
 
 interface ApplicantProfileViewProps {
   applicant: ApplicantRecord;
-  onRunAIScreening?: (applicantId: number) => void;
-  isRunningAIScreening?: boolean;
   onAccept?: () => void;
   onReject?: (reason: string) => void;
   onScheduleInterview?: () => void;
@@ -39,8 +37,6 @@ interface ApplicantProfileViewProps {
 
 export function ApplicantProfileView({
   applicant,
-  onRunAIScreening,
-  isRunningAIScreening = false,
   onAccept,
   onReject,
   onScheduleInterview,
@@ -234,18 +230,6 @@ export function ApplicantProfileView({
           >
             <FileText className="w-4 h-4 mr-2" />
             Lihat CV
-          </Button>
-        )}
-        {onRunAIScreening && (
-          <Button
-            variant="outline"
-            className="border-indigo-600 text-indigo-700 hover:bg-indigo-50 shadow-sm hover:shadow-md transition-all"
-            onClick={() => onRunAIScreening(applicant.id)}
-            disabled={isRunningAIScreening || !cvUrl}
-            title={!cvUrl ? 'CV belum tersedia untuk dilakukan screening' : 'Jalankan screening CV berbasis AI'}
-          >
-            <Bot className="w-4 h-4 mr-2" />
-            {isRunningAIScreening ? 'Memproses Screening AI...' : 'Screening AI CV'}
           </Button>
         )}
         {onScheduleInterview && !isHired && !isRejected && (
@@ -756,7 +740,7 @@ export function ApplicantProfileView({
 
               {!aiScreening ? (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  Belum ada hasil AI screening. Gunakan tombol <span className="font-semibold">Screening AI CV</span> untuk mulai analisis.
+                  Belum ada hasil AI screening. Screening berjalan otomatis saat pelamar submit lamaran.
                 </div>
               ) : (
                 <>

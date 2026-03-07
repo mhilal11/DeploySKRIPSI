@@ -46,11 +46,12 @@ const GENDER_OPTIONS = [
 ];
 
 const DEFAULT_SCORING_WEIGHTS = {
-    education: 30,
-    experience: 30,
-    skills: 25,
+    education: 25,
+    experience: 25,
+    skills: 20,
     certification: 10,
     profile: 5,
+    ai_screening: 15,
 } as const;
 
 const DEFAULT_SCORING_THRESHOLDS = {
@@ -615,7 +616,7 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                             onChange={(e) => updateScoringWeight('skills', e.target.value ? Number(e.target.value) : null)}
                                         />
                                         <p className="text-xs text-slate-500">
-                                            Bobot ini hanya menentukan kontribusi skor skill ke nilai total. Nilai skill dihitung dari jumlah requirement yang cocok dengan data `skills` pelamar.
+                                            Bobot ini menentukan kontribusi skor skill ke nilai total. Nilai skill dihitung dari kecocokan requirement terhadap data `skills` pelamar dan teks CV.
                                         </p>
                                     </div>
                                     <div className="space-y-2">
@@ -637,6 +638,19 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                             value={scoringWeights.profile ?? ''}
                                             onChange={(e) => updateScoringWeight('profile', e.target.value ? Number(e.target.value) : null)}
                                         />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm">Bobot AI CV Screening (%)</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={scoringWeights.ai_screening ?? ''}
+                                            onChange={(e) => updateScoringWeight('ai_screening', e.target.value ? Number(e.target.value) : null)}
+                                        />
+                                        <p className="text-xs text-slate-500">
+                                            Mengatur pengaruh skor AI terhadap total nilai kandidat.
+                                        </p>
                                     </div>
                                     <div className="rounded-lg border border-indigo-200 bg-white p-3">
                                         <p className="text-xs uppercase tracking-wide text-indigo-600">Total Bobot</p>

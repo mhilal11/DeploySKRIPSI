@@ -21,6 +21,7 @@ export type EligibilityCriteria = {
         skills?: number | null;
         certification?: number | null;
         profile?: number | null;
+        ai_screening?: number | null;
     } | null;
     scoring_thresholds?: {
         priority?: number | null;

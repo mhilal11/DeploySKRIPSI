@@ -12,8 +12,6 @@ interface ApplicantProfileDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     applicant: ApplicantRecord | null;
-    onRunAIScreening?: (applicantId: number) => void;
-    isRunningAIScreening?: boolean;
     onAccept?: () => void;
     onReject?: (reason: string) => void;
     onScheduleInterview?: () => void;
@@ -25,8 +23,6 @@ export default function ApplicantProfileDialog({
     open,
     onOpenChange,
     applicant,
-    onRunAIScreening,
-    isRunningAIScreening = false,
     onAccept,
     onReject,
     onScheduleInterview,
@@ -45,8 +41,6 @@ export default function ApplicantProfileDialog({
                 <div className="p-6">
                     <ApplicantProfileView
                         applicant={applicant}
-                        onRunAIScreening={onRunAIScreening}
-                        isRunningAIScreening={isRunningAIScreening}
                         onAccept={onAccept}
                         onReject={onReject}
                         onScheduleInterview={onScheduleInterview}
