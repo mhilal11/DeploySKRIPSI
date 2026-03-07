@@ -218,16 +218,11 @@ func TestEvaluateRecruitmentScore_UsesCustomScoringProfile(t *testing.T) {
 		Requirements: []string{"Golang", "REST API"},
 		Eligibility: map[string]any{
 			"scoring_weights": map[string]any{
-				"education":     10,
-				"experience":    10,
+				"education":     25,
+				"experience":    25,
 				"skills":        70,
-				"certification": 5,
+				"certification": 10,
 				"profile":       5,
-			},
-			"scoring_thresholds": map[string]any{
-				"priority":    90,
-				"recommended": 75,
-				"consider":    60,
 			},
 		},
 	}
@@ -235,8 +230,15 @@ func TestEvaluateRecruitmentScore_UsesCustomScoringProfile(t *testing.T) {
 	defaultScore := evaluateRecruitmentScore(app, profile, defaultCriteria)
 	customScore := evaluateRecruitmentScore(app, profile, customCriteria)
 
-	if customScore.Total <= defaultScore.Total {
-		t.Fatalf("expected custom score %.2f to be higher than default %.2f when skill weight is boosted", customScore.Total, defaultScore.Total)
+	if customScore.Total != defaultScore.Total {
+		t.Fatalf("expected total score to stay same when only skill weight changes, got custom %.2f vs default %.2f", customScore.Total, defaultScore.Total)
+	}
+
+	if _, ok := breakdownByKey(customScore.Breakdown, "skills"); ok {
+		t.Fatal("expected skills component to be removed from custom breakdown")
+	}
+	if _, ok := breakdownByKey(defaultScore.Breakdown, "skills"); ok {
+		t.Fatal("expected skills component to be removed from default breakdown")
 	}
 	if customScore.Method == defaultScore.Method {
 		t.Fatalf("expected custom scoring method label to differ, got %q", customScore.Method)
@@ -257,7 +259,7 @@ func TestScoringConfigFromEligibility_NormalizesWeightsAndThresholds(t *testing.
 		},
 	})
 
-	totalWeight := config.WeightEducation + config.WeightExperience + config.WeightSkills + config.WeightCerts + config.WeightCompleteness + config.WeightAIScreening
+	totalWeight := config.WeightEducation + config.WeightExperience + config.WeightCerts + config.WeightCompleteness + config.WeightAIScreening
 	if totalWeight < 0.999 || totalWeight > 1.001 {
 		t.Fatalf("expected normalized total weight ~1, got %.4f", totalWeight)
 	}
@@ -313,4 +315,13 @@ func scoreByComponentKey(items []recruitmentScoreBreakdown, key string) float64 
 		}
 	}
 	return 0
+}
+
+func breakdownByKey(items []recruitmentScoreBreakdown, key string) (recruitmentScoreBreakdown, bool) {
+	for _, item := range items {
+		if item.Key == key {
+			return item, true
+		}
+	}
+	return recruitmentScoreBreakdown{}, false
 }

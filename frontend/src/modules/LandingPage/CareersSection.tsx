@@ -43,7 +43,6 @@ const EDUCATION_LABELS: Record<string, string> = {
 const WEIGHT_LABELS: Record<string, string> = {
   education: 'Pendidikan',
   experience: 'Pengalaman',
-  skills: 'Skill Match',
   certification: 'Sertifikasi',
   profile: 'Profil',
 };
@@ -196,6 +195,9 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                 programStudies.length > 0 ? programStudies.join(', ') : null;
               const scoringWeights = toScoringMap(criteria.scoring_weights);
               const scoringThresholds = toScoringMap(criteria.scoring_thresholds);
+              const scoringWeightEntries = Object.entries(scoringWeights).filter(
+                ([key]) => key !== 'skills',
+              );
               const openedAt = formatDateIndo(job.hiring_opened_at);
 
               const additionalCriteriaEntries = Object.entries(criteria).filter(([key, value]) => {
@@ -322,15 +324,15 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                       )}
                     </div>
 
-                    {(Object.keys(scoringWeights).length > 0 || Object.keys(scoringThresholds).length > 0) && (
+                    {(scoringWeightEntries.length > 0 || Object.keys(scoringThresholds).length > 0) && (
                       <div className="space-y-2 rounded-xl border border-indigo-300/30 bg-indigo-500/10 p-3">
                         <p className="flex items-center gap-2 text-sm text-indigo-100">
                           <SlidersHorizontal className="h-4 w-4" />
                           Konfigurasi Scoring
                         </p>
-                        {Object.keys(scoringWeights).length > 0 && (
+                        {scoringWeightEntries.length > 0 && (
                           <div className="flex flex-wrap gap-2">
-                            {Object.entries(scoringWeights).map(([key, value]) => (
+                            {scoringWeightEntries.map(([key, value]) => (
                               <span key={`${job.id ?? job.division}-weight-${key}`} className="rounded-full border border-indigo-200/30 px-2.5 py-1 text-[11px] text-indigo-100">
                                 Bobot {WEIGHT_LABELS[key] ?? key}: {asNumber(value) ?? value}%
                               </span>

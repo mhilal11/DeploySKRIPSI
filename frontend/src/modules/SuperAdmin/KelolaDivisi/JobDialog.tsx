@@ -48,7 +48,6 @@ const GENDER_OPTIONS = [
 const DEFAULT_SCORING_WEIGHTS = {
     education: 25,
     experience: 25,
-    skills: 20,
     certification: 10,
     profile: 5,
     ai_screening: 15,
@@ -236,7 +235,13 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
         ...DEFAULT_SCORING_THRESHOLDS,
         ...(form.data.job_eligibility_criteria?.scoring_thresholds ?? {}),
     };
-    const totalWeight: number = Object.values(scoringWeights).reduce<number>(
+    const totalWeight: number = [
+        scoringWeights.education,
+        scoringWeights.experience,
+        scoringWeights.certification,
+        scoringWeights.profile,
+        scoringWeights.ai_screening,
+    ].reduce<number>(
         (sum, value) => sum + (typeof value === 'number' && Number.isFinite(value) ? value : 0),
         0,
     );
@@ -582,7 +587,7 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                     <Label className="text-indigo-900 font-semibold">Konfigurasi Explainable Scoring</Label>
                                 </div>
                                 <p className="text-xs text-indigo-700">
-                                    Atur bobot dan threshold rekomendasi per lowongan. Jika total bobot tidak 100, sistem akan menormalkan otomatis.
+                                    Atur bobot dan threshold rekomendasi per lowongan. Jika total bobot tidak 100, sistem akan menormalkan otomatis. Kecocokan skill tetap ditampilkan sebagai informasi, tetapi tidak dihitung ke skor total.
                                 </p>
 
                                 <div className="grid gap-4 md:grid-cols-2">
@@ -605,19 +610,6 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                             value={scoringWeights.experience ?? ''}
                                             onChange={(e) => updateScoringWeight('experience', e.target.value ? Number(e.target.value) : null)}
                                         />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm">Bobot Skill Match (%)</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={scoringWeights.skills ?? ''}
-                                            onChange={(e) => updateScoringWeight('skills', e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                        <p className="text-xs text-slate-500">
-                                            Bobot ini menentukan kontribusi skor skill ke nilai total. Nilai skill dihitung dari kecocokan requirement terhadap data `skills` pelamar dan teks CV.
-                                        </p>
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-sm">Bobot Sertifikasi (%)</Label>

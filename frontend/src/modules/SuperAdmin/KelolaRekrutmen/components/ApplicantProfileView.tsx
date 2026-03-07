@@ -102,6 +102,7 @@ export function ApplicantProfileView({
             ? 'border-amber-500 text-amber-700'
             : 'border-rose-500 text-rose-700';
   const aiScreeningStatus = (aiScreening?.status ?? '').trim().toLowerCase();
+  const visibleScoringBreakdown = scoring?.breakdown?.filter((item) => item.key !== 'skills') ?? [];
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -654,7 +655,7 @@ export function ApplicantProfileView({
                   </div>
 
                   <div className="space-y-3">
-                    {scoring.breakdown.map((item) => (
+                    {visibleScoringBreakdown.map((item) => (
                       <div key={item.key} className="rounded-xl border border-slate-200 p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>

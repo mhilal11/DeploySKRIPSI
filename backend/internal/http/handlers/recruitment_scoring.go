@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math"
-	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"hris-backend/internal/models"
-	"hris-backend/internal/services"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -22,7 +20,6 @@ const (
 
 	defaultWeightEducation    = 0.25
 	defaultWeightExperience   = 0.25
-	defaultWeightSkills       = 0.20
 	defaultWeightCerts        = 0.10
 	defaultWeightCompleteness = 0.05
 	defaultWeightAIScreening  = 0.15
@@ -84,7 +81,6 @@ type recruitmentScoringConfig struct {
 
 	WeightEducation    float64
 	WeightExperience   float64
-	WeightSkills       float64
 	WeightCerts        float64
 	WeightCompleteness float64
 	WeightAIScreening  float64
@@ -104,7 +100,6 @@ func buildRecruitmentScoreIndex(
 	profileByUser map[int64]*models.ApplicantProfile,
 ) map[int64]recruitmentScoreResult {
 	criteriaByVacancyKey, criteriaByPosition := loadVacancyScoringCriteria(db)
-	cvTextByApplicationID := loadApplicationCVTextIndex(apps)
 	applicationIDs := make([]int64, 0, len(apps))
 	for _, app := range apps {
 		applicationIDs = append(applicationIDs, app.ID)
@@ -122,24 +117,9 @@ func buildRecruitmentScoreIndex(
 			score := value
 			aiMatchScore = &score
 		}
-		skillSourceText := strings.TrimSpace(derefString(app.Skills))
-		if cvText, ok := cvTextByApplicationID[app.ID]; ok && strings.TrimSpace(cvText) != "" {
-			if skillSourceText == "" {
-				skillSourceText = cvText
-			} else {
-				skillSourceText = strings.TrimSpace(skillSourceText + "\n" + cvText)
-			}
-		}
-		appForScoring := app
-		if skillSourceText == "" {
-			appForScoring.Skills = nil
-		} else {
-			combinedSkillSource := skillSourceText
-			appForScoring.Skills = &combinedSkillSource
-		}
 
 		criteria := resolveVacancyScoringCriteria(app, criteriaByVacancyKey, criteriaByPosition)
-		score := evaluateRecruitmentScoreWithAI(appForScoring, profile, criteria, aiMatchScore)
+		score := evaluateRecruitmentScoreWithAI(app, profile, criteria, aiMatchScore)
 
 		submittedAt := time.Time{}
 		if app.SubmittedAt != nil {
@@ -155,58 +135,6 @@ func buildRecruitmentScoreIndex(
 	}
 
 	return assignRecruitmentRanks(scored)
-}
-
-func loadApplicationCVTextIndex(apps []models.Application) map[int64]string {
-	out := make(map[int64]string, len(apps))
-	for _, app := range apps {
-		if app.CvFile == nil || strings.TrimSpace(*app.CvFile) == "" {
-			continue
-		}
-		normalized := normalizeAttachmentPath(*app.CvFile)
-		if normalized == "" {
-			continue
-		}
-		absPath, ok := resolveCVPathForScoring(normalized)
-		if !ok {
-			continue
-		}
-		text, err := services.ExtractCVText(absPath)
-		if err != nil {
-			continue
-		}
-		trimmed := strings.TrimSpace(text)
-		if trimmed == "" {
-			continue
-		}
-		const maxSkillSourceChars = 30000
-		if len([]rune(trimmed)) > maxSkillSourceChars {
-			trimmed = string([]rune(trimmed)[:maxSkillSourceChars])
-		}
-		out[app.ID] = trimmed
-	}
-	return out
-}
-
-func resolveCVPathForScoring(relativePath string) (string, bool) {
-	candidates := []string{}
-	if storageEnv := strings.TrimSpace(os.Getenv("STORAGE_PATH")); storageEnv != "" {
-		candidates = append(candidates, storageEnv)
-	}
-	candidates = append(candidates, "./storage", "storage", "backend/storage", "")
-
-	seen := map[string]struct{}{}
-	for _, storagePath := range candidates {
-		key := strings.TrimSpace(storagePath)
-		if _, exists := seen[key]; exists {
-			continue
-		}
-		seen[key] = struct{}{}
-		if absPath, ok := resolveStorageFilePath(storagePath, relativePath); ok {
-			return absPath, true
-		}
-	}
-	return "", false
 }
 
 func assignRecruitmentRanks(scored []scoredRecruitmentCandidate) map[int64]recruitmentScoreResult {
@@ -356,7 +284,6 @@ func defaultRecruitmentScoringConfig() recruitmentScoringConfig {
 
 		WeightEducation:    defaultWeightEducation,
 		WeightExperience:   defaultWeightExperience,
-		WeightSkills:       defaultWeightSkills,
 		WeightCerts:        defaultWeightCerts,
 		WeightCompleteness: defaultWeightCompleteness,
 		WeightAIScreening:  defaultWeightAIScreening,
@@ -396,10 +323,6 @@ func scoringConfigFromEligibility(criteria map[string]any) recruitmentScoringCon
 			config.WeightExperience = value
 			changed = true
 		}
-		if value, ok := parseWeight("skills", "skill"); ok {
-			config.WeightSkills = value
-			changed = true
-		}
 		if value, ok := parseWeight("certification", "certifications", "cert"); ok {
 			config.WeightCerts = value
 			changed = true
@@ -414,11 +337,10 @@ func scoringConfigFromEligibility(criteria map[string]any) recruitmentScoringCon
 		}
 	}
 
-	totalWeight := config.WeightEducation + config.WeightExperience + config.WeightSkills + config.WeightCerts + config.WeightCompleteness + config.WeightAIScreening
+	totalWeight := config.WeightEducation + config.WeightExperience + config.WeightCerts + config.WeightCompleteness + config.WeightAIScreening
 	if totalWeight > 0 {
 		config.WeightEducation /= totalWeight
 		config.WeightExperience /= totalWeight
-		config.WeightSkills /= totalWeight
 		config.WeightCerts /= totalWeight
 		config.WeightCompleteness /= totalWeight
 		config.WeightAIScreening /= totalWeight
@@ -524,13 +446,11 @@ func evaluateRecruitmentScoreWithAI(
 		requiredProgramStudies,
 	)
 	experienceScore, experienceDetail, experiencePass := scoreExperienceCriterion(experienceYears, requiredExperienceYears)
-	skillScore, skillDetail, matchedRequirements, missingRequirements := scoreSkillCriterion(criteria.Requirements, derefString(app.Skills))
 	certificationScore, certificationDetail := scoreCertificationCriterion(certificationCount)
 	completenessScore, completenessDetail := scoreCompletenessCriterion(profileCompleteness)
 
 	weightEducation := scoringConfig.WeightEducation
 	weightExperience := scoringConfig.WeightExperience
-	weightSkills := scoringConfig.WeightSkills
 	weightCertifications := scoringConfig.WeightCerts
 	weightProfile := scoringConfig.WeightCompleteness
 	weightAI := scoringConfig.WeightAIScreening
@@ -538,13 +458,24 @@ func evaluateRecruitmentScoreWithAI(
 	if !hasAIScore {
 		weightAI = 0
 	}
-	totalWeight := weightEducation + weightExperience + weightSkills + weightCertifications + weightProfile + weightAI
+	totalWeight := weightEducation + weightExperience + weightCertifications + weightProfile + weightAI
 	if totalWeight <= 0 {
-		totalWeight = 1
+		weightEducation = defaultWeightEducation
+		weightExperience = defaultWeightExperience
+		weightCertifications = defaultWeightCerts
+		weightProfile = defaultWeightCompleteness
+		if hasAIScore {
+			weightAI = defaultWeightAIScreening
+		} else {
+			weightAI = 0
+		}
+		totalWeight = weightEducation + weightExperience + weightCertifications + weightProfile + weightAI
+		if totalWeight <= 0 {
+			totalWeight = 1
+		}
 	}
 	weightEducation /= totalWeight
 	weightExperience /= totalWeight
-	weightSkills /= totalWeight
 	weightCertifications /= totalWeight
 	weightProfile /= totalWeight
 	weightAI /= totalWeight
@@ -552,7 +483,6 @@ func evaluateRecruitmentScoreWithAI(
 	breakdown := []recruitmentScoreBreakdown{
 		componentScore("education", "Pendidikan", weightEducation, educationScore, educationDetail),
 		componentScore("experience", "Pengalaman", weightExperience, experienceScore, experienceDetail),
-		componentScore("skills", "Kecocokan Skill", weightSkills, skillScore, skillDetail),
 		componentScore("certification", "Sertifikasi", weightCertifications, certificationScore, certificationDetail),
 		componentScore("profile", "Kelengkapan Profil", weightProfile, completenessScore, completenessDetail),
 	}
@@ -593,15 +523,6 @@ func evaluateRecruitmentScoreWithAI(
 		}
 	} else if experienceYears > 0 {
 		highlights = append(highlights, fmt.Sprintf("Total pengalaman kerja terhitung %.1f tahun.", experienceYears))
-	}
-
-	if len(criteria.Requirements) > 0 {
-		if len(matchedRequirements) > 0 {
-			highlights = append(highlights, fmt.Sprintf("%d dari %d requirement skill cocok.", len(matchedRequirements), len(criteria.Requirements)))
-		}
-		if len(missingRequirements) > 0 {
-			risks = append(risks, fmt.Sprintf("Masih ada %d requirement skill yang belum terlihat pada profil/CV.", len(missingRequirements)))
-		}
 	}
 
 	if certificationCount > 0 {
