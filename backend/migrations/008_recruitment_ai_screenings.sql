@@ -1,0 +1,33 @@
+CREATE TABLE IF NOT EXISTS recruitment_ai_screenings (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  application_id BIGINT UNSIGNED NOT NULL,
+  actor_user_id BIGINT UNSIGNED NULL,
+  provider VARCHAR(32) NOT NULL DEFAULT 'groq',
+  model_used VARCHAR(128) NULL,
+  model_chain JSON NULL,
+  prompt_version VARCHAR(64) NOT NULL DEFAULT 'cv-screening-v1',
+  cv_file_path VARCHAR(255) NULL,
+  cv_text_chars INT NOT NULL DEFAULT 0,
+  match_score DECIMAL(5,2) NULL,
+  recommendation VARCHAR(64) NULL,
+  summary TEXT NULL,
+  strengths_json JSON NULL,
+  gaps_json JSON NULL,
+  red_flags_json JSON NULL,
+  interview_questions_json JSON NULL,
+  token_prompt INT NOT NULL DEFAULT 0,
+  token_completion INT NOT NULL DEFAULT 0,
+  token_total INT NOT NULL DEFAULT 0,
+  attempts_json JSON NULL,
+  raw_response JSON NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'success',
+  error_message TEXT NULL,
+  created_at TIMESTAMP NULL,
+  updated_at TIMESTAMP NULL,
+  INDEX idx_recruitment_ai_screenings_application (application_id),
+  INDEX idx_recruitment_ai_screenings_created_at (created_at),
+  CONSTRAINT fk_recruitment_ai_screenings_application
+    FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
+  CONSTRAINT fk_recruitment_ai_screenings_actor
+    FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

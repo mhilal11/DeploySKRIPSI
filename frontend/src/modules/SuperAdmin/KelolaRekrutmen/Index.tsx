@@ -243,6 +243,8 @@ export default function KelolaRekrutmenIndex({
 
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [updatingApplicantId, setUpdatingApplicantId] = useState<number | null>(null);
+    const [isRunningAIScreening, setIsRunningAIScreening] = useState(false);
+    const [screeningApplicantId, setScreeningApplicantId] = useState<number | null>(null);
     const [autoShortlistTopN, setAutoShortlistTopN] = useState('3');
     const [autoShortlistMinScore, setAutoShortlistMinScore] = useState('70');
     const [autoShortlistEligibleOnly, setAutoShortlistEligibleOnly] = useState(true);
@@ -627,6 +629,57 @@ export default function KelolaRekrutmenIndex({
 
         setProfileOpen(false);
         setInterviewDetailOpen(true);
+    };
+
+    const handleRunAIScreening = async (applicantId: number) => {
+        if (isRunningAIScreening) return;
+
+        const targetApplicant = applicationRows.find((item) => item.id === applicantId);
+        if (!targetApplicant) {
+            toast.error('Pelamar tidak ditemukan.');
+            return;
+        }
+
+        setIsRunningAIScreening(true);
+        setScreeningApplicantId(applicantId);
+        try {
+            const response = await api.post(apiUrl(`/super-admin/recruitment/${applicantId}/ai-screening/run`));
+            const aiScreening = (response.data?.ai_screening ?? null) as ApplicantRecord['ai_screening'];
+
+            setApplicationRows((prev) =>
+                prev.map((application) =>
+                    application.id === applicantId
+                        ? { ...application, ai_screening: aiScreening }
+                        : application,
+                ),
+            );
+            setSelectedApplicant((prev) =>
+                prev && prev.id === applicantId
+                    ? { ...prev, ai_screening: aiScreening }
+                    : prev,
+            );
+
+            const recommendation = aiScreening?.recommendation ?? '-';
+            const scoreLabel =
+                typeof aiScreening?.match_score === 'number'
+                    ? `${aiScreening.match_score.toFixed(1)}`
+                    : '-';
+            toast.success('AI screening CV berhasil.', {
+                description: `${targetApplicant.name} | Match ${scoreLabel} | ${recommendation}`,
+            });
+        } catch (error) {
+            if (isAxiosError(error)) {
+                const message =
+                    (error.response?.data as any)?.message ||
+                    'Gagal menjalankan AI screening CV.';
+                toast.error(message);
+            } else {
+                toast.error('Gagal menjalankan AI screening CV.');
+            }
+        } finally {
+            setIsRunningAIScreening(false);
+            setScreeningApplicantId(null);
+        }
     };
 
     const handleOnboardingChecklistSaved = (
@@ -1150,6 +1203,8 @@ export default function KelolaRekrutmenIndex({
                     open={profileOpen}
                     onOpenChange={setProfileOpen}
                     applicant={selectedApplicant}
+                    onRunAIScreening={handleRunAIScreening}
+                    isRunningAIScreening={isRunningAIScreening && screeningApplicantId === selectedApplicant?.id}
                     onAccept={handleAcceptFromProfile}
                     onReject={handleRejectFromProfile}
                     onScheduleInterview={handleScheduleFromProfile}
@@ -1171,7 +1226,4 @@ export default function KelolaRekrutmenIndex({
         </>
     );
 }
-
-
-
 

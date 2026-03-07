@@ -13,6 +13,8 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 	rg.GET("/super-admin/recruitment/analytics", SuperAdminRecruitmentAnalyticsIndex)
 	rg.POST("/super-admin/recruitment/sla-settings", SuperAdminRecruitmentUpdateSLASettings)
 	rg.GET("/super-admin/recruitment/:id/cv", SuperAdminRecruitmentViewCV)
+	rg.GET("/super-admin/recruitment/:id/ai-screening", SuperAdminRecruitmentGetAIScreening)
+	rg.POST("/super-admin/recruitment/:id/ai-screening/run", SuperAdminRecruitmentRunAIScreening)
 	rg.PUT("/super-admin/recruitment/:id/update-status", SuperAdminRecruitmentUpdateStatus)
 	rg.POST("/super-admin/recruitment/:id/reject", SuperAdminRecruitmentReject)
 	rg.POST("/super-admin/recruitment/:id/schedule-interview", SuperAdminRecruitmentScheduleInterview)

@@ -59,6 +59,11 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 	interviews := make([]map[string]any, 0)
 	onboarding := make([]map[string]any, 0)
 	scoreByApplicationID := buildRecruitmentScoreIndex(db, apps, profileByUser)
+	applicationIDs := make([]int64, 0, len(apps))
+	for _, app := range apps {
+		applicationIDs = append(applicationIDs, app.ID)
+	}
+	aiScreeningByApplicationID := loadLatestRecruitmentAIScreeningsIndex(db, applicationIDs)
 	scoringAudits := loadRecruitmentScoringAudits(db, 25)
 
 	for _, app := range apps {
@@ -213,7 +218,8 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 				}
 				return nil
 			}(),
-			"sla": slaIndicator,
+			"ai_screening": aiScreeningByApplicationID[app.ID],
+			"sla":          slaIndicator,
 		})
 
 		if hasInterview {

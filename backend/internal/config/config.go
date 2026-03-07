@@ -13,6 +13,12 @@ type Config struct {
 	BaseURL                 string
 	FrontendURL             string
 	EducationReferencePath  string
+	GroqAPIKey              string
+	GroqBaseURL             string
+	GroqModel               string
+	GroqFallbackModel       string
+	GroqModelChain          []string
+	GroqRequestTimeoutSec   int
 	DBHost                  string
 	DBPort                  int
 	DBUser                  string
@@ -40,6 +46,12 @@ func Load() Config {
 	if primaryFrontendURL == "" {
 		primaryFrontendURL = baseURL
 	}
+	groqModel := strings.TrimSpace(getenv("GROQ_MODEL", ""))
+	groqFallbackModel := strings.TrimSpace(getenv("GROQ_FALLBACK_MODEL", ""))
+	groqModelChain := parseCSVUnique(getenv("GROQ_MODEL_CHAIN", ""))
+	if len(groqModelChain) == 0 {
+		groqModelChain = parseCSVUnique(strings.Join([]string{groqModel, groqFallbackModel}, ","))
+	}
 	storagePath := resolveStoragePath(getenv("STORAGE_PATH", "./storage"))
 	return Config{
 		Env:                     getenv("APP_ENV", "development"),
@@ -47,6 +59,12 @@ func Load() Config {
 		BaseURL:                 baseURL,
 		FrontendURL:             frontendURL,
 		EducationReferencePath:  getenv("EDUCATION_REFERENCE_PATH", "./data/education_reference_id.json"),
+		GroqAPIKey:              strings.TrimSpace(getenv("GROQ_API_KEY", "")),
+		GroqBaseURL:             strings.TrimSpace(getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")),
+		GroqModel:               groqModel,
+		GroqFallbackModel:       groqFallbackModel,
+		GroqModelChain:          groqModelChain,
+		GroqRequestTimeoutSec:   getenvInt("GROQ_TIMEOUT_SECONDS", 60),
 		DBHost:                  getenv("DB_HOST", "127.0.0.1"),
 		DBPort:                  getenvInt("DB_PORT", 3306),
 		DBUser:                  getenv("DB_USER", "root"),
@@ -135,4 +153,22 @@ func firstCSVValue(value string) string {
 		}
 	}
 	return ""
+}
+
+func parseCSVUnique(value string) []string {
+	parts := strings.Split(value, ",")
+	seen := make(map[string]struct{}, len(parts))
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		if _, exists := seen[trimmed]; exists {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
 }

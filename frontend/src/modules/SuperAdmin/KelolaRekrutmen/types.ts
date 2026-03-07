@@ -55,6 +55,7 @@ export interface ApplicantRecord {
     profile_photo_url?: string | null;
     rejection_reason?: string | null;
     recruitment_score?: RecruitmentScore | null;
+    ai_screening?: RecruitmentAIScreening | null;
     sla?: RecruitmentSLAIndicator | null;
 }
 
@@ -117,6 +118,36 @@ export interface RecruitmentScore {
     breakdown: RecruitmentScoreBreakdown[];
     highlights: string[];
     risks: string[];
+}
+
+export interface RecruitmentAIScreeningTokens {
+    prompt?: number;
+    completion?: number;
+    total?: number;
+}
+
+export interface RecruitmentAIScreening {
+    id: number;
+    application_id: number;
+    provider: string;
+    model_used?: string | null;
+    model_chain?: string[];
+    prompt_version?: string | null;
+    cv_file_path?: string | null;
+    cv_text_chars?: number;
+    match_score?: number | null;
+    recommendation?: string | null;
+    summary?: string | null;
+    strengths: string[];
+    gaps: string[];
+    red_flags: string[];
+    interview_questions: string[];
+    tokens?: RecruitmentAIScreeningTokens;
+    attempts?: Array<Record<string, unknown>>;
+    status?: string;
+    error_message?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
 }
 
 export interface RecruitmentScoringAudit {
@@ -297,5 +328,4 @@ export type StatusSummary = Partial<Record<ApplicantStatus, number>>;
 
 export const formatApplicationId = (id: number) =>
     `APL${String(id).padStart(3, '0')}`;
-
 

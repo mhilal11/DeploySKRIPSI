@@ -13,6 +13,7 @@ require (
 	github.com/jung-kurt/gofpdf v1.16.2
 	golang.org/x/crypto v0.47.0
 	golang.org/x/oauth2 v0.35.0
+	rsc.io/pdf v0.1.1
 )
 
 require (

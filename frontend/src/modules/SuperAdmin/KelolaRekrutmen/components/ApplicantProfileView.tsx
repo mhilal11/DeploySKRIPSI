@@ -10,6 +10,7 @@
   Download,
   CheckCircle,
   Clock,
+  Bot,
   Sparkles,
   ShieldAlert,
 } from 'lucide-react';
@@ -27,6 +28,8 @@ import RejectionModal from './RejectionModal';
 
 interface ApplicantProfileViewProps {
   applicant: ApplicantRecord;
+  onRunAIScreening?: (applicantId: number) => void;
+  isRunningAIScreening?: boolean;
   onAccept?: () => void;
   onReject?: (reason: string) => void;
   onScheduleInterview?: () => void;
@@ -36,6 +39,8 @@ interface ApplicantProfileViewProps {
 
 export function ApplicantProfileView({
   applicant,
+  onRunAIScreening,
+  isRunningAIScreening = false,
   onAccept,
   onReject,
   onScheduleInterview,
@@ -60,6 +65,7 @@ export function ApplicantProfileView({
   const isHired = applicant.status === 'Hired';
   const isRejected = applicant.status === 'Rejected';
   const scoring = applicant.recruitment_score;
+  const aiScreening = applicant.ai_screening;
   const cvUrl =
     applicant.cv_file || applicant.cv_url
       ? resolveAssetUrl(apiUrl(`/super-admin/recruitment/${applicant.id}/cv`))
@@ -85,6 +91,21 @@ export function ApplicantProfileView({
     applicant.status === 'Interview' ||
     Boolean(applicant.interview_date || applicant.interview_time || applicant.interview_mode);
   const scheduleButtonLabel = hasInterviewSchedule ? 'Edit Jadwal' : 'Jadwalkan Interview';
+  const aiScore =
+    aiScreening && typeof aiScreening.match_score === 'number'
+      ? aiScreening.match_score
+      : null;
+  const aiScoreBadgeClassName =
+    aiScore === null
+      ? 'border-slate-300 text-slate-600'
+      : aiScore >= 85
+        ? 'border-emerald-500 text-emerald-700'
+        : aiScore >= 70
+          ? 'border-blue-500 text-blue-700'
+          : aiScore >= 55
+            ? 'border-amber-500 text-amber-700'
+            : 'border-rose-500 text-rose-700';
+  const aiScreeningStatus = (aiScreening?.status ?? '').trim().toLowerCase();
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -215,6 +236,18 @@ export function ApplicantProfileView({
             Lihat CV
           </Button>
         )}
+        {onRunAIScreening && (
+          <Button
+            variant="outline"
+            className="border-indigo-600 text-indigo-700 hover:bg-indigo-50 shadow-sm hover:shadow-md transition-all"
+            onClick={() => onRunAIScreening(applicant.id)}
+            disabled={isRunningAIScreening || !cvUrl}
+            title={!cvUrl ? 'CV belum tersedia untuk dilakukan screening' : 'Jalankan screening CV berbasis AI'}
+          >
+            <Bot className="w-4 h-4 mr-2" />
+            {isRunningAIScreening ? 'Memproses Screening AI...' : 'Screening AI CV'}
+          </Button>
+        )}
         {onScheduleInterview && !isHired && !isRejected && (
           <Button
             onClick={onScheduleInterview}
@@ -260,7 +293,7 @@ export function ApplicantProfileView({
 
       {/* Modern Tabbed Content */}
       <Tabs defaultValue="personal" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 h-auto bg-gray-100 p-1 rounded-xl">
+        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 h-auto bg-gray-100 p-1 rounded-xl">
           <TabsTrigger value="personal" className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-lg py-3 px-2 sm:px-4">
             <User className="w-4 h-4 mr-0 sm:mr-2" />
             <span className="hidden sm:inline">Data Pribadi</span>
@@ -285,6 +318,11 @@ export function ApplicantProfileView({
             <Sparkles className="w-4 h-4 mr-0 sm:mr-2" />
             <span className="hidden sm:inline">Skoring</span>
             <span className="sm:hidden">Skor</span>
+          </TabsTrigger>
+          <TabsTrigger value="ai-screening" className="data-[state=active]:bg-white data-[state=active]:shadow-md rounded-lg py-3 px-2 sm:px-4">
+            <Bot className="w-4 h-4 mr-0 sm:mr-2" />
+            <span className="hidden sm:inline">AI Screening</span>
+            <span className="sm:hidden">AI</span>
           </TabsTrigger>
         </TabsList>
 
@@ -692,6 +730,136 @@ export function ApplicantProfileView({
                         </div>
                       )}
                     </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ai-screening">
+          <Card className="border-0 shadow-md">
+            <div className="p-6 space-y-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-blue-900">AI CV Screening (Groq)</h3>
+                  <p className="text-sm text-slate-600">
+                    Ringkasan kecocokan CV kandidat terhadap kriteria lowongan.
+                  </p>
+                </div>
+                {aiScore !== null && (
+                  <Badge variant="outline" className={`${aiScoreBadgeClassName} px-3 py-1`}>
+                    Match {aiScore.toFixed(1)}
+                  </Badge>
+                )}
+              </div>
+
+              {!aiScreening ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  Belum ada hasil AI screening. Gunakan tombol <span className="font-semibold">Screening AI CV</span> untuk mulai analisis.
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Rekomendasi</p>
+                      <p className="text-sm font-medium text-slate-900 mt-1">
+                        {aiScreening.recommendation ?? '-'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Model</p>
+                      <p className="text-sm font-medium text-slate-900 mt-1">
+                        {aiScreening.model_used ?? '-'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Status</p>
+                      <p
+                        className={`text-sm font-medium mt-1 ${
+                          aiScreeningStatus === 'success'
+                            ? 'text-emerald-700'
+                            : 'text-rose-700'
+                        }`}
+                      >
+                        {aiScreening.status ?? '-'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {aiScreening.summary && (
+                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                      <p className="text-xs uppercase tracking-wide text-slate-500 mb-1">Ringkasan</p>
+                      <p className="text-sm text-slate-700 leading-relaxed">{aiScreening.summary}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                      <p className="text-sm font-semibold text-emerald-900 mb-2">Kekuatan CV</p>
+                      {aiScreening.strengths?.length ? (
+                        <div className="space-y-1">
+                          {aiScreening.strengths.map((item, index) => (
+                            <p key={`ai-strength-${index}`} className="text-xs text-emerald-900">{item}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-emerald-800">Belum ada poin kekuatan.</p>
+                      )}
+                    </div>
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-sm font-semibold text-amber-900 mb-2">Gap Kandidat</p>
+                      {aiScreening.gaps?.length ? (
+                        <div className="space-y-1">
+                          {aiScreening.gaps.map((item, index) => (
+                            <p key={`ai-gap-${index}`} className="text-xs text-amber-900">{item}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-amber-800">Tidak ada gap utama terdeteksi.</p>
+                      )}
+                    </div>
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                      <p className="text-sm font-semibold text-rose-900 mb-2">Red Flags</p>
+                      {aiScreening.red_flags?.length ? (
+                        <div className="space-y-1">
+                          {aiScreening.red_flags.map((item, index) => (
+                            <p key={`ai-flag-${index}`} className="text-xs text-rose-900">{item}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-rose-800">Tidak ada red flag signifikan.</p>
+                      )}
+                    </div>
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                      <p className="text-sm font-semibold text-indigo-900 mb-2">Saran Pertanyaan Interview</p>
+                      {aiScreening.interview_questions?.length ? (
+                        <div className="space-y-1">
+                          {aiScreening.interview_questions.map((item, index) => (
+                            <p key={`ai-question-${index}`} className="text-xs text-indigo-900">{item}</p>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-indigo-800">Belum ada saran pertanyaan.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-slate-600">
+                      <p>
+                        Token Prompt: <span className="font-semibold text-slate-700">{aiScreening.tokens?.prompt ?? 0}</span>
+                      </p>
+                      <p>
+                        Token Completion: <span className="font-semibold text-slate-700">{aiScreening.tokens?.completion ?? 0}</span>
+                      </p>
+                      <p>
+                        Token Total: <span className="font-semibold text-slate-700">{aiScreening.tokens?.total ?? 0}</span>
+                      </p>
+                    </div>
+                    {aiScreening.error_message && (
+                      <p className="mt-2 text-xs text-rose-700">{aiScreening.error_message}</p>
+                    )}
                   </div>
                 </>
               )}
