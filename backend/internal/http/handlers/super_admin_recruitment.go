@@ -569,7 +569,10 @@ func SuperAdminRecruitmentUpdateStatus(c *gin.Context) {
 		},
 	})
 
-	c.JSON(http.StatusOK, gin.H{"status": "Status pelamar berhasil diperbarui."})
+	c.JSON(http.StatusOK, gin.H{
+		"status":               "Status pelamar berhasil diperbarui.",
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
+	})
 }
 
 func SuperAdminRecruitmentReject(c *gin.Context) {
@@ -621,7 +624,10 @@ func SuperAdminRecruitmentReject(c *gin.Context) {
 		},
 	})
 
-	c.JSON(http.StatusOK, gin.H{"status": "Pelamar berhasil ditolak."})
+	c.JSON(http.StatusOK, gin.H{
+		"status":               "Pelamar berhasil ditolak.",
+		"sidebarNotifications": computeSuperAdminSidebarNotifications(db, user.ID),
+	})
 }
 
 func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {

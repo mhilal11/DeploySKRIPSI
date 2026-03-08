@@ -23,7 +23,7 @@ import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Input } from '@/shared/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
-import { Head, router } from '@/shared/lib/inertia';
+import { Head, router, usePageManager } from '@/shared/lib/inertia';
 
 import ApplicantProfileDialog from './components/ApplicantProfileDialog';
 import ApplicantsTab from './components/ApplicantsTab';
@@ -224,6 +224,7 @@ export default function KelolaRekrutmenIndex({
     slaOverview = defaultSLAOverview,
     slaReminders = [],
 }: RecruitmentPageProps) {
+    const { setSidebarNotifications } = usePageManager();
     const [applicationRows, setApplicationRows] = useState(applications);
     const [interviewRows, setInterviewRows] = useState(interviews);
     const [onboardingRows, setOnboardingRows] = useState(onboarding);
@@ -488,7 +489,10 @@ export default function KelolaRekrutmenIndex({
             },
             {
                 preserveScroll: true,
-                onSuccess: () => {
+                onSuccess: (data) => {
+                    if (data?.sidebarNotifications && typeof data.sidebarNotifications === 'object') {
+                        setSidebarNotifications(data.sidebarNotifications as Record<string, number>);
+                    }
                     const successTitle =
                         newStatus === 'Rejected'
                             ? 'Pelamar berhasil ditolak.'
