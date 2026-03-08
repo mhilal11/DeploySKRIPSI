@@ -6,7 +6,14 @@ import (
 	"time"
 
 	"hris-backend/internal/config"
-	"hris-backend/internal/http/handlers"
+	adminhandlers "hris-backend/internal/http/handlers/admin"
+	authhandlers "hris-backend/internal/http/handlers/auth"
+	dashboardhandlers "hris-backend/internal/http/handlers/dashboard"
+	pelamarhandlers "hris-backend/internal/http/handlers/pelamar"
+	profilehandlers "hris-backend/internal/http/handlers/profile"
+	publichandlers "hris-backend/internal/http/handlers/public"
+	staffhandlers "hris-backend/internal/http/handlers/staff"
+	superadminhandlers "hris-backend/internal/http/handlers/superadmin"
 	"hris-backend/internal/http/middleware"
 
 	"github.com/gin-contrib/cors"
@@ -51,26 +58,26 @@ func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	r.Use(middleware.EnsureCSRFToken())
 
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
-	r.GET("/verify-email", handlers.VerifyEmail)
-	r.GET("/verify-email/:id/:hash", handlers.VerifyEmail)
+	r.GET("/verify-email", authhandlers.VerifyEmail)
+	r.GET("/verify-email/:id/:hash", authhandlers.VerifyEmail)
 
 	api := r.Group("/api")
 	{
-		api.GET("/csrf", handlers.GetCSRF)
-		handlers.RegisterAuthRoutes(api)
-		handlers.RegisterPublicRoutes(api)
+		api.GET("/csrf", authhandlers.GetCSRF)
+		authhandlers.RegisterAuthRoutes(api)
+		publichandlers.RegisterPublicRoutes(api)
 
 		authGroup := api.Group("")
 		authGroup.Use(middleware.RequireAuth())
 		{
-			authGroup.POST("/password", handlers.UpdatePassword)
-			authGroup.PUT("/password", handlers.UpdatePassword)
-			handlers.RegisterProfileRoutes(authGroup)
-			handlers.RegisterDashboardRoutes(authGroup)
-			handlers.RegisterStaffRoutes(authGroup)
-			handlers.RegisterPelamarRoutes(authGroup)
-			handlers.RegisterAdminStaffRoutes(authGroup)
-			handlers.RegisterSuperAdminRoutes(authGroup)
+			authGroup.POST("/password", profilehandlers.UpdatePassword)
+			authGroup.PUT("/password", profilehandlers.UpdatePassword)
+			profilehandlers.RegisterProfileRoutes(authGroup)
+			dashboardhandlers.RegisterDashboardRoutes(authGroup)
+			staffhandlers.RegisterStaffRoutes(authGroup)
+			pelamarhandlers.RegisterPelamarRoutes(authGroup)
+			adminhandlers.RegisterAdminStaffRoutes(authGroup)
+			superadminhandlers.RegisterSuperAdminRoutes(authGroup)
 		}
 	}
 

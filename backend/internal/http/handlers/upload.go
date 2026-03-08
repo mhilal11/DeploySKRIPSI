@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func saveUploadedFile(c *gin.Context, field string, subdir string) (string, *UploadMeta, error) {
+func SaveUploadedFile(c *gin.Context, field string, subdir string) (string, *UploadMeta, error) {
 	file, err := c.FormFile(field)
 	if err != nil {
 		return "", nil, err

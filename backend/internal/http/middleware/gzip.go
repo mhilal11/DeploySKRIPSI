@@ -69,4 +69,3 @@ func Gzip() gin.HandlerFunc {
 		c.Next()
 	}
 }
-

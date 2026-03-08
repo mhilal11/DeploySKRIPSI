@@ -5,35 +5,35 @@ import (
 	"time"
 )
 
-func formatDate(t *time.Time) string {
+func FormatDate(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return "-"
 	}
 	return t.Format("02 Jan 2006")
 }
 
-func formatDateISO(t *time.Time) string {
+func FormatDateISO(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
 	return t.Format("2006-01-02")
 }
 
-func formatDateTime(t *time.Time) string {
+func FormatDateTime(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return "-"
 	}
 	return t.Format("02 Jan 2006 15:04")
 }
 
-func formatTimeHM(t *time.Time) string {
+func FormatTimeHM(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return "-"
 	}
 	return t.Format("15:04")
 }
 
-func diffForHumans(t *time.Time) string {
+func DiffForHumans(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return "-"
 	}
@@ -106,7 +106,7 @@ func itoa(value int) string {
 
 // computeSuperAdminSidebarNotifications calculates badge counts for SuperAdmin sidebar.
 // Pass userID to get personalized unread audit-log count.
-func computeSuperAdminSidebarNotifications(db any, userID ...int64) map[string]int {
+func ComputeSuperAdminSidebarNotifications(db any, userID ...int64) map[string]int {
 	type Querier interface {
 		Get(dest interface{}, query string, args ...interface{}) error
 	}

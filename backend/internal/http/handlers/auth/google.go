@@ -1,0 +1,379 @@
+package auth
+
+import (
+	"encoding/json"
+	"errors"
+	"html/template"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
+	"hris-backend/internal/config"
+	"hris-backend/internal/http/middleware"
+	"hris-backend/internal/models"
+	"hris-backend/internal/services"
+	"hris-backend/internal/utils"
+
+	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/oauth2"
+)
+
+const (
+	googleOAuthStateKey    = "google_oauth_state"
+	googleOAuthNonceKey    = "google_oauth_nonce"
+	googleOAuthIssuedAtKey = "google_oauth_issued_at"
+)
+
+type googleTokenClaims struct {
+	Sub           string `json:"sub"`
+	Email         string `json:"email"`
+	EmailVerified bool   `json:"email_verified"`
+	Name          string `json:"name"`
+	Nonce         string `json:"nonce"`
+}
+
+func GoogleRegister(c *gin.Context) {
+	cfg := middleware.GetConfig(c)
+	oauthCfg, err := googleOAuthConfig(cfg)
+	if err != nil {
+		redirectGoogleRegisterError(c, cfg, "Konfigurasi pendaftaran Google belum lengkap.")
+		return
+	}
+
+	state, err := utils.RandomToken(32)
+	if err != nil || state == "" {
+		redirectGoogleRegisterError(c, cfg, "Gagal menyiapkan proses pendaftaran Google.")
+		return
+	}
+	nonce, err := utils.RandomToken(32)
+	if err != nil || nonce == "" {
+		redirectGoogleRegisterError(c, cfg, "Gagal menyiapkan proses pendaftaran Google.")
+		return
+	}
+
+	session := sessions.Default(c)
+	session.Set(googleOAuthStateKey, state)
+	session.Set(googleOAuthNonceKey, nonce)
+	session.Set(googleOAuthIssuedAtKey, time.Now().Unix())
+	if err := session.Save(); err != nil {
+		redirectGoogleRegisterError(c, cfg, "Gagal menyiapkan sesi pendaftaran Google.")
+		return
+	}
+
+	authURL := oauthCfg.AuthCodeURL(
+		state,
+		oauth2.AccessTypeOnline,
+		oauth2.SetAuthURLParam("prompt", "select_account"),
+		oauth2.SetAuthURLParam("nonce", nonce),
+	)
+	redirectBrowser(c, authURL)
+}
+
+func GoogleRegisterCallback(c *gin.Context) {
+	cfg := middleware.GetConfig(c)
+	oauthCfg, err := googleOAuthConfig(cfg)
+	if err != nil {
+		redirectGoogleRegisterError(c, cfg, "Konfigurasi pendaftaran Google belum lengkap.")
+		return
+	}
+
+	session := sessions.Default(c)
+	expectedState := sessionString(session.Get(googleOAuthStateKey))
+	expectedNonce := sessionString(session.Get(googleOAuthNonceKey))
+	issuedAt := sessionInt64(session.Get(googleOAuthIssuedAtKey))
+
+	clearGoogleOAuthSession(session)
+	_ = session.Save()
+
+	queryState := strings.TrimSpace(c.Query("state"))
+	code := strings.TrimSpace(c.Query("code"))
+	if expectedState == "" || queryState == "" || queryState != expectedState {
+		redirectGoogleRegisterError(c, cfg, "State OAuth tidak valid. Silakan coba lagi.")
+		return
+	}
+	if code == "" {
+		redirectGoogleRegisterError(c, cfg, "Kode otorisasi Google tidak ditemukan.")
+		return
+	}
+	if issuedAt > 0 && time.Since(time.Unix(issuedAt, 0)) > 10*time.Minute {
+		redirectGoogleRegisterError(c, cfg, "Sesi pendaftaran Google sudah kedaluwarsa. Coba lagi.")
+		return
+	}
+
+	token, err := oauthCfg.Exchange(c.Request.Context(), code)
+	if err != nil {
+		redirectGoogleRegisterError(c, cfg, "Gagal menukar kode otorisasi Google.")
+		return
+	}
+
+	rawIDToken, _ := token.Extra("id_token").(string)
+	if rawIDToken == "" {
+		redirectGoogleRegisterError(c, cfg, "Google tidak mengirim ID token yang valid.")
+		return
+	}
+
+	provider, err := oidc.NewProvider(c.Request.Context(), "https://accounts.google.com")
+	if err != nil {
+		redirectGoogleRegisterError(c, cfg, "Gagal memvalidasi identitas Google.")
+		return
+	}
+
+	idToken, err := provider.Verifier(&oidc.Config{ClientID: cfg.GoogleOAuthClientID}).Verify(c.Request.Context(), rawIDToken)
+	if err != nil {
+		redirectGoogleRegisterError(c, cfg, "ID token Google tidak valid.")
+		return
+	}
+
+	var claims googleTokenClaims
+	if err := idToken.Claims(&claims); err != nil {
+		redirectGoogleRegisterError(c, cfg, "Data akun Google tidak dapat diproses.")
+		return
+	}
+
+	if expectedNonce != "" && claims.Nonce != expectedNonce {
+		redirectGoogleRegisterError(c, cfg, "Nonce OAuth tidak valid. Silakan coba lagi.")
+		return
+	}
+
+	claims.Email = strings.ToLower(strings.TrimSpace(claims.Email))
+	if claims.Email == "" {
+		redirectGoogleRegisterError(c, cfg, "Email Google tidak tersedia.")
+		return
+	}
+	if !claims.EmailVerified {
+		redirectGoogleRegisterError(c, cfg, "Email Google belum terverifikasi.")
+		return
+	}
+
+	db := middleware.GetDB(c)
+	if db == nil {
+		redirectGoogleRegisterError(c, cfg, "Koneksi database tidak tersedia.")
+		return
+	}
+
+	var existing int
+	if err := db.Get(&existing, "SELECT COUNT(*) FROM users WHERE email = ?", claims.Email); err != nil {
+		redirectGoogleRegisterError(c, cfg, "Gagal memeriksa akun pengguna.")
+		return
+	}
+	if existing > 0 {
+		redirectGoogleRegisterErrorWithCode(c, cfg, "Email sudah terdaftar. Silakan login.", "email_exists")
+		return
+	}
+
+	user, err := createGoogleRegisteredUser(c, claims)
+	if err != nil {
+		redirectGoogleRegisterError(c, cfg, err.Error())
+		return
+	}
+
+	if err := sendGooglePasswordSetupEmail(c, user.Email); err != nil {
+		redirectGoogleRegisterError(c, cfg, "Akun berhasil dibuat, tetapi email pengaturan kata sandi gagal dikirim.")
+		return
+	}
+
+	redirectGoogleRegisterSuccess(c, cfg, "Akun berhasil dibuat dengan Google. Silakan cek email Anda untuk mengatur kata sandi, lalu login.")
+}
+
+func googleOAuthConfig(cfg config.Config) (*oauth2.Config, error) {
+	clientID := strings.TrimSpace(cfg.GoogleOAuthClientID)
+	clientSecret := strings.TrimSpace(cfg.GoogleOAuthClientSecret)
+	redirectURL := strings.TrimSpace(cfg.GoogleOAuthRedirectURL)
+	if clientID == "" || clientSecret == "" || redirectURL == "" {
+		return nil, errors.New("google oauth config is incomplete")
+	}
+	return &oauth2.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		RedirectURL:  redirectURL,
+		Scopes:       []string{oidc.ScopeOpenID, "profile", "email"},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  "https://accounts.google.com/o/oauth2/v2/auth",
+			TokenURL: "https://oauth2.googleapis.com/token",
+		},
+	}, nil
+}
+
+func createGoogleRegisteredUser(c *gin.Context, claims googleTokenClaims) (*models.User, error) {
+	db := middleware.GetDB(c)
+	if db == nil {
+		return nil, errors.New("Koneksi database tidak tersedia.")
+	}
+
+	employeeCode, err := services.GenerateEmployeeCode(db, models.RolePelamar)
+	if err != nil {
+		return nil, errors.New("Gagal menyiapkan akun baru.")
+	}
+
+	seedPassword, err := utils.RandomToken(32)
+	if err != nil || seedPassword == "" {
+		seedPassword = claims.Sub + strconv.FormatInt(time.Now().UnixNano(), 10)
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(seedPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, errors.New("Gagal menyiapkan akun baru.")
+	}
+
+	displayName := strings.TrimSpace(claims.Name)
+	if displayName == "" {
+		parts := strings.SplitN(claims.Email, "@", 2)
+		displayName = parts[0]
+	}
+
+	now := time.Now()
+	res, err := db.Exec(`INSERT INTO users (employee_code, name, email, role, status, registered_at, email_verified_at, password, created_at, updated_at)
+		VALUES (?, ?, ?, ?, 'Active', ?, ?, ?, ?, ?)`,
+		employeeCode, displayName, claims.Email, models.RolePelamar, now.Format("2006-01-02"), now, string(hash), now, now)
+	if err != nil {
+		return nil, errors.New("Gagal membuat akun baru.")
+	}
+	userID, _ := res.LastInsertId()
+
+	_, _ = db.Exec(`INSERT INTO applicant_profiles (user_id, full_name, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		userID, displayName, claims.Email, now, now)
+
+	var user models.User
+	if err := db.Get(&user, "SELECT * FROM users WHERE id = ? LIMIT 1", userID); err != nil {
+		return nil, errors.New("Gagal memuat akun pengguna.")
+	}
+	return &user, nil
+}
+
+func sendGooglePasswordSetupEmail(c *gin.Context, email string) error {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return errors.New("email kosong")
+	}
+
+	db := middleware.GetDB(c)
+	if db == nil {
+		return errors.New("database unavailable")
+	}
+
+	token, err := utils.RandomToken(24)
+	if err != nil || token == "" {
+		token = "setup-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	}
+
+	_, _ = db.Exec("DELETE FROM password_reset_tokens WHERE email = ?", email)
+	if _, err := db.Exec("INSERT INTO password_reset_tokens (email, token, created_at) VALUES (?, ?, ?)", email, token, time.Now()); err != nil {
+		return err
+	}
+
+	cfg := middleware.GetConfig(c)
+	resetURL := frontendURL(cfg, "/set-password/"+token+"?email="+url.QueryEscape(email))
+	body := "Halo,\n\nAkun Anda berhasil dibuat menggunakan Google.\nSilakan atur kata sandi akun Anda melalui tautan berikut:\n" + resetURL + "\n\nTautan ini berlaku selama 60 menit."
+	return services.SendEmail(cfg, email, "Atur Kata Sandi Akun", body)
+}
+
+func clearGoogleOAuthSession(session sessions.Session) {
+	session.Delete(googleOAuthStateKey)
+	session.Delete(googleOAuthNonceKey)
+	session.Delete(googleOAuthIssuedAtKey)
+}
+
+func sessionString(value any) string {
+	if v, ok := value.(string); ok {
+		return strings.TrimSpace(v)
+	}
+	return ""
+}
+
+func sessionInt64(value any) int64 {
+	switch v := value.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	case string:
+		parsed, _ := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		return parsed
+	default:
+		return 0
+	}
+}
+
+func frontendURL(cfg config.Config, path string) string {
+	base := firstNonEmpty(strings.Split(cfg.FrontendURL, ",")...)
+	base = strings.TrimRight(base, "/")
+
+	if path == "" {
+		path = "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	if base == "" {
+		return path
+	}
+	return base + path
+}
+
+func redirectGoogleRegisterError(c *gin.Context, cfg config.Config, message string) {
+	redirectGoogleRegisterErrorWithCode(c, cfg, message, "")
+}
+
+func redirectGoogleRegisterErrorWithCode(c *gin.Context, cfg config.Config, message string, code string) {
+	msg := strings.TrimSpace(message)
+	if msg == "" {
+		msg = "Pendaftaran Google gagal."
+	}
+	query := url.Values{}
+	query.Set("oauth_error", msg)
+	code = strings.TrimSpace(code)
+	if code != "" {
+		query.Set("oauth_error_code", code)
+	}
+	redirectBrowser(c, frontendURL(cfg, "/register?"+query.Encode()))
+}
+
+func redirectGoogleRegisterSuccess(c *gin.Context, cfg config.Config, message string) {
+	msg := strings.TrimSpace(message)
+	if msg == "" {
+		msg = "Akun berhasil dibuat."
+	}
+	query := url.Values{}
+	query.Set("status", msg)
+	redirectBrowser(c, frontendURL(cfg, "/login?"+query.Encode()))
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func redirectBrowser(c *gin.Context, target string) {
+	safeTarget := strings.TrimSpace(target)
+	if safeTarget == "" {
+		safeTarget = "/"
+	}
+
+	escapedHref := template.HTMLEscapeString(safeTarget)
+	jsValue, err := json.Marshal(safeTarget)
+	if err != nil {
+		jsValue = []byte(`"/"`)
+	}
+
+	body := "<!doctype html><html><head><meta charset=\"utf-8\">" +
+		"<meta http-equiv=\"refresh\" content=\"0;url=" + escapedHref + "\">" +
+		"<title>Redirecting...</title></head><body>" +
+		"<script>window.location.replace(" + string(jsValue) + ");</script>" +
+		"<a href=\"" + escapedHref + "\">Continue</a>" +
+		"</body></html>"
+
+	c.Header("Location", safeTarget)
+	c.Data(http.StatusFound, "text/html; charset=utf-8", []byte(body))
+}
