@@ -22,7 +22,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-const recruitmentAIScreeningPromptVersion = "cv-screening-v1"
+const recruitmentAIScreeningPromptVersion = "cv-screening-v2"
 
 var (
 	errAIScreeningConfigIncomplete    = errors.New("konfigurasi groq belum lengkap")

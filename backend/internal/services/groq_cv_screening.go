@@ -228,8 +228,11 @@ func groqScreeningSystemPrompt() string {
 		"Anda adalah AI recruiter untuk screening CV kandidat.",
 		"Tugas Anda menilai kecocokan CV terhadap lowongan kerja berdasarkan bukti yang tersedia.",
 		"Balas HANYA JSON valid (tanpa markdown, tanpa teks lain).",
+		"Semua teks naratif WAJIB menggunakan Bahasa Indonesia yang natural dan profesional.",
+		"Jika ada istilah berbahasa Inggris, terjemahkan ke Bahasa Indonesia kecuali nama teknologi, sertifikasi, atau nama institusi.",
 		"Gunakan skala match_score 0-100.",
 		"JSON wajib punya key: match_score, recommendation, summary, strengths, gaps, red_flags, interview_questions.",
+		"recommendation wajib salah satu: Sangat Cocok, Cocok Potensial, Perlu Ditinjau, Tidak Direkomendasikan.",
 		"strengths, gaps, red_flags, interview_questions selalu array string.",
 	}, " ")
 }
@@ -259,7 +262,8 @@ func groqScreeningUserPrompt(input CVScreeningInput) string {
 	builder.WriteString("\n\nTeks CV (hasil ekstraksi):\n")
 	builder.WriteString(sanitizePromptText(input.CVText, maxCVPromptChars))
 	builder.WriteString("\n\n")
-	builder.WriteString("Aturan rekomendasi: gunakan salah satu Strong Match, Potential Match, Needs Review, Not Recommended.")
+	builder.WriteString("Aturan rekomendasi: gunakan salah satu Sangat Cocok, Cocok Potensial, Perlu Ditinjau, Tidak Direkomendasikan.")
+	builder.WriteString("\nSeluruh summary, strengths, gaps, red_flags, dan interview_questions wajib berbahasa Indonesia.")
 	return builder.String()
 }
 
@@ -381,24 +385,30 @@ func normalizeRecommendation(input string, score float64) string {
 	trimmed := strings.TrimSpace(input)
 	switch strings.ToLower(trimmed) {
 	case "strong match":
-		return "Strong Match"
+		return "Sangat Cocok"
+	case "sangat cocok", "sangat sesuai", "sangat direkomendasikan":
+		return "Sangat Cocok"
 	case "potential match":
-		return "Potential Match"
-	case "needs review":
-		return "Needs Review"
+		return "Cocok Potensial"
+	case "cocok potensial", "cukup cocok", "berpotensi cocok":
+		return "Cocok Potensial"
+	case "needs review", "perlu review", "butuh review", "perlu ditinjau":
+		return "Perlu Ditinjau"
 	case "not recommended":
-		return "Not Recommended"
+		return "Tidak Direkomendasikan"
+	case "tidak direkomendasikan", "tidak cocok":
+		return "Tidak Direkomendasikan"
 	}
 
 	switch {
 	case score >= 85:
-		return "Strong Match"
+		return "Sangat Cocok"
 	case score >= 70:
-		return "Potential Match"
+		return "Cocok Potensial"
 	case score >= 55:
-		return "Needs Review"
+		return "Perlu Ditinjau"
 	default:
-		return "Not Recommended"
+		return "Tidak Direkomendasikan"
 	}
 }
 
