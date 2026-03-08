@@ -56,6 +56,8 @@ const statusOrder: ApplicantStatus[] = [
     'Hired',
     'Rejected',
 ];
+const inProgressApplicantStatuses: ApplicantStatus[] = ['Applied', 'Screening', 'Interview', 'Offering'];
+const completedInterviewStatuses = new Set<ApplicantStatus>(['Offering', 'Hired', 'Rejected']);
 const defaultSLASettings: RecruitmentSLASettings = {
     Applied: 2,
     Screening: 3,
@@ -78,6 +80,7 @@ const onboardingStepLabels = [
 
 const getFirstErrorMessage = (errors: Record<string, string>) =>
     Object.values(errors)[0] || 'Terjadi kesalahan. Silakan coba lagi.';
+const formatTabBadgeCount = (count: number) => (count > 99 ? '99+' : String(count));
 
 const formatDateLabel = (dateValue?: string | null) => {
     if (!dateValue) return '-';
@@ -187,6 +190,7 @@ const buildInterviewRow = (application: ApplicantRecord): InterviewSchedule => {
         interviewer: application.interviewer_name ?? '-',
         meeting_link: application.meeting_link ?? null,
         interview_notes: application.interview_notes ?? null,
+        status: application.status,
     };
 };
 
@@ -408,22 +412,44 @@ export default function KelolaRekrutmenIndex({
             (acc[application.status as ApplicantStatus] ?? 0) + 1;
         return acc;
     }, {} as StatusSummary);
+    const applicantsInProgressCount = useMemo(
+        () =>
+            applicationRows.filter((application) =>
+                inProgressApplicantStatuses.includes(application.status),
+            ).length,
+        [applicationRows],
+    );
+    const interviewsInProgressCount = useMemo(
+        () =>
+            interviewRows.filter(
+                (interview) =>
+                    !interview.status ||
+                    !completedInterviewStatuses.has(interview.status as ApplicantStatus),
+            ).length,
+        [interviewRows],
+    );
+    const onboardingInProgressCount = useMemo(
+        () => onboardingRows.filter((item) => item.status !== 'Selesai' || !item.is_staff).length,
+        [onboardingRows],
+    );
 
     const syncRelatedRows = (application: ApplicantRecord) => {
         setInterviewRows((prev) => {
-            // Jika status masih Interview, tambahkan atau update data interview
-            if (application.status === 'Interview') {
-                const interviewRow = buildInterviewRow(application);
-                const exists = prev.some((item) => item.application_id === application.id);
-                if (!exists) {
-                    return [interviewRow, ...prev];
-                }
+            const interviewRow = buildInterviewRow(application);
+            const index = prev.findIndex((item) => item.application_id === application.id);
+
+            // Keep interview history visible, but always refresh its latest status/detail.
+            if (index >= 0) {
                 return prev.map((item) =>
                     item.application_id === application.id ? interviewRow : item,
                 );
             }
-            // Jika status bukan Interview, tetap pertahankan riwayat interview
-            // (jangan dihapus dari list)
+
+            // Add new row only when interview has been scheduled/reached.
+            if (application.status === 'Interview' || application.has_interview_schedule) {
+                return [interviewRow, ...prev];
+            }
+
             return prev;
         });
 
@@ -859,21 +885,36 @@ export default function KelolaRekrutmenIndex({
                             className="flex-none rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
                         >
                             <Users className="h-4 w-4" />
-                            Daftar Pelamar
+                            <span>Daftar Pelamar</span>
+                            {applicantsInProgressCount > 0 && (
+                                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                                    {formatTabBadgeCount(applicantsInProgressCount)}
+                                </span>
+                            )}
                         </TabsTrigger>
                         <TabsTrigger
                             value="interviews"
                             className="flex-none rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
                         >
                             <Video className="h-4 w-4" />
-                            Jadwal Interview
+                            <span>Jadwal Interview</span>
+                            {interviewsInProgressCount > 0 && (
+                                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                                    {formatTabBadgeCount(interviewsInProgressCount)}
+                                </span>
+                            )}
                         </TabsTrigger>
                         <TabsTrigger
                             value="onboarding"
                             className="flex-none rounded-lg border border-input bg-background px-4 py-2.5 data-[state=active]:border-primary data-[state=active]:bg-primary/5 data-[state=active]:text-primary font-medium gap-2 shadow-sm transition-all hover:border-primary/50"
                         >
                             <UserCheck className="h-4 w-4" />
-                            Onboarding
+                            <span>Onboarding</span>
+                            {onboardingInProgressCount > 0 && (
+                                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-rose-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                                    {formatTabBadgeCount(onboardingInProgressCount)}
+                                </span>
+                            )}
                         </TabsTrigger>
                         <TabsTrigger
                             value="calendar"
