@@ -76,7 +76,14 @@ export default function Login({
         e.preventDefault();
 
         post(route('login'), {
-            onSuccess: () => {
+            onSuccess: (responseData: any) => {
+                if (
+                    typeof window !== 'undefined' &&
+                    (responseData?.user?.role === 'Pelamar' ||
+                        responseData?.redirect_to === '/pelamar/dashboard')
+                ) {
+                    window.sessionStorage.setItem('pelamar_login_success_toast', '1');
+                }
                 toast.success('Login berhasil.', {
                     description: 'Selamat datang kembali.',
                 });

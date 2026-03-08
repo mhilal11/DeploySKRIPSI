@@ -12,7 +12,7 @@ import { SummaryCards } from './components/SummaryCards';
 import CreateDivisionDialog, { CreateDivisionFormFields } from './Create';
 import EditDivisionDialog, { EditFormFields } from './Edit';
 import JobDialog, { JobFormFields } from './JobDialog';
-import { DivisionRecord, KelolaDivisiPageProps, StatsSummary } from './types';
+import { DivisionJob, DivisionRecord, KelolaDivisiPageProps, StatsSummary } from './types';
 
 export default function KelolaDivisiIndex({
     divisions: initialDivisions,
@@ -43,6 +43,7 @@ export default function KelolaDivisiIndex({
     });
 
     const jobForm = useForm<JobFormFields>({
+        job_id: null,
         job_title: '',
         job_description: '',
         job_requirements: [''],
@@ -158,22 +159,23 @@ export default function KelolaDivisiIndex({
         });
     };
 
-    const openJobDialog = (division: DivisionRecord) => {
+    const openJobDialog = (division: DivisionRecord, job?: DivisionJob) => {
         setJobDivision(division);
 
         jobForm.reset();
         jobForm.clearErrors();
 
         const cleanRequirements =
-            division.job_requirements && division.job_requirements.length > 0
-                ? division.job_requirements.filter((req) => req != null && req.trim() !== '')
+            job?.job_requirements && job.job_requirements.length > 0
+                ? job.job_requirements.filter((req) => req != null && req.trim() !== '')
                 : [];
 
         jobForm.setData({
-            job_title: division.job_title ?? '',
-            job_description: division.job_description ?? '',
+            job_id: job?.id ?? null,
+            job_title: job?.job_title ?? '',
+            job_description: job?.job_description ?? '',
             job_requirements: cleanRequirements.length > 0 ? cleanRequirements : [''],
-            job_eligibility_criteria: division.job_eligibility_criteria ?? {},
+            job_eligibility_criteria: job?.job_eligibility_criteria ?? {},
         });
     };
 
@@ -241,8 +243,10 @@ export default function KelolaDivisiIndex({
         });
     };
 
-    const closeJob = (division: DivisionRecord) => {
-        jobForm.delete(route('super-admin.divisions.close-job', division.id), {
+    const closeJob = (division: DivisionRecord, jobId?: number | null) => {
+        const baseRoute = route('super-admin.divisions.close-job', division.id);
+        const targetRoute = jobId ? `${baseRoute}?job_id=${jobId}` : baseRoute;
+        jobForm.delete(targetRoute, {
             preserveScroll: true,
             onSuccess: (responseData: any) => {
                 toast.success(responseData?.flash?.success || 'Lowongan pekerjaan telah ditutup.');

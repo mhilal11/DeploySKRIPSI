@@ -60,6 +60,7 @@ const DEFAULT_SCORING_THRESHOLDS = {
 } as const;
 
 export type JobFormFields = {
+    job_id?: number | null;
     job_title: string;
     job_description: string;
     job_requirements: string[];
@@ -309,7 +310,7 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
         <Dialog open={Boolean(division)} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-2xl p-6">
                 <DialogHeader>
-                    <DialogTitle>Publikasikan Lowongan</DialogTitle>
+                    <DialogTitle>{form.data.job_id ? 'Edit Lowongan' : 'Publikasikan Lowongan'}</DialogTitle>
                     <DialogDescription>
                         Lengkapi detail rekrutmen untuk divisi {division?.name}.
                     </DialogDescription>

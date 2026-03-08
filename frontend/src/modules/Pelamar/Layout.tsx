@@ -1,10 +1,10 @@
-﻿import { Toaster } from 'sonner';
+import { useEffect } from 'react';
+import { Toaster, toast } from 'sonner';
 
 import Breadcrumbs from '@/modules/AdminStaff/components/Breadcrumbs';
 import Navbar from '@/modules/Pelamar/components/Navbar';
 
 import type { PropsWithChildren, ReactNode } from 'react';
-
 
 interface PelamarLayoutProps {
     title: string;
@@ -20,6 +20,20 @@ export default function PelamarLayout({
     actions,
     children,
 }: PropsWithChildren<PelamarLayoutProps>) {
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const shouldShowToast = window.sessionStorage.getItem('pelamar_login_success_toast');
+        if (shouldShowToast === '1') {
+            toast.success('Login berhasil.', {
+                description: 'Selamat datang kembali.',
+            });
+            window.sessionStorage.removeItem('pelamar_login_success_toast');
+        }
+    }, []);
+
     return (
         <div className="min-h-screen bg-slate-50" style={{ scrollbarGutter: 'stable' }}>
             {/* Top Navbar */}
@@ -57,6 +71,3 @@ export default function PelamarLayout({
         </div>
     );
 }
-
-
-

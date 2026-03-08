@@ -1,4 +1,4 @@
-﻿import {
+import {
     AlertCircle,
     Briefcase,
     Building2,
@@ -46,21 +46,45 @@ import {
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/shared/components/ui/tooltip";
+} from '@/shared/components/ui/tooltip';
 
-import { DivisionRecord, StaffMember } from '../types';
-
+import { DivisionJob, DivisionRecord, StaffMember } from '../types';
 
 type DivisionTabsProps = {
     divisions: DivisionRecord[];
     activeDivisionId: string;
     onTabChange: (value: string) => void;
     onEditDivision: (division: DivisionRecord) => void;
-    onOpenJobDialog: (division: DivisionRecord) => void;
-    onCloseJob: (division: DivisionRecord) => void;
+    onOpenJobDialog: (division: DivisionRecord, job?: DivisionJob) => void;
+    onCloseJob: (division: DivisionRecord, jobId?: number) => void;
     onDeleteDivision: (division: DivisionRecord) => void;
     deletingDivisionId: number | null;
 };
+
+function getActiveDivisionJobs(division: DivisionRecord): DivisionJob[] {
+    const jobs = Array.isArray(division.jobs)
+        ? division.jobs.filter((job) => job && job.is_active !== false)
+        : [];
+
+    if (jobs.length > 0) {
+        return jobs;
+    }
+
+    if (division.is_hiring && division.job_title) {
+        return [
+            {
+                id: null,
+                job_title: division.job_title,
+                job_description: division.job_description,
+                job_requirements: Array.isArray(division.job_requirements) ? division.job_requirements : [],
+                job_eligibility_criteria: division.job_eligibility_criteria,
+                is_active: true,
+            },
+        ];
+    }
+
+    return [];
+}
 
 export function DivisionTabs({
     divisions,
@@ -77,11 +101,12 @@ export function DivisionTabs({
             <div className="w-full overflow-x-auto overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                 <TabsList className="h-auto min-w-max justify-start gap-2 rounded-none bg-transparent p-0">
                     {divisions.map((division) => {
-                        const isHiringActive = division.is_hiring && Boolean(division.job_title);
+                        const activeJobs = getActiveDivisionJobs(division);
+                        const isHiringActive = activeJobs.length > 0;
                         const isHiringButFull = isHiringActive && division.available_slots <= 0;
                         const triggerClass = isHiringButFull
                             ? 'border-red-200 bg-red-50 text-red-800 hover:bg-red-100 data-[state=active]:bg-red-200 data-[state=active]:text-red-900 data-[state=active]:border-red-300'
-                            : division.is_hiring
+                            : isHiringActive
                                 ? 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100 data-[state=active]:bg-green-200 data-[state=active]:text-green-900 data-[state=active]:border-green-300'
                                 : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 data-[state=active]:bg-blue-900 data-[state=active]:text-white data-[state=active]:border-blue-900';
 
@@ -115,34 +140,41 @@ export function DivisionTabs({
                 </span>
             </div>
 
-            {divisions.map((division) => (
-                <TabsContent key={division.id} value={division.id.toString()} className="space-y-6 pt-6">
-                    <DivisionHeader
-                        division={division}
-                        onEdit={() => onEditDivision(division)}
-                        onDelete={() => onDeleteDivision(division)}
-                        isDeleting={deletingDivisionId === division.id}
-                    />
-                    <DivisionOverview division={division} />
-                    <DivisionStaffTable staff={division.staff} />
-                    <DivisionVacancySection
-                        division={division}
-                        onOpenJob={() => onOpenJobDialog(division)}
-                        onCloseJob={() => onCloseJob(division)}
-                    />
-                </TabsContent>
-            ))}
+            {divisions.map((division) => {
+                const activeJobs = getActiveDivisionJobs(division);
+
+                return (
+                    <TabsContent key={division.id} value={division.id.toString()} className="space-y-6 pt-6">
+                        <DivisionHeader
+                            division={division}
+                            activeJobsCount={activeJobs.length}
+                            onEdit={() => onEditDivision(division)}
+                            onDelete={() => onDeleteDivision(division)}
+                            isDeleting={deletingDivisionId === division.id}
+                        />
+                        <DivisionOverview division={division} hasActiveJobs={activeJobs.length > 0} />
+                        <DivisionStaffTable staff={division.staff} />
+                        <DivisionVacancySection
+                            division={division}
+                            onOpenJob={onOpenJobDialog}
+                            onCloseJob={onCloseJob}
+                        />
+                    </TabsContent>
+                );
+            })}
         </Tabs>
     );
 }
 
 function DivisionHeader({
     division,
+    activeJobsCount,
     onEdit,
     onDelete,
     isDeleting,
 }: {
     division: DivisionRecord;
+    activeJobsCount: number;
     onEdit: () => void;
     onDelete: () => void;
     isDeleting: boolean;
@@ -156,10 +188,10 @@ function DivisionHeader({
                 <div>
                     <div className="mb-2 flex items-center gap-3">
                         <h3 className="text-xl font-semibold text-blue-900">{division.name}</h3>
-                        {division.is_hiring && (
+                        {activeJobsCount > 0 && (
                             <Badge className="bg-green-600 hover:bg-green-600">
                                 <Briefcase className="mr-1 h-3 w-3" />
-                                Lowongan Terbuka
+                                {activeJobsCount} Lowongan Aktif
                             </Badge>
                         )}
                     </div>
@@ -219,7 +251,13 @@ function DivisionHeader({
     );
 }
 
-function DivisionOverview({ division }: { division: DivisionRecord }) {
+function DivisionOverview({
+    division,
+    hasActiveJobs,
+}: {
+    division: DivisionRecord;
+    hasActiveJobs: boolean;
+}) {
     const ratio =
         division.capacity > 0
             ? Math.min((division.current_staff / division.capacity) * 100, 100)
@@ -268,7 +306,7 @@ function DivisionOverview({ division }: { division: DivisionRecord }) {
             <div className="grid gap-4 sm:grid-cols-2">
                 <InfoCard label="Total Staff" value={`${division.current_staff} orang`} />
                 <InfoCard label="Slot Tersedia" value={`${division.available_slots} slot`} />
-                <InfoCard label="Status Rekrutmen" value={division.is_hiring ? 'Aktif' : 'Tidak Aktif'} />
+                <InfoCard label="Status Rekrutmen" value={hasActiveJobs ? 'Aktif' : 'Tidak Aktif'} />
                 <InfoCard label="Manager" value={division.manager_name ?? '-'} />
             </div>
         </div>
@@ -283,9 +321,6 @@ function InfoCard({ label, value }: { label: string; value: string }) {
         </div>
     );
 }
-
-
-// ... (other imports)
 
 function DivisionStaffTable({ staff }: { staff: StaffMember[] }) {
     const [currentPage, setCurrentPage] = useState(1);
@@ -308,9 +343,8 @@ function DivisionStaffTable({ staff }: { staff: StaffMember[] }) {
         setCurrentPage(page);
     };
 
-    // Helper to generate page numbers with ellipsis
     const getPageNumbers = () => {
-        const pages = [];
+        const pages: Array<number | 'ellipsis'> = [];
         if (totalPages <= 5) {
             for (let i = 1; i <= totalPages; i++) pages.push(i);
         } else {
@@ -360,7 +394,6 @@ function DivisionStaffTable({ staff }: { staff: StaffMember[] }) {
                 </Table>
             </div>
 
-            {/* Pagination Controls */}
             {totalPages > 1 && (
                 <div className="flex flex-col-reverse gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-xs text-slate-500 text-center sm:text-left">
@@ -408,18 +441,20 @@ function DivisionStaffTable({ staff }: { staff: StaffMember[] }) {
     );
 }
 
-function DivisionVacancySection({
+function VacancyCard({
     division,
-    onOpenJob,
-    onCloseJob,
+    job,
+    onEdit,
+    onDelete,
 }: {
     division: DivisionRecord;
-    onOpenJob: () => void;
-    onCloseJob: () => void;
+    job: DivisionJob;
+    onEdit: () => void;
+    onDelete: () => void;
 }) {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
-    const criteria: NonNullable<DivisionRecord['job_eligibility_criteria']> =
-        division.job_eligibility_criteria ?? {};
+    const criteria: NonNullable<DivisionJob['job_eligibility_criteria']> =
+        job.job_eligibility_criteria ?? {};
     const scoringWeights = criteria.scoring_weights;
     const hasCustomScoring = Boolean(
         scoringWeights &&
@@ -431,117 +466,185 @@ function DivisionVacancySection({
                 scoringWeights.ai_screening != null
             ),
     );
+    const cleanRequirements = (job.job_requirements ?? []).filter(
+        (req) => req && req.trim() !== '',
+    );
+    const cleanPrograms = Array.isArray(criteria.program_studies)
+        ? criteria.program_studies.filter((item) => item && item.trim() !== '')
+        : [];
 
-    if (division.is_hiring && division.job_title) {
-        return (
-            <div className="space-y-3 md:space-y-4 rounded-xl border border-green-200 bg-green-50 p-3 md:p-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h4 className="text-base md:text-lg font-semibold text-green-900">{division.job_title}</h4>
-                        <p className="text-xs md:text-sm text-slate-700">{division.job_description}</p>
-                        {division.job_requirements && division.job_requirements.length > 0 && (
-                            <ul className="mt-2 md:mt-3 space-y-1 text-xs md:text-sm text-slate-700">
-                                {division.job_requirements
-                                    .filter(req => req && req.trim() !== '')
-                                    .map((requirement, index) => (
-                                        <li key={index} className="flex items-start gap-2">
-                                            <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-600" />
-                                            <span>{requirement}</span>
-                                        </li>
-                                    ))}
-                            </ul>
+    return (
+        <div className="rounded-xl border border-emerald-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <h5 className="text-base md:text-lg font-semibold text-emerald-900">
+                        {job.job_title ?? 'Lowongan tanpa judul'}
+                    </h5>
+                    <p className="text-xs md:text-sm text-slate-700">
+                        {job.job_description || 'Belum ada deskripsi pekerjaan.'}
+                    </p>
+
+                    {cleanRequirements.length > 0 && (
+                        <ul className="mt-2 md:mt-3 space-y-1 text-xs md:text-sm text-slate-700">
+                            {cleanRequirements.map((requirement, index) => (
+                                <li key={`${job.id ?? 'legacy'}-req-${index}`} className="flex items-start gap-2">
+                                    <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-600" />
+                                    <span>{requirement}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {criteria.min_education && (
+                            <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                Min Edu: {criteria.min_education}
+                            </Badge>
                         )}
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {criteria.min_education && (
-                                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
-                                    Min Edu: {criteria.min_education}
-                                </Badge>
-                            )}
-                            {Array.isArray(criteria.program_studies) &&
-                                criteria.program_studies.filter((item) => item && item.trim() !== '').slice(0, 3).map((program) => (
-                                    <Badge key={program} variant="outline" className="border-emerald-300 bg-white text-emerald-700">
-                                        Prodi: {program}
-                                    </Badge>
-                                ))}
-                            {Array.isArray(criteria.program_studies) && criteria.program_studies.filter((item) => item && item.trim() !== '').length > 3 && (
-                                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
-                                    +{criteria.program_studies.filter((item) => item && item.trim() !== '').length - 3} prodi lain
-                                </Badge>
-                            )}
-                            {(criteria.min_experience_years ?? 0) > 0 && (
-                                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
-                                    Min Exp: {criteria.min_experience_years} th
-                                </Badge>
-                            )}
-                            {(criteria.min_age ?? 0) > 0 && (
-                                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
-                                    Umur Min: {criteria.min_age}
-                                </Badge>
-                            )}
-                            {(criteria.max_age ?? 0) > 0 && (
-                                <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
-                                    Umur Max: {criteria.max_age}
-                                </Badge>
-                            )}
-                            {hasCustomScoring && (
-                                <Badge variant="outline" className="border-indigo-300 bg-white text-indigo-700">
-                                    Custom Scoring Aktif
-                                </Badge>
-                            )}
-                        </div>
+                        {cleanPrograms.slice(0, 3).map((program) => (
+                            <Badge key={`${job.id ?? 'legacy'}-${program}`} variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                Prodi: {program}
+                            </Badge>
+                        ))}
+                        {cleanPrograms.length > 3 && (
+                            <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                +{cleanPrograms.length - 3} prodi lain
+                            </Badge>
+                        )}
+                        {(criteria.min_experience_years ?? 0) > 0 && (
+                            <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                Min Exp: {criteria.min_experience_years} th
+                            </Badge>
+                        )}
+                        {(criteria.min_age ?? 0) > 0 && (
+                            <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                Umur Min: {criteria.min_age}
+                            </Badge>
+                        )}
+                        {(criteria.max_age ?? 0) > 0 && (
+                            <Badge variant="outline" className="border-emerald-300 bg-white text-emerald-700">
+                                Umur Max: {criteria.max_age}
+                            </Badge>
+                        )}
+                        {hasCustomScoring && (
+                            <Badge variant="outline" className="border-indigo-300 bg-white text-indigo-700">
+                                Custom Scoring Aktif
+                            </Badge>
+                        )}
                     </div>
-                    <div className="flex flex-col gap-2">
+                </div>
+                <div className="flex flex-col gap-2">
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="outline" size="sm" onClick={onEdit}>
+                                    <Edit className="h-4 w-4 text-blue-600" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Edit Lowongan</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+
+                    <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="outline" size="sm" onClick={onOpenJob}>
-                                        <Edit className="h-4 w-4 text-blue-600" />
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                        onClick={() => setIsAlertOpen(true)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>Edit Lowongan</p>
+                                    <p>Hapus Lowongan</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
-
-                        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                            onClick={() => setIsAlertOpen(true)}
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>Hapus Lowongan</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                            <AlertDialogContent className="bg-white">
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>Hapus Lowongan?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Lowongan akan ditutup dan tidak lagi muncul pada portal pelamar.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Batal</AlertDialogCancel>
-                                    <AlertDialogAction
-                                        onClick={onCloseJob}
-                                        className="bg-red-600 text-white hover:bg-red-700"
-                                    >
-                                        Hapus
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
+                        <AlertDialogContent className="bg-white">
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Hapus Lowongan?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Lowongan akan ditutup dan tidak lagi muncul pada portal pelamar.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Batal</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={onDelete}
+                                    className="bg-red-600 text-white hover:bg-red-700"
+                                >
+                                    Hapus
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
+            </div>
+            {division.available_slots <= 0 && (
+                <p className="mt-3 text-xs text-red-600">
+                    Kapasitas divisi penuh. Pertimbangkan menambah kapasitas untuk mempercepat pemenuhan posisi.
+                </p>
+            )}
+        </div>
+    );
+}
+
+function DivisionVacancySection({
+    division,
+    onOpenJob,
+    onCloseJob,
+}: {
+    division: DivisionRecord;
+    onOpenJob: (division: DivisionRecord, job?: DivisionJob) => void;
+    onCloseJob: (division: DivisionRecord, jobId?: number) => void;
+}) {
+    const activeJobs = getActiveDivisionJobs(division);
+
+    if (activeJobs.length > 0) {
+        return (
+            <div className="space-y-3 md:space-y-4 rounded-xl border border-green-200 bg-green-50 p-3 md:p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h4 className="text-base md:text-lg font-semibold text-green-900">
+                            Lowongan Aktif ({activeJobs.length})
+                        </h4>
+                        <p className="text-xs md:text-sm text-slate-700">
+                            Setiap lowongan bisa dikelola secara terpisah untuk proses rekrutmen yang lebih fleksibel.
+                        </p>
+                    </div>
+                    <Button
+                        onClick={() => onOpenJob(division)}
+                        disabled={division.available_slots === 0}
+                        className="bg-green-600 hover:bg-green-700 disabled:opacity-60"
+                    >
+                        <Briefcase className="mr-2 h-4 w-4" />
+                        Buka Lowongan Baru
+                    </Button>
+                </div>
+
+                <div className="space-y-3">
+                    {activeJobs.map((job, index) => (
+                        <VacancyCard
+                            key={job.id ?? `legacy-${division.id}-${index}`}
+                            division={division}
+                            job={job}
+                            onEdit={() => onOpenJob(division, job)}
+                            onDelete={() => onCloseJob(division, job.id ?? undefined)}
+                        />
+                    ))}
+                </div>
+
+                {division.available_slots === 0 && (
+                    <div className="rounded-lg bg-orange-50 p-3 text-sm text-orange-700">
+                        <AlertCircle className="mr-2 inline h-4 w-4" />
+                        Kapasitas sudah penuh. Edit kapasitas divisi terlebih dahulu.
+                    </div>
+                )}
             </div>
         );
     }
@@ -557,7 +660,7 @@ function DivisionVacancySection({
             </p>
             <div className="mt-4 flex justify-center">
                 <Button
-                    onClick={onOpenJob}
+                    onClick={() => onOpenJob(division)}
                     disabled={division.available_slots === 0}
                     className="bg-green-600 hover:bg-green-700 disabled:opacity-60"
                 >

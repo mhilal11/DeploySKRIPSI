@@ -33,6 +33,16 @@ export type EligibilityCriteria = {
     extra_penalty_score?: number | null;
 };
 
+export type DivisionJob = {
+    id: number | null;
+    job_title: string | null;
+    job_description: string | null;
+    job_requirements: string[];
+    job_eligibility_criteria: EligibilityCriteria | null;
+    is_active: boolean;
+    opened_at?: string | null;
+};
+
 export type DivisionRecord = {
     id: number;
     name: string;
@@ -46,6 +56,7 @@ export type DivisionRecord = {
     job_description: string | null;
     job_requirements: string[];
     job_eligibility_criteria: EligibilityCriteria | null;
+    jobs?: DivisionJob[];
     staff: StaffMember[];
 };
 

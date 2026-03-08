@@ -15,9 +15,11 @@ import (
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
 
 type OpenJobRequest struct {
+	JobID                  *int64                 `json:"job_id" form:"job_id"`
 	JobTitle               string                 `json:"job_title" form:"job_title"`
 	JobDescription         string                 `json:"job_description" form:"job_description"`
 	JobRequirements        []string               `json:"job_requirements" form:"job_requirements"`
@@ -55,6 +57,11 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 	totalStaff := 0
 	activeVacancies := 0
 	availableSlotsTotal := 0
+	divisionIDs := make([]int64, 0, len(profiles))
+	for _, profile := range profiles {
+		divisionIDs = append(divisionIDs, profile.ID)
+	}
+	activeJobsByDivisionID := loadActiveDivisionJobsByDivisionIDs(db, divisionIDs)
 
 	for _, profile := range profiles {
 		var currentStaff int
@@ -67,13 +74,55 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 		if availableSlots < 0 {
 			availableSlots = 0
 		}
-		if profile.IsHiring {
-			activeVacancies++
+		jobs := activeJobsByDivisionID[profile.ID]
+		if len(jobs) == 0 && profile.IsHiring && profile.JobTitle != nil && strings.TrimSpace(*profile.JobTitle) != "" {
+			// Backward compatibility for pre-migration data kept in division_profiles.
+			jobs = append(jobs, map[string]any{
+				"id":                       nil,
+				"job_title":                profile.JobTitle,
+				"job_description":          profile.JobDescription,
+				"job_requirements":         handlers.DecodeJSONStringArray(profile.JobRequirements),
+				"job_eligibility_criteria": handlers.DecodeJSONMap(profile.JobEligibility),
+				"is_active":                true,
+				"opened_at":                profile.HiringOpenedAt,
+			})
 		}
+		isHiring := len(jobs) > 0
+		activeVacancies += len(jobs)
 		totalStaff += currentStaff
 		availableSlotsTotal += availableSlots
 
 		staffList, _ := services.StaffForDivision(db, profile.Name)
+		var primaryJobTitle *string
+		var primaryJobDescription *string
+		var primaryJobRequirements []string
+		var primaryJobEligibility map[string]any
+		if len(jobs) > 0 {
+			if value, ok := jobs[0]["job_title"].(*string); ok {
+				primaryJobTitle = value
+			}
+			if value, ok := jobs[0]["job_description"].(*string); ok {
+				primaryJobDescription = value
+			}
+			if value, ok := jobs[0]["job_requirements"].([]string); ok {
+				primaryJobRequirements = value
+			}
+			if value, ok := jobs[0]["job_eligibility_criteria"].(map[string]any); ok {
+				primaryJobEligibility = value
+			}
+		}
+		if primaryJobTitle == nil {
+			primaryJobTitle = profile.JobTitle
+		}
+		if primaryJobDescription == nil {
+			primaryJobDescription = profile.JobDescription
+		}
+		if len(primaryJobRequirements) == 0 {
+			primaryJobRequirements = handlers.DecodeJSONStringArray(profile.JobRequirements)
+		}
+		if primaryJobEligibility == nil {
+			primaryJobEligibility = handlers.DecodeJSONMap(profile.JobEligibility)
+		}
 
 		divisions = append(divisions, map[string]any{
 			"id":                       profile.ID,
@@ -83,11 +132,12 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 			"capacity":                 profile.Capacity,
 			"current_staff":            currentStaff,
 			"available_slots":          availableSlots,
-			"is_hiring":                profile.IsHiring,
-			"job_title":                profile.JobTitle,
-			"job_description":          profile.JobDescription,
-			"job_requirements":         handlers.DecodeJSONStringArray(profile.JobRequirements),
-			"job_eligibility_criteria": handlers.DecodeJSONMap(profile.JobEligibility),
+			"is_hiring":                isHiring,
+			"job_title":                primaryJobTitle,
+			"job_description":          primaryJobDescription,
+			"job_requirements":         primaryJobRequirements,
+			"job_eligibility_criteria": primaryJobEligibility,
+			"jobs":                     jobs,
 			"staff":                    staffList,
 		})
 	}
@@ -385,19 +435,16 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 	}
 
 	id := c.Param("id")
+	divisionID, parseErr := strconv.ParseInt(id, 10, 64)
+	if parseErr != nil || divisionID <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID divisi tidak valid")
+		return
+	}
 	db := middleware.GetDB(c)
 
 	var profile models.DivisionProfile
-	if err := db.Get(&profile, "SELECT * FROM division_profiles WHERE id = ?", id); err != nil {
+	if err := db.Get(&profile, "SELECT * FROM division_profiles WHERE id = ?", divisionID); err != nil {
 		handlers.JSONError(c, http.StatusNotFound, "Divisi tidak ditemukan")
-		return
-	}
-
-	var currentStaff int
-	_ = db.Get(&currentStaff, "SELECT COUNT(*) FROM users WHERE division = ? AND role IN (?, ?)", profile.Name, models.RoleAdmin, models.RoleStaff)
-	availableSlots := profile.Capacity - currentStaff
-	if availableSlots <= 0 {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"capacity": "Kapasitas divisi saat ini penuh. Tingkatkan kapasitas sebelum membuka lowongan."})
 		return
 	}
 
@@ -418,6 +465,13 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 	if req.JobEligibilityCriteria == nil {
 		if raw := strings.TrimSpace(c.PostForm("job_eligibility_criteria")); raw != "" {
 			_ = json.Unmarshal([]byte(raw), &req.JobEligibilityCriteria)
+		}
+	}
+	if req.JobID == nil {
+		if raw := strings.TrimSpace(c.PostForm("job_id")); raw != "" {
+			if parsedID, err := strconv.ParseInt(raw, 10, 64); err == nil && parsedID > 0 {
+				req.JobID = &parsedID
+			}
 		}
 	}
 
@@ -456,13 +510,63 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 
 	criteriaBytes, _ := json.Marshal(criteria)
 	requirementsBytes, _ := json.Marshal(cleaned)
+	now := time.Now()
+	var currentStaff int
+	_ = db.Get(&currentStaff, "SELECT COUNT(*) FROM users WHERE division = ? AND role IN (?, ?)", profile.Name, models.RoleAdmin, models.RoleStaff)
+	availableSlots := profile.Capacity - currentStaff
 
-	_, err := db.Exec(`UPDATE division_profiles SET is_hiring = 1, job_title = ?, job_description = ?, job_requirements = ?, job_eligibility_criteria = ?, hiring_opened_at = ?, updated_at = ? WHERE id = ?`,
-		req.JobTitle, req.JobDescription, string(requirementsBytes), string(criteriaBytes), time.Now(), time.Now(), id)
-	if err != nil {
-		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyimpan lowongan. Coba lagi.")
-		return
+	actionLabel := "menambahkan"
+	if req.JobID != nil {
+		var existing models.DivisionJob
+		if err := db.Get(&existing, "SELECT * FROM division_jobs WHERE id = ? AND division_profile_id = ? AND is_active = 1 LIMIT 1", *req.JobID, divisionID); err != nil {
+			if err == sql.ErrNoRows {
+				handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
+				return
+			}
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat lowongan")
+			return
+		}
+		_, err := db.Exec(
+			`UPDATE division_jobs
+			 SET job_title = ?, job_description = ?, job_requirements = ?, job_eligibility_criteria = ?, updated_at = ?
+			 WHERE id = ? AND division_profile_id = ?`,
+			req.JobTitle,
+			req.JobDescription,
+			string(requirementsBytes),
+			string(criteriaBytes),
+			now,
+			*req.JobID,
+			divisionID,
+		)
+		if err != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui lowongan. Coba lagi.")
+			return
+		}
+		actionLabel = "memperbarui"
+	} else {
+		if availableSlots <= 0 {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"capacity": "Kapasitas divisi saat ini penuh. Tingkatkan kapasitas sebelum membuka lowongan."})
+			return
+		}
+		_, err := db.Exec(
+			`INSERT INTO division_jobs (division_profile_id, job_title, job_description, job_requirements, job_eligibility_criteria, is_active, opened_at, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+			divisionID,
+			req.JobTitle,
+			req.JobDescription,
+			string(requirementsBytes),
+			string(criteriaBytes),
+			now,
+			now,
+			now,
+		)
+		if err != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyimpan lowongan. Coba lagi.")
+			return
+		}
 	}
+
+	syncDivisionProfilePrimaryJob(db, divisionID)
 
 	criteriaForAudit := map[string]any{}
 	for key, value := range criteria {
@@ -476,6 +580,7 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 		profile.Name,
 		req.JobTitle,
 		map[string]any{
+			"action":             actionLabel,
 			"job_title":          req.JobTitle,
 			"job_requirements":   cleaned,
 			"requirements_count": len(cleaned),
@@ -488,20 +593,24 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 		Action:      "OPEN_JOB",
 		EntityType:  "division_profile",
 		EntityID:    id,
-		Description: "Membuka lowongan pada divisi.",
+		Description: "Mengelola lowongan pada divisi.",
 		NewValues: map[string]any{
+			"action":              actionLabel,
 			"division_name":       profile.Name,
 			"job_title":           req.JobTitle,
 			"job_description":     req.JobDescription,
 			"job_requirements":    cleaned,
 			"eligibility":         criteriaForAudit,
-			"is_hiring":           true,
 			"available_slots_now": availableSlots,
 		},
 	})
 
+	message := "Lowongan pekerjaan berhasil dipublikasikan."
+	if req.JobID != nil {
+		message = "Lowongan pekerjaan berhasil diperbarui."
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"flash": gin.H{"success": "Lowongan pekerjaan berhasil dipublikasikan."},
+		"flash": gin.H{"success": message},
 	})
 }
 
@@ -513,10 +622,73 @@ func SuperAdminDivisionsCloseJob(c *gin.Context) {
 	}
 
 	id := c.Param("id")
+	divisionID, parseErr := strconv.ParseInt(id, 10, 64)
+	if parseErr != nil || divisionID <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID divisi tidak valid")
+		return
+	}
 	db := middleware.GetDB(c)
 	var profile models.DivisionProfile
-	_ = db.Get(&profile, "SELECT * FROM division_profiles WHERE id = ?", id)
-	_, _ = db.Exec(`UPDATE division_profiles SET is_hiring = 0, job_title = NULL, job_description = NULL, job_requirements = NULL, hiring_opened_at = NULL WHERE id = ?`, id)
+	if err := db.Get(&profile, "SELECT * FROM division_profiles WHERE id = ?", divisionID); err != nil {
+		handlers.JSONError(c, http.StatusNotFound, "Divisi tidak ditemukan")
+		return
+	}
+	var jobID *int64
+	if raw := strings.TrimSpace(c.Query("job_id")); raw != "" {
+		if parsedID, err := strconv.ParseInt(raw, 10, 64); err == nil && parsedID > 0 {
+			jobID = &parsedID
+		}
+	}
+	if jobID == nil {
+		if raw := strings.TrimSpace(c.PostForm("job_id")); raw != "" {
+			if parsedID, err := strconv.ParseInt(raw, 10, 64); err == nil && parsedID > 0 {
+				jobID = &parsedID
+			}
+		}
+	}
+
+	var oldValues map[string]any
+	if jobID != nil {
+		var existing models.DivisionJob
+		if err := db.Get(&existing, "SELECT * FROM division_jobs WHERE id = ? AND division_profile_id = ? AND is_active = 1 LIMIT 1", *jobID, divisionID); err != nil {
+			if err == sql.ErrNoRows {
+				handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
+				return
+			}
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat lowongan")
+			return
+		}
+		oldValues = map[string]any{
+			"division_name":    profile.Name,
+			"job_id":           existing.ID,
+			"job_title":        existing.JobTitle,
+			"job_description":  existing.JobDescription,
+			"job_requirements": handlers.DecodeJSONStringArray(existing.JobRequirements),
+			"is_active":        existing.IsActive,
+		}
+		_, _ = db.Exec(
+			"UPDATE division_jobs SET is_active = 0, closed_at = ?, updated_at = ? WHERE id = ? AND division_profile_id = ?",
+			time.Now(),
+			time.Now(),
+			*jobID,
+			divisionID,
+		)
+	} else {
+		oldValues = map[string]any{
+			"division_name":    profile.Name,
+			"job_title":        profile.JobTitle,
+			"job_description":  profile.JobDescription,
+			"job_requirements": handlers.DecodeJSONStringArray(profile.JobRequirements),
+			"is_hiring":        profile.IsHiring,
+		}
+		_, _ = db.Exec(
+			"UPDATE division_jobs SET is_active = 0, closed_at = ?, updated_at = ? WHERE division_profile_id = ? AND is_active = 1",
+			time.Now(),
+			time.Now(),
+			divisionID,
+		)
+	}
+	syncDivisionProfilePrimaryJob(db, divisionID)
 
 	appendAuditLog(c, db, auditLogPayload{
 		Module:      "Divisions",
@@ -524,21 +696,117 @@ func SuperAdminDivisionsCloseJob(c *gin.Context) {
 		EntityType:  "division_profile",
 		EntityID:    id,
 		Description: "Menutup lowongan divisi.",
-		OldValues: map[string]any{
-			"division_name":    profile.Name,
-			"job_title":        profile.JobTitle,
-			"job_description":  profile.JobDescription,
-			"job_requirements": handlers.DecodeJSONStringArray(profile.JobRequirements),
-			"is_hiring":        profile.IsHiring,
-		},
+		OldValues:   oldValues,
 		NewValues: map[string]any{
 			"is_hiring": false,
 		},
 	})
 
+	message := "Semua lowongan pekerjaan telah ditutup."
+	if jobID != nil {
+		message = "Lowongan pekerjaan telah ditutup."
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"flash": gin.H{"success": "Lowongan pekerjaan telah ditutup."},
+		"flash": gin.H{"success": message},
 	})
+}
+
+func loadActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) map[int64][]map[string]any {
+	result := make(map[int64][]map[string]any, len(divisionIDs))
+	if db == nil || len(divisionIDs) == 0 {
+		return result
+	}
+
+	idSet := make(map[int64]struct{}, len(divisionIDs))
+	for _, divisionID := range divisionIDs {
+		idSet[divisionID] = struct{}{}
+	}
+
+	rows := []models.DivisionJob{}
+	if err := db.Select(&rows, "SELECT * FROM division_jobs WHERE is_active = 1 ORDER BY opened_at DESC, id DESC"); err != nil {
+		// Table might not exist yet on older environment before migration.
+		return result
+	}
+
+	for _, row := range rows {
+		if _, ok := idSet[row.DivisionProfileID]; !ok {
+			continue
+		}
+		title := strings.TrimSpace(row.JobTitle)
+		desc := strings.TrimSpace(row.JobDescription)
+		var titlePtr *string
+		var descPtr *string
+		if title != "" {
+			titleValue := title
+			titlePtr = &titleValue
+		}
+		if desc != "" {
+			descValue := desc
+			descPtr = &descValue
+		}
+		result[row.DivisionProfileID] = append(result[row.DivisionProfileID], map[string]any{
+			"id":                       row.ID,
+			"job_title":                titlePtr,
+			"job_description":          descPtr,
+			"job_requirements":         handlers.DecodeJSONStringArray(row.JobRequirements),
+			"job_eligibility_criteria": handlers.DecodeJSONMap(row.JobEligibility),
+			"is_active":                row.IsActive,
+			"opened_at":                row.OpenedAt,
+		})
+	}
+
+	return result
+}
+
+func syncDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64) {
+	if db == nil || divisionID <= 0 {
+		return
+	}
+
+	now := time.Now()
+	var primary models.DivisionJob
+	if err := db.Get(&primary, "SELECT * FROM division_jobs WHERE division_profile_id = ? AND is_active = 1 ORDER BY opened_at DESC, id DESC LIMIT 1", divisionID); err != nil {
+		if err == sql.ErrNoRows {
+			_, _ = db.Exec(
+				`UPDATE division_profiles
+				 SET is_hiring = 0,
+				     job_title = NULL,
+				     job_description = NULL,
+				     job_requirements = NULL,
+				     job_eligibility_criteria = NULL,
+				     hiring_opened_at = NULL,
+				     updated_at = ?
+				 WHERE id = ?`,
+				now,
+				divisionID,
+			)
+		}
+		return
+	}
+
+	openedAt := primary.OpenedAt
+	if openedAt == nil {
+		openedAt = &now
+	}
+
+	_, _ = db.Exec(
+		`UPDATE division_profiles
+		 SET is_hiring = 1,
+		     job_title = ?,
+		     job_description = ?,
+		     job_requirements = ?,
+		     job_eligibility_criteria = ?,
+		     hiring_opened_at = ?,
+		     updated_at = ?
+		 WHERE id = ?`,
+		primary.JobTitle,
+		primary.JobDescription,
+		primary.JobRequirements,
+		primary.JobEligibility,
+		openedAt,
+		now,
+		divisionID,
+	)
 }
 
 func sanitizeEligibilityCriteria(input map[string]interface{}) map[string]interface{} {

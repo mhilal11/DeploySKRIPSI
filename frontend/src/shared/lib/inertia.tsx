@@ -467,6 +467,14 @@ export function useForm<T extends Record<string, any>>(initialData: T): InertiaF
       if (responseData?.flash) {
         ctx?.mergeProps({ flash: responseData.flash });
       }
+      if (
+        typeof window !== 'undefined' &&
+        responseData?.user?.role === 'Pelamar' &&
+        typeof responseData?.redirect_to === 'string' &&
+        responseData.redirect_to.startsWith('/pelamar/')
+      ) {
+        window.sessionStorage.setItem('pelamar_login_success_toast', '1');
+      }
       if (responseData?.redirect_to && routerStore) {
         routerStore.navigate(responseData.redirect_to, { replace: true });
       }
