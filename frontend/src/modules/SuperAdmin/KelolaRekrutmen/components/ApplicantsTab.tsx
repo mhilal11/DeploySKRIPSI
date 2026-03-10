@@ -186,7 +186,7 @@ const recommendationBadgeClass = (recommendation?: string | null, eligible?: boo
     if (recommendation === 'Prioritas Tinggi') return 'border-emerald-500 bg-emerald-50 text-emerald-700';
     if (recommendation === 'Direkomendasikan') return 'border-blue-500 bg-blue-50 text-blue-700';
     if (recommendation === 'Pertimbangkan') return 'border-amber-500 bg-amber-50 text-amber-700';
-    return 'border-slate-400 bg-slate-50 text-slate-700';
+    return 'border-slate-400 bg-slate-50 text-slate-700'; 
 };
 
 const normalizeDivisionLabel = (division?: string | null) => {
