@@ -15,6 +15,7 @@ import (
 	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
+	dbrepo "hris-backend/internal/repository"
 	"hris-backend/internal/services"
 	"hris-backend/internal/utils"
 
@@ -103,8 +104,8 @@ func Login(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	var user models.User
-	if err := db.Get(&user, "SELECT * FROM users WHERE email = ? LIMIT 1", req.Email); err != nil {
+	user, err := dbrepo.GetUserByEmail(db, req.Email)
+	if err != nil || user == nil {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"credentials": "Email atau kata sandi salah."})
 		return
 	}
@@ -120,15 +121,15 @@ func Login(c *gin.Context) {
 	}
 
 	now := time.Now()
-	_, _ = db.Exec("UPDATE users SET last_login_at = ? WHERE id = ?", now, user.ID)
+	_ = dbrepo.SetUserLastLogin(db, user.ID, now)
 
 	session := sessions.Default(c)
 	session.Set("user_id", user.ID)
 	_ = session.Save()
 
 	c.JSON(http.StatusOK, gin.H{
-		"user":        sanitizeUser(&user),
-		"redirect_to": dashboardPathFor(user),
+		"user":        sanitizeUser(user),
+		"redirect_to": dashboardPathFor(*user),
 	})
 }
 
@@ -152,9 +153,8 @@ func Register(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	var exists int
-	_ = db.Get(&exists, "SELECT COUNT(*) FROM users WHERE email = ?", req.Email)
-	if exists > 0 {
+	exists, _ := dbrepo.UserEmailExists(db, req.Email, nil)
+	if exists {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email sudah digunakan."})
 		return
 	}
@@ -172,17 +172,20 @@ func Register(c *gin.Context) {
 	}
 
 	now := time.Now()
-	res, err := db.Exec(`INSERT INTO users (employee_code, name, email, role, status, registered_at, password, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 'Active', ?, ?, ?, ?)`,
-		employeeCode, req.Name, req.Email, models.RolePelamar, now.Format("2006-01-02"), string(hash), now, now)
+	userID, err := dbrepo.CreatePelamarUserWithProfile(
+		db,
+		employeeCode,
+		req.Name,
+		req.Email,
+		string(hash),
+		now,
+		nil,
+		now,
+	)
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuat akun")
 		return
 	}
-	userID, _ := res.LastInsertId()
-
-	_, _ = db.Exec(`INSERT INTO applicant_profiles (user_id, full_name, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-		userID, req.Name, req.Email, now, now)
 
 	sendVerificationEmail(c, &models.User{ID: userID, Name: req.Name, Email: req.Email})
 
@@ -201,17 +204,15 @@ func ForgotPassword(c *gin.Context) {
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
 
 	db := middleware.GetDB(c)
-	var exists int
-	_ = db.Get(&exists, "SELECT COUNT(*) FROM users WHERE email = ?", req.Email)
+	exists, _ := dbrepo.UserEmailExists(db, req.Email, nil)
 
 	var token string
-	if exists > 0 {
+	if exists {
 		token, _ = utils.RandomToken(24)
 		if token == "" {
 			token = "reset-token"
 		}
-		_, _ = db.Exec("DELETE FROM password_reset_tokens WHERE email = ?", req.Email)
-		_, _ = db.Exec("INSERT INTO password_reset_tokens (email, token, created_at) VALUES (?, ?, ?)", req.Email, token, time.Now())
+		_ = dbrepo.SavePasswordResetToken(db, req.Email, token, time.Now())
 
 		cfg := middleware.GetConfig(c)
 		resetURL := cfg.FrontendURL + "/reset-password/" + token + "?email=" + url.QueryEscape(req.Email)
@@ -237,26 +238,23 @@ func ResetPassword(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	var record struct {
-		Token     string    `db:"token"`
-		CreatedAt time.Time `db:"created_at"`
-	}
-	if err := db.Get(&record, "SELECT token, created_at FROM password_reset_tokens WHERE email = ? LIMIT 1", req.Email); err != nil || record.Token != req.Token {
+	record, err := dbrepo.GetPasswordResetTokenByEmail(db, req.Email)
+	if err != nil || record == nil || record.Token != req.Token {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"token": "Token reset tidak valid."})
 		return
 	}
 	if time.Since(record.CreatedAt) > 60*time.Minute {
-		_, _ = db.Exec("DELETE FROM password_reset_tokens WHERE email = ?", req.Email)
+		_ = dbrepo.DeletePasswordResetTokenByEmail(db, req.Email)
 		handlers.ValidationErrors(c, handlers.FieldErrors{"token": "Token reset sudah kedaluwarsa."})
 		return
 	}
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if _, err := db.Exec("UPDATE users SET password = ? WHERE email = ?", string(hash), req.Email); err != nil {
+	if err := dbrepo.UpdateUserPasswordByEmail(db, req.Email, string(hash)); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui password")
 		return
 	}
-	_, _ = db.Exec("DELETE FROM password_reset_tokens WHERE email = ?", req.Email)
+	_ = dbrepo.DeletePasswordResetTokenByEmail(db, req.Email)
 
 	c.JSON(http.StatusOK, gin.H{"status": "Password berhasil diperbarui.", "redirect_to": "/login"})
 }
@@ -352,8 +350,8 @@ func VerifyEmail(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	var user models.User
-	if err := db.Get(&user, "SELECT * FROM users WHERE id = ? LIMIT 1", userID); err != nil {
+	user, err := dbrepo.GetUserByID(db, userID)
+	if err != nil || user == nil {
 		handlers.JSONError(c, http.StatusNotFound, "User tidak ditemukan")
 		return
 	}
@@ -369,7 +367,7 @@ func VerifyEmail(c *gin.Context) {
 	}
 
 	if user.EmailVerifiedAt == nil {
-		_, _ = db.Exec("UPDATE users SET email_verified_at = ?, updated_at = ? WHERE id = ?", time.Now(), time.Now(), userID)
+		_ = dbrepo.MarkUserEmailVerified(db, userID, time.Now())
 	}
 
 	redirectURL := "/dashboard"

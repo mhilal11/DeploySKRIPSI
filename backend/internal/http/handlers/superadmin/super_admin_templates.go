@@ -2,10 +2,12 @@ package superadmin
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,8 +26,7 @@ func SuperAdminTemplatesList(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	templates := []models.LetterTemplate{}
-	_ = db.Select(&templates, "SELECT * FROM letter_templates ORDER BY created_at DESC")
+	templates, _ := dbrepo.ListLetterTemplates(db)
 
 	payload := make([]map[string]any, 0, len(templates))
 	for _, t := range templates {
@@ -97,8 +98,7 @@ func SuperAdminTemplatesIndex(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	templates := []models.LetterTemplate{}
-	_ = db.Select(&templates, "SELECT * FROM letter_templates ORDER BY created_at DESC")
+	templates, _ := dbrepo.ListLetterTemplates(db)
 	payload := make([]map[string]any, 0, len(templates))
 	for _, t := range templates {
 		payload = append(payload, map[string]any{
@@ -167,11 +167,16 @@ func SuperAdminTemplatesStore(c *gin.Context) {
 
 	db := middleware.GetDB(c)
 	now := time.Now()
-	_, _ = db.Exec(`INSERT INTO letter_templates (name, file_path, file_name, header_text, footer_text, logo_path, is_active, created_by, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-		name, templatePath, meta.OriginalName, headerText, footerText, logoPath, user.ID, now, now)
-
-	_, _ = db.Exec("UPDATE letter_templates SET is_active = 0 WHERE file_path != ?", templatePath)
+	_ = dbrepo.CreateAndActivateLetterTemplate(db, dbrepo.LetterTemplateCreateInput{
+		Name:       name,
+		FilePath:   templatePath,
+		FileName:   meta.OriginalName,
+		HeaderText: headerText,
+		FooterText: footerText,
+		LogoPath:   logoPath,
+		CreatedBy:  user.ID,
+		Now:        now,
+	})
 
 	c.JSON(http.StatusOK, gin.H{"status": "Template berhasil diunggah dan diaktifkan."})
 }
@@ -183,16 +188,19 @@ func SuperAdminTemplatesToggle(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID template tidak valid")
+		return
+	}
 	db := middleware.GetDB(c)
 
-	var active bool
-	_ = db.Get(&active, "SELECT is_active FROM letter_templates WHERE id = ?", id)
+	active, _ := dbrepo.GetLetterTemplateIsActive(db, id)
 
 	if !active {
-		_, _ = db.Exec("UPDATE letter_templates SET is_active = 0")
+		_ = dbrepo.DeactivateAllLetterTemplates(db)
 	}
-	_, _ = db.Exec("UPDATE letter_templates SET is_active = ? WHERE id = ?", !active, id)
+	_ = dbrepo.SetLetterTemplateActive(db, id, !active)
 
 	c.JSON(http.StatusOK, gin.H{"status": "Template diperbarui."})
 }
@@ -204,10 +212,14 @@ func SuperAdminTemplatesDownload(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID template tidak valid")
+		return
+	}
 	db := middleware.GetDB(c)
-	var template models.LetterTemplate
-	if err := db.Get(&template, "SELECT * FROM letter_templates WHERE id = ?", id); err != nil {
+	template, err := dbrepo.GetLetterTemplateByID(db, id)
+	if err != nil || template == nil {
 		handlers.JSONError(c, http.StatusNotFound, "Template tidak ditemukan")
 		return
 	}
@@ -245,15 +257,19 @@ func SuperAdminTemplatesUpdate(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID template tidak valid")
+		return
+	}
 	name := c.PostForm("name")
 	headerText := c.PostForm("header_text")
 	footerText := c.PostForm("footer_text")
 	removeLogo := c.PostForm("remove_logo") == "true"
 
 	db := middleware.GetDB(c)
-	var template models.LetterTemplate
-	if err := db.Get(&template, "SELECT * FROM letter_templates WHERE id = ?", id); err != nil {
+	template, err := dbrepo.GetLetterTemplateByID(db, id)
+	if err != nil || template == nil {
 		handlers.JSONError(c, http.StatusNotFound, "Template tidak ditemukan")
 		return
 	}
@@ -284,8 +300,16 @@ func SuperAdminTemplatesUpdate(c *gin.Context) {
 		}
 	}
 
-	_, _ = db.Exec(`UPDATE letter_templates SET name=?, file_path=?, file_name=?, header_text=?, footer_text=?, logo_path=?, updated_at=? WHERE id = ?`,
-		name, filePath, fileName, headerText, footerText, logoPath, time.Now(), id)
+	_ = dbrepo.UpdateLetterTemplate(db, dbrepo.LetterTemplateUpdateInput{
+		ID:         id,
+		Name:       name,
+		FilePath:   filePath,
+		FileName:   fileName,
+		HeaderText: headerText,
+		FooterText: footerText,
+		LogoPath:   logoPath,
+		UpdatedAt:  time.Now(),
+	})
 
 	cfg := middleware.GetConfig(c)
 	if oldTemplatePath != "" && oldTemplatePath != filePath {
@@ -308,18 +332,21 @@ func SuperAdminTemplatesDelete(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID template tidak valid")
+		return
+	}
 	db := middleware.GetDB(c)
 
-	var template models.LetterTemplate
-	_ = db.Get(&template, "SELECT * FROM letter_templates WHERE id = ?", id)
-	_, _ = db.Exec("DELETE FROM letter_templates WHERE id = ?", id)
+	template, _ := dbrepo.GetLetterTemplateByID(db, id)
+	_ = dbrepo.DeleteLetterTemplateByID(db, id)
 
 	cfg := middleware.GetConfig(c)
-	if template.FilePath != "" {
+	if template != nil && template.FilePath != "" {
 		deleteStoredPath(cfg.StoragePath, template.FilePath)
 	}
-	if template.LogoPath != nil {
+	if template != nil && template.LogoPath != nil {
 		deleteStoredPath(cfg.StoragePath, *template.LogoPath)
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "Template berhasil dihapus."})

@@ -1,11 +1,7 @@
 package superadmin
 
 import (
-	"hris-backend/internal/http/handlers"
-
 	"context"
-	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,8 +10,10 @@ import (
 	"time"
 
 	"hris-backend/internal/config"
+	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
+	dbrepo "hris-backend/internal/repository"
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -167,12 +165,12 @@ func runRecruitmentAIScreeningForApplication(
 		return nil, fmt.Errorf("%w: id lamaran tidak valid", errAIScreeningApplicationNotFound)
 	}
 
-	var app models.Application
-	if err := db.Get(&app, "SELECT * FROM applications WHERE id = ?", applicationID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errAIScreeningApplicationNotFound
-		}
+	app, err := dbrepo.GetApplicationByID(db, applicationID)
+	if err != nil {
 		return nil, fmt.Errorf("%w: %v", errAIScreeningPersistFailed, err)
+	}
+	if app == nil {
+		return nil, errAIScreeningApplicationNotFound
 	}
 
 	client := services.NewGroqCVScreeningClient(
@@ -199,7 +197,7 @@ func runRecruitmentAIScreeningForApplication(
 
 	cvText, err := services.ExtractCVText(absCVPath)
 	if err != nil {
-		insertRecruitmentAIScreeningFailure(db, app.ID, actorUserID, normalizedCVPath, client.Models(), err.Error(), nil)
+		_ = insertRecruitmentAIScreeningFailure(db, app.ID, actorUserID, normalizedCVPath, client.Models(), err.Error(), nil)
 		return nil, fmt.Errorf("%w: %v", errAIScreeningCVUnreadable, err)
 	}
 
@@ -217,8 +215,8 @@ func runRecruitmentAIScreeningForApplication(
 	}
 
 	criteriaByVacancyKey, criteriaByPosition := loadVacancyScoringCriteria(db)
-	criteria := resolveVacancyScoringCriteria(app, criteriaByVacancyKey, criteriaByPosition)
-	jobDescription := loadJobDescriptionByApplication(db, app)
+	criteria := resolveVacancyScoringCriteria(*app, criteriaByVacancyKey, criteriaByPosition)
+	jobDescription := loadJobDescriptionByApplication(db, *app)
 
 	input := services.CVScreeningInput{
 		CandidateName:    strings.TrimSpace(app.FullName),
@@ -234,7 +232,7 @@ func runRecruitmentAIScreeningForApplication(
 
 	result, modelUsed, attempts, usage, rawResponse, screeningErr := client.ScreenCV(ctx, input)
 	if screeningErr != nil {
-		insertRecruitmentAIScreeningFailure(db, app.ID, actorUserID, normalizedCVPath, client.Models(), screeningErr.Error(), attempts)
+		_ = insertRecruitmentAIScreeningFailure(db, app.ID, actorUserID, normalizedCVPath, client.Models(), screeningErr.Error(), attempts)
 		return nil, fmt.Errorf("%w: %v", errAIScreeningProviderFailed, screeningErr)
 	}
 
@@ -256,7 +254,7 @@ func runRecruitmentAIScreeningForApplication(
 	}
 
 	return &recruitmentAIScreeningRunOutput{
-		Application: app,
+		Application: *app,
 		Row:         row,
 		ModelUsed:   modelUsed,
 		Result:      result,
@@ -267,48 +265,22 @@ func loadApplicantProfileByUserID(db *sqlx.DB, userID *int64) *models.ApplicantP
 	if db == nil || userID == nil || *userID <= 0 {
 		return nil
 	}
-
-	var profile models.ApplicantProfile
-	if err := db.Get(&profile, "SELECT * FROM applicant_profiles WHERE user_id = ?", *userID); err != nil {
+	profile, err := dbrepo.GetApplicantProfileByUserID(db, *userID)
+	if err != nil {
 		return nil
 	}
-	return &profile
+	return profile
 }
 
 func loadJobDescriptionByApplication(db *sqlx.DB, app models.Application) string {
 	if db == nil {
 		return ""
 	}
-
-	var desc sql.NullString
-	if app.Division != nil && strings.TrimSpace(*app.Division) != "" {
-		_ = db.Get(
-			&desc,
-			`SELECT job_description
-			 FROM division_profiles
-			 WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))
-			   AND LOWER(TRIM(job_title)) = LOWER(TRIM(?))
-			 LIMIT 1`,
-			*app.Division,
-			app.Position,
-		)
-		if desc.Valid {
-			return strings.TrimSpace(desc.String)
-		}
+	jobDesc, err := dbrepo.GetJobDescriptionByApplication(db, app.Division, app.Position)
+	if err != nil {
+		return ""
 	}
-
-	_ = db.Get(
-		&desc,
-		`SELECT job_description
-		 FROM division_profiles
-		 WHERE LOWER(TRIM(job_title)) = LOWER(TRIM(?))
-		 LIMIT 1`,
-		app.Position,
-	)
-	if desc.Valid {
-		return strings.TrimSpace(desc.String)
-	}
-	return ""
+	return strings.TrimSpace(jobDesc)
 }
 
 func loadLatestRecruitmentAIScreeningsIndex(db *sqlx.DB, applicationIDs []int64) map[int64]map[string]any {
@@ -316,32 +288,15 @@ func loadLatestRecruitmentAIScreeningsIndex(db *sqlx.DB, applicationIDs []int64)
 	if db == nil || len(applicationIDs) == 0 {
 		return out
 	}
-	if err := ensureRecruitmentAIScreeningTable(db); err != nil {
-		return out
-	}
 
-	query, args, err := sqlx.In(`
-		SELECT s.*
-		FROM recruitment_ai_screenings s
-		INNER JOIN (
-			SELECT application_id, MAX(id) AS latest_id
-			FROM recruitment_ai_screenings
-			WHERE application_id IN (?)
-			GROUP BY application_id
-		) latest ON latest.latest_id = s.id
-	`, applicationIDs)
+	rows, err := dbrepo.GetLatestRecruitmentAIScreeningsByApplicationIDs(db, applicationIDs)
 	if err != nil {
 		return out
 	}
-	query = db.Rebind(query)
 
-	rows := []models.RecruitmentAIScreening{}
-	if err := db.Select(&rows, query, args...); err != nil {
-		return out
-	}
-	for _, row := range rows {
+	for appID, row := range rows {
 		cloned := row
-		out[row.ApplicationID] = mapAIScreeningPayload(&cloned)
+		out[appID] = mapAIScreeningPayload(&cloned)
 	}
 	return out
 }
@@ -350,25 +305,13 @@ func loadLatestRecruitmentAIScreening(db *sqlx.DB, applicationID string) (*model
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
 	}
-	if err := ensureRecruitmentAIScreeningTable(db); err != nil {
-		return nil, err
+
+	parsedID, err := strconv.ParseInt(strings.TrimSpace(applicationID), 10, 64)
+	if err != nil || parsedID <= 0 {
+		return nil, errors.New("id lamaran tidak valid")
 	}
 
-	var row models.RecruitmentAIScreening
-	err := db.Get(&row, `
-		SELECT *
-		FROM recruitment_ai_screenings
-		WHERE application_id = ?
-		ORDER BY id DESC
-		LIMIT 1
-	`, applicationID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &row, nil
+	return dbrepo.GetLatestRecruitmentAIScreeningByApplicationID(db, parsedID)
 }
 
 func insertRecruitmentAIScreeningFailure(
@@ -379,37 +322,20 @@ func insertRecruitmentAIScreeningFailure(
 	modelChain []string,
 	errorMessage string,
 	attempts []services.CVScreeningAttempt,
-) {
+) error {
 	if db == nil || applicationID <= 0 {
-		return
+		return nil
 	}
-	if err := ensureRecruitmentAIScreeningTable(db); err != nil {
-		return
-	}
-	now := time.Now()
-	_, _ = db.Exec(`
-		INSERT INTO recruitment_ai_screenings (
-			application_id, actor_user_id, provider, model_chain, prompt_version,
-			cv_file_path, cv_text_chars, token_prompt, token_completion, token_total,
-			attempts_json, status, error_message, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`,
-		applicationID,
-		nullableInt64(actorUserID),
-		"groq",
-		marshalModelsJSON(modelChain),
-		recruitmentAIScreeningPromptVersion,
-		nullableString(cvFilePath),
-		0,
-		0,
-		0,
-		0,
-		marshalModelsJSON(attempts),
-		"failed",
-		nullableString(errorMessage),
-		now,
-		now,
-	)
+	return dbrepo.InsertRecruitmentAIScreeningFailure(db, dbrepo.RecruitmentAIScreeningFailureInput{
+		ApplicationID: applicationID,
+		ActorUserID:   actorUserID,
+		PromptVersion: recruitmentAIScreeningPromptVersion,
+		CVFilePath:    cvFilePath,
+		ModelChain:    modelChain,
+		ErrorMessage:  errorMessage,
+		Attempts:      attempts,
+		Now:           time.Now(),
+	})
 }
 
 func insertRecruitmentAIScreeningSuccess(
@@ -428,98 +354,28 @@ func insertRecruitmentAIScreeningSuccess(
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
 	}
-	if err := ensureRecruitmentAIScreeningTable(db); err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	score := result.MatchScore
-	recommendation := strings.TrimSpace(result.Recommendation)
-	summary := strings.TrimSpace(result.Summary)
-
-	_, err := db.Exec(`
-		INSERT INTO recruitment_ai_screenings (
-			application_id, actor_user_id, provider, model_used, model_chain, prompt_version,
-			cv_file_path, cv_text_chars, match_score, recommendation, summary,
-			strengths_json, gaps_json, red_flags_json, interview_questions_json,
-			token_prompt, token_completion, token_total, attempts_json, raw_response,
-			status, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`,
-		applicationID,
-		nullableInt64(actorUserID),
-		"groq",
-		nullableString(modelUsed),
-		marshalModelsJSON(modelChain),
-		recruitmentAIScreeningPromptVersion,
-		nullableString(cvFilePath),
-		cvTextChars,
-		score,
-		nullableString(recommendation),
-		nullableString(summary),
-		marshalModelsJSON(result.Strengths),
-		marshalModelsJSON(result.Gaps),
-		marshalModelsJSON(result.RedFlags),
-		marshalModelsJSON(result.InterviewQuestions),
-		usage.PromptTokens,
-		usage.CompletionTokens,
-		usage.TotalTokens,
-		marshalModelsJSON(attempts),
-		marshalRawResponse(rawResponse),
-		"success",
-		now,
-		now,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	latest, loadErr := loadLatestRecruitmentAIScreening(db, fmt.Sprintf("%d", applicationID))
-	if loadErr != nil {
-		return nil, loadErr
-	}
-	return latest, nil
-}
-
-func marshalModelsJSON(value any) models.JSON {
-	if value == nil {
-		return nil
-	}
-	raw, err := json.Marshal(value)
-	if err != nil || len(raw) == 0 {
-		return nil
-	}
-	return models.JSON(raw)
-}
-
-func marshalRawResponse(value string) models.JSON {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return nil
-	}
-	if json.Valid([]byte(trimmed)) {
-		return models.JSON([]byte(trimmed))
-	}
-	raw, err := json.Marshal(trimmed)
-	if err != nil {
-		return nil
-	}
-	return models.JSON(raw)
-}
-
-func nullableString(value string) any {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return nil
-	}
-	return trimmed
-}
-
-func nullableInt64(value int64) any {
-	if value <= 0 {
-		return nil
-	}
-	return value
+	return dbrepo.InsertRecruitmentAIScreeningSuccess(db, dbrepo.RecruitmentAIScreeningSuccessInput{
+		ApplicationID:      applicationID,
+		ActorUserID:        actorUserID,
+		PromptVersion:      recruitmentAIScreeningPromptVersion,
+		CVFilePath:         cvFilePath,
+		CVTextChars:        cvTextChars,
+		ModelUsed:          modelUsed,
+		ModelChain:         modelChain,
+		MatchScore:         result.MatchScore,
+		Recommendation:     result.Recommendation,
+		Summary:            result.Summary,
+		Strengths:          result.Strengths,
+		Gaps:               result.Gaps,
+		RedFlags:           result.RedFlags,
+		InterviewQuestions: result.InterviewQuestions,
+		PromptTokens:       usage.PromptTokens,
+		CompletionTokens:   usage.CompletionTokens,
+		TotalTokens:        usage.TotalTokens,
+		Attempts:           attempts,
+		RawResponse:        rawResponse,
+		Now:                time.Now(),
+	})
 }
 
 func mapAIScreeningPayload(row *models.RecruitmentAIScreening) map[string]any {
@@ -569,44 +425,4 @@ func mapAIScreeningPayload(row *models.RecruitmentAIScreening) map[string]any {
 		"created_at":    createdAt,
 		"updated_at":    updatedAt,
 	}
-}
-
-func ensureRecruitmentAIScreeningTable(db *sqlx.DB) error {
-	if db == nil {
-		return errors.New("database tidak tersedia")
-	}
-	_, err := db.Exec(`
-CREATE TABLE IF NOT EXISTS recruitment_ai_screenings (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  application_id BIGINT UNSIGNED NOT NULL,
-  actor_user_id BIGINT UNSIGNED NULL,
-  provider VARCHAR(32) NOT NULL DEFAULT 'groq',
-  model_used VARCHAR(128) NULL,
-  model_chain JSON NULL,
-  prompt_version VARCHAR(64) NOT NULL DEFAULT 'cv-screening-v1',
-  cv_file_path VARCHAR(255) NULL,
-  cv_text_chars INT NOT NULL DEFAULT 0,
-  match_score DECIMAL(5,2) NULL,
-  recommendation VARCHAR(64) NULL,
-  summary TEXT NULL,
-  strengths_json JSON NULL,
-  gaps_json JSON NULL,
-  red_flags_json JSON NULL,
-  interview_questions_json JSON NULL,
-  token_prompt INT NOT NULL DEFAULT 0,
-  token_completion INT NOT NULL DEFAULT 0,
-  token_total INT NOT NULL DEFAULT 0,
-  attempts_json JSON NULL,
-  raw_response JSON NULL,
-  status VARCHAR(16) NOT NULL DEFAULT 'success',
-  error_message TEXT NULL,
-  created_at TIMESTAMP NULL,
-  updated_at TIMESTAMP NULL,
-  INDEX idx_recruitment_ai_screenings_application (application_id),
-  INDEX idx_recruitment_ai_screenings_created_at (created_at),
-  CONSTRAINT fk_recruitment_ai_screenings_application FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
-  CONSTRAINT fk_recruitment_ai_screenings_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-`)
-	return err
 }

@@ -9,6 +9,7 @@ import (
 
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
+	dbrepo "hris-backend/internal/repository"
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -40,8 +41,7 @@ func FirstString(ptr *string, fallback string) string {
 }
 
 func LookupUserName(db *sqlx.DB, userID int64) string {
-	var name string
-	_ = db.Get(&name, "SELECT name FROM users WHERE id = ?", userID)
+	name, _ := dbrepo.GetUserNameByID(db, userID)
 	if name == "" {
 		return "HRD"
 	}
@@ -181,29 +181,26 @@ func EnsureDepartemen(db *sqlx.DB, division *string) *int64 {
 	if division == nil || *division == "" {
 		return nil
 	}
-	var departemen models.Departemen
-	err := db.Get(&departemen, "SELECT * FROM departemen WHERE nama = ? LIMIT 1", *division)
-	if err == nil {
+	departemen, err := dbrepo.GetDepartemenByName(db, *division)
+	if err == nil && departemen != nil {
 		return &departemen.ID
 	}
 	code := services.DivisionCodeFromName(*division)
-	res, err := db.Exec("INSERT INTO departemen (nama, kode, created_at, updated_at) VALUES (?, ?, NOW(), NOW())", *division, code)
+	id, err := dbrepo.CreateDepartemenAndReturnID(db, *division, code)
 	if err != nil {
 		return nil
 	}
-	id, _ := res.LastInsertId()
-	return &id
+	return id
 }
 
 func LookupDepartemenName(db *sqlx.DB, departemenID *int64, userID int64) string {
 	if departemenID != nil {
-		var name string
-		if err := db.Get(&name, "SELECT nama FROM departemen WHERE id = ?", *departemenID); err == nil {
+		name, err := dbrepo.GetDepartemenNameByID(db, *departemenID)
+		if err == nil && name != "" {
 			return name
 		}
 	}
-	var division string
-	_ = db.Get(&division, "SELECT division FROM users WHERE id = ?", userID)
+	division, _ := dbrepo.GetUserDivisionByID(db, userID)
 	if division != "" {
 		return division
 	}
@@ -213,8 +210,7 @@ func LookupDepartemenName(db *sqlx.DB, departemenID *int64, userID int64) string
 func TransformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map[string]any {
 	result := make([]map[string]any, 0, len(letters))
 	for _, surat := range letters {
-		replyHistories := []models.SuratReplyHistory{}
-		_ = db.Select(&replyHistories, "SELECT * FROM surat_reply_histories WHERE surat_id = ? ORDER BY replied_at", surat.SuratID)
+		replyHistories, _ := dbrepo.ListSuratReplyHistories(db, surat.SuratID)
 		historyPayload := make([]map[string]any, 0, len(replyHistories))
 		for _, history := range replyHistories {
 			authorName := ""
@@ -302,11 +298,11 @@ func TransformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 }
 
 func GetApplicantProfile(db *sqlx.DB, userID int64) *models.ApplicantProfile {
-	var profile models.ApplicantProfile
-	if err := db.Get(&profile, "SELECT * FROM applicant_profiles WHERE user_id = ?", userID); err != nil {
+	profile, err := dbrepo.GetApplicantProfileByUserID(db, userID)
+	if err != nil || profile == nil {
 		return nil
 	}
-	return &profile
+	return profile
 }
 
 func ToInt(value any) (int, bool) {

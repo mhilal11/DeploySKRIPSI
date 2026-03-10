@@ -2,6 +2,7 @@ package profile
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
 	"strings"
@@ -69,9 +70,9 @@ func UpdateProfile(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	var exists int
-	_ = db.Get(&exists, "SELECT COUNT(*) FROM users WHERE email = ? AND id != ?", req.Email, user.ID)
-	if exists > 0 {
+	excludeID := user.ID
+	exists, _ := dbrepo.UserEmailExists(db, req.Email, &excludeID)
+	if exists {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email sudah digunakan."})
 		return
 	}
@@ -81,8 +82,7 @@ func UpdateProfile(c *gin.Context) {
 		emailVerifiedAt = nil
 	}
 
-	_, err := db.Exec("UPDATE users SET name = ?, email = ?, email_verified_at = ?, updated_at = ? WHERE id = ?", req.Name, req.Email, emailVerifiedAt, time.Now(), user.ID)
-	if err != nil {
+	if err := dbrepo.UpdateUserBasicProfile(db, user.ID, req.Name, req.Email, emailVerifiedAt, time.Now()); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui profil")
 		return
 	}
@@ -115,8 +115,7 @@ func UpdatePassword(c *gin.Context) {
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	db := middleware.GetDB(c)
-	_, err := db.Exec("UPDATE users SET password = ?, updated_at = ? WHERE id = ?", string(hash), time.Now(), user.ID)
-	if err != nil {
+	if err := dbrepo.UpdateUserPassword(db, user.ID, string(hash)); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui password")
 		return
 	}
@@ -143,8 +142,7 @@ func DeleteProfile(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	_, err := db.Exec("DELETE FROM users WHERE id = ?", user.ID)
-	if err != nil {
+	if err := dbrepo.DeleteUserByID(db, user.ID); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menghapus akun")
 		return
 	}

@@ -3,6 +3,9 @@ package handlers
 import (
 	"fmt"
 	"time"
+
+	"github.com/jmoiron/sqlx"
+	dbrepo "hris-backend/internal/repository"
 )
 
 func FormatDate(t *time.Time) string {
@@ -107,67 +110,30 @@ func itoa(value int) string {
 // computeSuperAdminSidebarNotifications calculates badge counts for SuperAdmin sidebar.
 // Pass userID to get personalized unread audit-log count.
 func ComputeSuperAdminSidebarNotifications(db any, userID ...int64) map[string]int {
-	type Querier interface {
-		Get(dest interface{}, query string, args ...interface{}) error
-	}
-
-	q, ok := db.(Querier)
+	sqlDB, ok := db.(*sqlx.DB)
 	if !ok {
 		return map[string]int{}
 	}
 
 	notifications := map[string]int{}
 
-	// Letters: status in ['Menunggu HR', 'Diajukan', 'Diproses'] AND current_recipient = 'hr'
-	var lettersCount int
-	_ = q.Get(&lettersCount, `
-		SELECT COUNT(*) FROM surat 
-		WHERE LOWER(status_persetujuan) IN ('menunggu hr', 'diajukan', 'diproses')
-		AND LOWER(current_recipient) = 'hr'
-	`)
+	lettersCount, _ := dbrepo.CountPendingHRLetters(sqlDB)
 	notifications["super-admin.letters.index"] = lettersCount
 
-	// Recruitment: status in ['Applied', 'Screening']
-	var recruitmentCount int
-	_ = q.Get(&recruitmentCount, `
-		SELECT COUNT(*) FROM applications 
-		WHERE LOWER(status) IN ('applied', 'screening')
-	`)
+	recruitmentCount, _ := dbrepo.CountPendingRecruitmentApplications(sqlDB)
 	notifications["super-admin.recruitment"] = recruitmentCount
 
-	// Staff terminations: status in ['Diajukan', 'Proses', 'Diproses']
-	var staffCount int
-	_ = q.Get(&staffCount, `
-		SELECT COUNT(*) FROM staff_terminations 
-		WHERE status IN ('Diajukan', 'Proses', 'Diproses')
-	`)
+	staffCount, _ := dbrepo.CountPendingStaffTerminations(sqlDB)
 	notifications["super-admin.staff.index"] = staffCount
 
-	// Complaints: status = 'new' (legacy rows might still use 'Baru')
-	var complaintsCount int
-	_ = q.Get(&complaintsCount, `
-		SELECT COUNT(*) FROM complaints 
-		WHERE LOWER(status) IN ('new', 'baru')
-	`)
+	complaintsCount, _ := dbrepo.CountNewComplaints(sqlDB)
 	notifications["super-admin.complaints.index"] = complaintsCount
 
-	// Audit log: unread activity in the last 24 hours (per user when userID is provided).
-	var auditCount int
+	auditCount := 0
 	if len(userID) > 0 && userID[0] > 0 {
-		_ = q.Get(&auditCount, `
-			SELECT COUNT(*)
-			FROM audit_logs al
-			LEFT JOIN audit_log_views av
-			  ON av.audit_log_id = al.id
-			 AND av.user_id = ?
-			WHERE al.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-			  AND av.id IS NULL
-		`, userID[0])
+		auditCount, _ = dbrepo.CountUnreadRecentAuditLogs(sqlDB, userID[0])
 	} else {
-		_ = q.Get(&auditCount, `
-			SELECT COUNT(*) FROM audit_logs
-			WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-		`)
+		auditCount, _ = dbrepo.CountRecentAuditLogs(sqlDB)
 	}
 	notifications["super-admin.audit-log"] = auditCount
 

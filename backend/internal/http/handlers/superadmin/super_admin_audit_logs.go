@@ -2,6 +2,7 @@ package superadmin
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
 	"encoding/json"
 	"net/http"
@@ -24,11 +25,6 @@ type auditLogPayload struct {
 	Description string
 	OldValues   any
 	NewValues   any
-}
-
-type auditLogListRow struct {
-	models.AuditLog
-	IsViewed int `db:"is_viewed"`
 }
 
 func SuperAdminAuditLogsIndex(c *gin.Context) {
@@ -54,45 +50,14 @@ func SuperAdminAuditLogsIndex(c *gin.Context) {
 	}
 	perPage := 20
 
-	where := []string{}
-	args := []any{}
-	if filters["search"] != "" {
-		keyword := "%" + filters["search"] + "%"
-		where = append(where, "(al.user_name LIKE ? OR al.user_email LIKE ? OR al.description LIKE ? OR al.entity_id LIKE ?)")
-		args = append(args, keyword, keyword, keyword, keyword)
+	repoFilters := dbrepo.AuditLogFilters{
+		Search:   filters["search"],
+		Module:   filters["module"],
+		Action:   filters["action"],
+		DateFrom: filters["date_from"],
+		DateTo:   filters["date_to"],
 	}
-	if filters["module"] != "" && filters["module"] != "all" {
-		where = append(where, "al.module = ?")
-		args = append(args, filters["module"])
-	}
-	if filters["action"] != "" && filters["action"] != "all" {
-		where = append(where, "al.action = ?")
-		args = append(args, filters["action"])
-	}
-	if filters["date_from"] != "" {
-		where = append(where, "DATE(al.created_at) >= ?")
-		args = append(args, filters["date_from"])
-	}
-	if filters["date_to"] != "" {
-		where = append(where, "DATE(al.created_at) <= ?")
-		args = append(args, filters["date_to"])
-	}
-
-	countBaseQuery := "FROM audit_logs al"
-	selectBaseQuery := `
-		FROM audit_logs al
-		LEFT JOIN audit_log_views av
-		  ON av.audit_log_id = al.id
-		 AND av.user_id = ?
-	`
-	if len(where) > 0 {
-		whereClause := " WHERE " + strings.Join(where, " AND ")
-		countBaseQuery += whereClause
-		selectBaseQuery += whereClause
-	}
-
-	var total int
-	_ = db.Get(&total, "SELECT COUNT(*) "+countBaseQuery, args...)
+	total, _ := dbrepo.CountAuditLogs(db, repoFilters)
 
 	lastPage := (total + perPage - 1) / perPage
 	if lastPage == 0 {
@@ -103,17 +68,7 @@ func SuperAdminAuditLogsIndex(c *gin.Context) {
 	}
 	offset := (page - 1) * perPage
 
-	rows := []auditLogListRow{}
-	argsWithLimit := append([]any{user.ID}, args...)
-	argsWithLimit = append(argsWithLimit, perPage, offset)
-	_ = db.Select(
-		&rows,
-		`SELECT al.*,
-		        CASE WHEN av.id IS NULL THEN 0 ELSE 1 END AS is_viewed
-		 `+" "+selectBaseQuery+`
-		 ORDER BY al.id DESC LIMIT ? OFFSET ?`,
-		argsWithLimit...,
-	)
+	rows, _ := dbrepo.ListAuditLogs(db, user.ID, repoFilters, perPage, offset)
 
 	data := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
@@ -137,11 +92,9 @@ func SuperAdminAuditLogsIndex(c *gin.Context) {
 		})
 	}
 
-	moduleOptions := []string{}
-	_ = db.Select(&moduleOptions, "SELECT DISTINCT module FROM audit_logs WHERE module IS NOT NULL AND module <> '' ORDER BY module ASC")
+	moduleOptions, _ := dbrepo.ListAuditLogModules(db)
 
-	actionOptions := []string{}
-	_ = db.Select(&actionOptions, "SELECT DISTINCT action FROM audit_logs WHERE action IS NOT NULL AND action <> '' ORDER BY action ASC")
+	actionOptions, _ := dbrepo.ListAuditLogActions(db)
 
 	c.JSON(http.StatusOK, gin.H{
 		"auditLogs": gin.H{
@@ -196,24 +149,14 @@ func SuperAdminAuditLogsMarkViewed(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	query, args, err := sqlx.In("SELECT id FROM audit_logs WHERE id IN (?)", ids)
+	existingIDs, err := dbrepo.ListExistingAuditLogIDs(db, ids)
 	if err != nil {
-		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memproses data audit log")
-		return
-	}
-	query = db.Rebind(query)
-	existingIDs := []int64{}
-	if err := db.Select(&existingIDs, query, args...); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat data audit log")
 		return
 	}
 
 	for _, auditLogID := range existingIDs {
-		_, _ = db.Exec(`
-			INSERT INTO audit_log_views (audit_log_id, user_id, viewed_at)
-			VALUES (?, ?, NOW())
-			ON DUPLICATE KEY UPDATE viewed_at = VALUES(viewed_at)
-		`, auditLogID, user.ID)
+		_ = dbrepo.UpsertAuditLogView(db, auditLogID, user.ID)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -253,30 +196,22 @@ func appendAuditLog(c *gin.Context, db *sqlx.DB, payload auditLogPayload) {
 	ipAddress := nullIfBlank(c.ClientIP())
 	userAgent := nullIfBlank(c.Request.UserAgent())
 
-	_, _ = db.Exec(`
-		INSERT INTO audit_logs (
-			user_id, user_name, user_email, user_role,
-			module, action, entity_type, entity_id,
-			description, old_values, new_values,
-			ip_address, user_agent, created_at
-		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`,
-		userID,
-		userName,
-		userEmail,
-		userRole,
-		module,
-		action,
-		entityType,
-		entityID,
-		description,
-		auditValueToJSON(payload.OldValues),
-		auditValueToJSON(payload.NewValues),
-		ipAddress,
-		userAgent,
-		time.Now(),
-	)
+	_ = dbrepo.InsertAuditLog(db, dbrepo.AuditLogInsertInput{
+		UserID:      userID,
+		UserName:    userName,
+		UserEmail:   userEmail,
+		UserRole:    userRole,
+		Module:      module,
+		Action:      action,
+		EntityType:  entityType,
+		EntityID:    entityID,
+		Description: description,
+		OldValues:   auditValueToJSON(payload.OldValues),
+		NewValues:   auditValueToJSON(payload.NewValues),
+		IPAddress:   ipAddress,
+		UserAgent:   userAgent,
+		CreatedAt:   time.Now(),
+	})
 }
 
 func auditValueToJSON(value any) any {

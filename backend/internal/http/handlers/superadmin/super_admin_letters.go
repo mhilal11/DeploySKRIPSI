@@ -2,12 +2,14 @@ package superadmin
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,25 +33,10 @@ func SuperAdminLettersIndex(c *gin.Context) {
 	search := strings.TrimSpace(c.Query("search"))
 	category := strings.TrimSpace(c.Query("category"))
 
-	query := "SELECT * FROM surat"
-	clauses := []string{}
-	args := []any{}
-	if search != "" {
-		clauses = append(clauses, "(nomor_surat LIKE ? OR perihal LIKE ? OR penerima LIKE ?)")
-		like := "%" + search + "%"
-		args = append(args, like, like, like)
-	}
-	if category != "" && category != "all" {
-		clauses = append(clauses, "kategori = ?")
-		args = append(args, category)
-	}
-	if len(clauses) > 0 {
-		query += " WHERE " + strings.Join(clauses, " AND ")
-	}
-	query += " ORDER BY tanggal_surat DESC, surat_id DESC"
-
-	letters := []models.Surat{}
-	_ = db.Select(&letters, query, args...)
+	letters, _ := dbrepo.ListSuratByFilters(db, dbrepo.SuratListFilters{
+		Search:   search,
+		Category: category,
+	})
 
 	archive := []models.Surat{}
 	activeLetters := []models.Surat{}
@@ -171,9 +158,31 @@ func SuperAdminLettersStore(c *gin.Context) {
 
 	for _, div := range targetDivisions {
 		nomor, _ := services.GenerateNomorSurat(db, divisionCode, now)
-		_, _ = db.Exec(`INSERT INTO surat (user_id, departemen_id, nomor_surat, tipe_surat, jenis_surat, tanggal_surat, perihal, isi_surat, status_persetujuan, kategori, prioritas, penerima, target_division, previous_division, current_recipient, disposed_by, disposed_at, disposition_note, lampiran_path, lampiran_nama, lampiran_mime, lampiran_size, created_at, updated_at)
-            VALUES (?, ?, ?, 'keluar', ?, ?, ?, ?, 'Didisposisi', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			user.ID, departemenID, nomor, jenis, now.Format("2006-01-02"), perihal, isiSurat, kategori, prioritas, handlers.FirstString(&penerima, div), div, user.Division, div, user.ID, now, "Dikirim langsung oleh Super Admin", attachmentPath, attachmentName, attachmentMime, attachmentSize, now, now)
+		_ = dbrepo.InsertSuperAdminLetter(db, dbrepo.SuperAdminLetterCreateInput{
+			UserID:            user.ID,
+			DepartemenID:      departemenID,
+			NomorSurat:        nomor,
+			JenisSurat:        jenis,
+			TanggalSurat:      now.Format("2006-01-02"),
+			Perihal:           perihal,
+			IsiSurat:          isiSurat,
+			Kategori:          kategori,
+			Prioritas:         prioritas,
+			Penerima:          handlers.FirstString(&penerima, div),
+			TargetDivision:    div,
+			PreviousDivision:  user.Division,
+			CurrentRecipient:  div,
+			DisposedBy:        user.ID,
+			DisposedAt:        now,
+			DispositionNote:   "Dikirim langsung oleh Super Admin",
+			LampiranPath:      attachmentPath,
+			LampiranNama:      attachmentName,
+			LampiranMime:      attachmentMime,
+			LampiranSize:      attachmentSize,
+			CreatedAt:         now,
+			UpdatedAt:         now,
+			StatusPersetujuan: "Didisposisi",
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Surat berhasil dikirim langsung ke divisi tujuan."})
@@ -186,12 +195,16 @@ func SuperAdminLettersDisposition(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID surat tidak valid")
+		return
+	}
 	note := c.PostForm("disposition_note")
 	db := middleware.GetDB(c)
 
-	var surat models.Surat
-	if err := db.Get(&surat, "SELECT * FROM surat WHERE surat_id = ?", id); err != nil {
+	surat, err := dbrepo.GetSuratByID(db, id)
+	if err != nil || surat == nil {
 		handlers.JSONError(c, http.StatusNotFound, "Surat tidak ditemukan")
 		return
 	}
@@ -201,8 +214,7 @@ func SuperAdminLettersDisposition(c *gin.Context) {
 		return
 	}
 
-	_, _ = db.Exec(`UPDATE surat SET current_recipient='division', penerima=?, status_persetujuan='Didisposisi', disposition_note=?, disposed_by=?, disposed_at=?, updated_at=? WHERE surat_id=?`,
-		handlers.FirstString(surat.TargetDivision, surat.Penerima), note, user.ID, time.Now(), time.Now(), surat.SuratID)
+	_ = dbrepo.UpdateSuratDispositionToDivision(db, surat.SuratID, handlers.FirstString(surat.TargetDivision, surat.Penerima), note, user.ID, time.Now())
 
 	c.JSON(http.StatusOK, gin.H{"status": "Surat berhasil didisposisi ke divisi tujuan."})
 }
@@ -221,10 +233,8 @@ func SuperAdminLettersBulkDisposition(c *gin.Context) {
 	note := c.PostForm("disposition_note")
 
 	db := middleware.GetDB(c)
-	for _, id := range ids {
-		_, _ = db.Exec(`UPDATE surat SET current_recipient='division', penerima=COALESCE(target_division,penerima), status_persetujuan='Didisposisi', disposition_note=?, disposed_by=?, disposed_at=?, updated_at=? WHERE surat_id=?`,
-			note, user.ID, time.Now(), time.Now(), id)
-	}
+	idValues := parseInt64IDs(ids)
+	_ = dbrepo.BulkDispositionLetters(db, idValues, note, user.ID, time.Now())
 
 	c.JSON(http.StatusOK, gin.H{"status": fmt.Sprintf("%d surat berhasil didisposisi ke divisi tujuan.", len(ids))})
 }
@@ -248,13 +258,16 @@ func SuperAdminLettersRejectDisposition(c *gin.Context) {
 
 	db := middleware.GetDB(c)
 	for _, id := range ids {
-		var surat models.Surat
-		if err := db.Get(&surat, "SELECT * FROM surat WHERE surat_id = ?", id); err != nil {
+		suratID, parseErr := strconv.ParseInt(id, 10, 64)
+		if parseErr != nil || suratID <= 0 {
+			continue
+		}
+		surat, err := dbrepo.GetSuratByID(db, suratID)
+		if err != nil || surat == nil {
 			continue
 		}
 		originDivision := handlers.LookupDepartemenName(db, surat.DepartemenID, surat.UserID)
-		_, _ = db.Exec(`UPDATE surat SET current_recipient='division', penerima=?, target_division=?, status_persetujuan='Ditolak HR', disposition_note=?, disposed_by=?, disposed_at=?, updated_at=? WHERE surat_id=?`,
-			originDivision, originDivision, note, user.ID, time.Now(), time.Now(), id)
+		_ = dbrepo.UpdateSuratRejectedToOrigin(db, suratID, originDivision, note, user.ID, time.Now())
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": fmt.Sprintf("%d surat ditolak dan dikembalikan ke divisi pengirim.", len(ids))})
@@ -275,8 +288,12 @@ func SuperAdminLettersFinalDisposition(c *gin.Context) {
 
 	db := middleware.GetDB(c)
 	for _, id := range ids {
-		var surat models.Surat
-		if err := db.Get(&surat, "SELECT * FROM surat WHERE surat_id = ?", id); err != nil {
+		suratID, parseErr := strconv.ParseInt(id, 10, 64)
+		if parseErr != nil || suratID <= 0 {
+			continue
+		}
+		surat, err := dbrepo.GetSuratByID(db, suratID)
+		if err != nil || surat == nil {
 			continue
 		}
 
@@ -284,9 +301,8 @@ func SuperAdminLettersFinalDisposition(c *gin.Context) {
 			surat.DispositionNote = &note
 		}
 
-		filePath, fileName := generateDispositionDocument(c, db, &surat)
-		_, _ = db.Exec(`UPDATE surat SET current_recipient='division', penerima=COALESCE(target_division,penerima), status_persetujuan='Didisposisi', is_finalized=1, disposition_document_path=?, disposition_document_name=?, disposition_note=?, disposed_by=?, disposed_at=?, updated_at=? WHERE surat_id=?`,
-			filePath, fileName, surat.DispositionNote, user.ID, time.Now(), time.Now(), surat.SuratID)
+		filePath, fileName := generateDispositionDocument(c, db, surat)
+		_ = dbrepo.UpdateSuratFinalDisposition(db, surat.SuratID, &filePath, &fileName, surat.DispositionNote, user.ID, time.Now())
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": fmt.Sprintf("%d surat didisposisi final.", len(ids))})
@@ -298,9 +314,13 @@ func SuperAdminLettersArchive(c *gin.Context) {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID surat tidak valid")
+		return
+	}
 	db := middleware.GetDB(c)
-	_, _ = db.Exec(`UPDATE surat SET status_persetujuan='Diarsipkan', current_recipient='archive' WHERE surat_id = ?`, id)
+	_ = dbrepo.ArchiveSurat(db, id)
 	c.JSON(http.StatusOK, gin.H{"status": "Surat dipindahkan ke arsip."})
 }
 
@@ -310,9 +330,13 @@ func SuperAdminLettersUnarchive(c *gin.Context) {
 		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
 		return
 	}
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID surat tidak valid")
+		return
+	}
 	db := middleware.GetDB(c)
-	_, _ = db.Exec(`UPDATE surat SET status_persetujuan='Didisposisi', current_recipient='division' WHERE surat_id = ?`, id)
+	_ = dbrepo.UnarchiveSurat(db, id)
 	c.JSON(http.StatusOK, gin.H{"status": "Surat dikembalikan ke daftar aktif."})
 }
 
@@ -323,15 +347,19 @@ func SuperAdminLettersExportWord(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID surat tidak valid")
+		return
+	}
 	db := middleware.GetDB(c)
-	var surat models.Surat
-	if err := db.Get(&surat, "SELECT * FROM surat WHERE surat_id = ?", id); err != nil {
+	surat, err := dbrepo.GetSuratByID(db, id)
+	if err != nil || surat == nil {
 		handlers.JSONError(c, http.StatusNotFound, "Surat tidak ditemukan")
 		return
 	}
 
-	filePath, fileName := generateDispositionDocument(c, db, &surat)
+	filePath, fileName := generateDispositionDocument(c, db, surat)
 	absPath := filepath.Join(middleware.GetConfig(c).StoragePath, filePath)
 	c.FileAttachment(absPath, fileName)
 }
@@ -344,10 +372,9 @@ func generateDispositionDocument(c *gin.Context, db *sqlx.DB, surat *models.Sura
 	placeholders := dispositionPlaceholders(db, surat)
 
 	// try template
-	var template models.LetterTemplate
-	err := db.Get(&template, "SELECT * FROM letter_templates WHERE is_active = 1 LIMIT 1")
+	template, err := dbrepo.GetActiveLetterTemplate(db)
 	var tempFile string
-	if err == nil && template.FilePath != "" {
+	if err == nil && template != nil && template.FilePath != "" {
 		templatePath := filepath.Join(middleware.GetConfig(c).StoragePath, template.FilePath)
 		if _, err := os.Stat(templatePath); err == nil {
 			tempFile, _ = services.ReplaceDocxPlaceholders(templatePath, placeholders)
@@ -434,4 +461,16 @@ func hrDivisionOptions(db *sqlx.DB) []string {
 		return []string{}
 	}
 	return divisions
+}
+
+func parseInt64IDs(values []string) []int64 {
+	out := make([]int64, 0, len(values))
+	for _, value := range values {
+		id, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+		if err != nil || id <= 0 {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
 }

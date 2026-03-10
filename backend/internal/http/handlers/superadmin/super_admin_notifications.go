@@ -2,6 +2,7 @@ package superadmin
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
 	"strconv"
@@ -38,12 +39,7 @@ func SuperAdminNotifications(c *gin.Context) {
 	}
 
 	letters := []models.Surat{}
-	_ = db.Select(&letters, `
-		SELECT * FROM surat
-		WHERE LOWER(current_recipient) = 'hr'
-		  AND LOWER(status_persetujuan) IN ('menunggu hr','diajukan','diproses')
-		ORDER BY created_at DESC
-	`)
+	letters, _ = dbrepo.ListPendingHRLetters(db)
 	sidebarNotifications["super-admin.letters.index"] = len(letters)
 	for _, letter := range letters {
 		notifications = append(notifications, map[string]any{
@@ -58,11 +54,7 @@ func SuperAdminNotifications(c *gin.Context) {
 	}
 
 	applications := []models.Application{}
-	_ = db.Select(&applications, `
-		SELECT * FROM applications
-		WHERE LOWER(status) IN ('applied','screening')
-		ORDER BY created_at DESC
-	`)
+	applications, _ = dbrepo.ListPendingRecruitmentApplications(db)
 	sidebarNotifications["super-admin.recruitment"] = len(applications)
 	for _, app := range applications {
 		notifications = append(notifications, map[string]any{
@@ -77,11 +69,7 @@ func SuperAdminNotifications(c *gin.Context) {
 	}
 
 	terminations := []models.StaffTermination{}
-	_ = db.Select(&terminations, `
-		SELECT * FROM staff_terminations
-		WHERE status IN ('Diajukan','Proses','Diproses')
-		ORDER BY request_date DESC
-	`)
+	terminations, _ = dbrepo.ListPendingStaffTerminations(db)
 	sidebarNotifications["super-admin.staff.index"] = len(terminations)
 	for _, term := range terminations {
 		notifications = append(notifications, map[string]any{
@@ -96,11 +84,7 @@ func SuperAdminNotifications(c *gin.Context) {
 	}
 
 	complaints := []models.Complaint{}
-	_ = db.Select(&complaints, `
-		SELECT * FROM complaints
-		WHERE LOWER(status) IN ('new', 'baru')
-		ORDER BY created_at DESC
-	`)
+	complaints, _ = dbrepo.ListNewComplaints(db)
 	sidebarNotifications["super-admin.complaints.index"] = len(complaints)
 	for _, complaint := range complaints {
 		notifications = append(notifications, map[string]any{
@@ -115,17 +99,7 @@ func SuperAdminNotifications(c *gin.Context) {
 	}
 
 	auditLogs := []models.AuditLog{}
-	_ = db.Select(&auditLogs, `
-		SELECT id, module, action, entity_type, entity_id, description, created_at
-		FROM audit_logs
-		WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-		  AND id NOT IN (
-			SELECT audit_log_id
-			FROM audit_log_views
-			WHERE user_id = ?
-		  )
-		ORDER BY created_at DESC
-	`, user.ID)
+	auditLogs, _ = dbrepo.ListUnreadAuditLogs(db, user.ID)
 	sidebarNotifications["super-admin.audit-log"] = len(auditLogs)
 	for _, audit := range auditLogs {
 		description := "Aktivitas audit baru tercatat."

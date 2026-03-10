@@ -2,9 +2,10 @@ package superadmin
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
-	"database/sql"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,47 +32,12 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		"category": strings.TrimSpace(c.Query("category")),
 	}
 
-	query := "SELECT * FROM complaints"
-	clauses := []string{}
-	args := []any{}
-	if filters["search"] != "" {
-		like := "%" + filters["search"] + "%"
-		clauses = append(clauses, "(complaint_code LIKE ? OR subject LIKE ? OR description LIKE ?)")
-		args = append(args, like, like, like)
-	}
-	if filters["status"] != "" && filters["status"] != "all" {
-		switch normalizeComplaintStatus(filters["status"]) {
-		case models.ComplaintStatusNew:
-			clauses = append(clauses, "LOWER(status) IN ('new','baru','open')")
-		case models.ComplaintStatusInProgress:
-			clauses = append(clauses, "LOWER(status) IN ('in_progress','onprogress','inprogress','processing','proses','diproses')")
-		case models.ComplaintStatusResolved:
-			clauses = append(clauses, "LOWER(status) IN ('resolved','selesai','closed','done')")
-		case models.ComplaintStatusArchived:
-			clauses = append(clauses, "LOWER(status) IN ('archived','diarsipkan','archive')")
-		}
-	}
-	if filters["priority"] != "" && filters["priority"] != "all" {
-		switch normalizeComplaintPriority(filters["priority"]) {
-		case models.ComplaintPriorityHigh:
-			clauses = append(clauses, "LOWER(priority) IN ('high','tinggi')")
-		case models.ComplaintPriorityMedium:
-			clauses = append(clauses, "LOWER(priority) IN ('medium','sedang','normal')")
-		case models.ComplaintPriorityLow:
-			clauses = append(clauses, "LOWER(priority) IN ('low','rendah')")
-		}
-	}
-	if filters["category"] != "" && filters["category"] != "all" {
-		clauses = append(clauses, "category = ?")
-		args = append(args, filters["category"])
-	}
-	if len(clauses) > 0 {
-		query += " WHERE " + strings.Join(clauses, " AND ")
-	}
-	query += " ORDER BY submitted_at DESC"
-
-	complaints := []models.Complaint{}
-	_ = db.Select(&complaints, query, args...)
+	complaints, _ := dbrepo.ListComplaintsByFilters(db, dbrepo.ComplaintListFilters{
+		Search:   filters["search"],
+		Status:   normalizeComplaintStatus(filters["status"]),
+		Priority: normalizeComplaintPriority(filters["priority"]),
+		Category: filters["category"],
+	})
 
 	data := make([]map[string]any, 0, len(complaints))
 	categoryOptions := map[string]bool{}
@@ -187,9 +153,14 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 	resolution := strings.TrimSpace(payload.ResolutionNotes)
 
 	db := middleware.GetDB(c)
+	complaintID, err := strconv.ParseInt(id, 10, 64)
+	if err != nil || complaintID <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID pengaduan tidak valid")
+		return
+	}
 
-	var existing models.Complaint
-	if err := db.Get(&existing, "SELECT * FROM complaints WHERE id = ?", id); err != nil {
+	existing, err := dbrepo.GetComplaintByID(db, complaintID)
+	if err != nil || existing == nil {
 		handlers.JSONError(c, http.StatusNotFound, "Pengaduan tidak ditemukan")
 		return
 	}
@@ -207,14 +178,20 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 		priority = models.ComplaintPriorityMedium
 	}
 
-	resolvedAt := sql.NullTime{}
+	var resolvedAt *time.Time
 	if status == models.ComplaintStatusResolved {
-		resolvedAt.Valid = true
-		resolvedAt.Time = time.Now()
+		now := time.Now()
+		resolvedAt = &now
 	}
 
-	_, _ = db.Exec(`UPDATE complaints SET status = ?, priority = ?, resolution_notes = ?, handled_by_id = ?, resolved_at = ? WHERE id = ?`,
-		status, priority, resolution, user.ID, resolvedAt, id)
+	_ = dbrepo.UpdateComplaint(db, dbrepo.ComplaintUpdateInput{
+		ID:              complaintID,
+		Status:          status,
+		Priority:        priority,
+		ResolutionNotes: resolution,
+		HandledByID:     user.ID,
+		ResolvedAt:      resolvedAt,
+	})
 
 	c.JSON(http.StatusOK, gin.H{"status": "Pengaduan berhasil diperbarui."})
 }
@@ -274,7 +251,9 @@ func complaintPriorityLabel(priority string) string {
 }
 
 func lookupUserEmail(db *sqlx.DB, userID int64) string {
-	var email string
-	_ = db.Get(&email, "SELECT email FROM users WHERE id = ?", userID)
-	return email
+	user, err := dbrepo.GetUserByID(db, userID)
+	if err != nil || user == nil {
+		return ""
+	}
+	return user.Email
 }

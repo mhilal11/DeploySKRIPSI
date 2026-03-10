@@ -2,6 +2,7 @@ package superadmin
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
 	"time"
@@ -23,12 +24,10 @@ func SuperAdminDashboard(c *gin.Context) {
 	db := middleware.GetDB(c)
 
 	roleCounts := map[string]int{}
-	rows, _ := db.Queryx("SELECT role, COUNT(*) as total FROM users GROUP BY role")
-	defer rows.Close()
-	for rows.Next() {
-		var role string
-		var total int
-		_ = rows.Scan(&role, &total)
+	roleRows, _ := dbrepo.ListUserRoleCounts(db)
+	for _, row := range roleRows {
+		role := row.Role
+		total := row.Total
 		roleCounts[role] = total
 	}
 
@@ -36,14 +35,7 @@ func SuperAdminDashboard(c *gin.Context) {
 	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 
 	countRegistered := func(role *string, start, end time.Time) int {
-		query := "SELECT COUNT(*) FROM users WHERE COALESCE(registered_at, created_at) BETWEEN ? AND ?"
-		args := []any{start, end}
-		if role != nil {
-			query += " AND role = ?"
-			args = append(args, *role)
-		}
-		var count int
-		_ = db.Get(&count, query, args...)
+		count, _ := dbrepo.CountRegisteredUsersBetween(db, role, start, end)
 		return count
 	}
 
@@ -70,10 +62,11 @@ func SuperAdminDashboard(c *gin.Context) {
 		{"name": models.RolePelamar, "value": roleCounts[models.RolePelamar], "color": "#f97316"},
 	}
 
-	var staffTotal, staffActive, staffInactive int
-	_ = db.Get(&staffTotal, "SELECT COUNT(*) FROM users WHERE role = ?", models.RoleStaff)
-	_ = db.Get(&staffActive, "SELECT COUNT(*) FROM users WHERE role = ? AND status = 'Active'", models.RoleStaff)
-	_ = db.Get(&staffInactive, "SELECT COUNT(*) FROM users WHERE role = ? AND status = 'Inactive'", models.RoleStaff)
+	activeStatus := "Active"
+	inactiveStatus := "Inactive"
+	staffTotal, _ := dbrepo.CountUsersByRoleAndStatus(db, models.RoleStaff, nil)
+	staffActive, _ := dbrepo.CountUsersByRoleAndStatus(db, models.RoleStaff, &activeStatus)
+	staffInactive, _ := dbrepo.CountUsersByRoleAndStatus(db, models.RoleStaff, &inactiveStatus)
 
 	staffStats := map[string]int{
 		"total":    staffTotal,
@@ -82,15 +75,12 @@ func SuperAdminDashboard(c *gin.Context) {
 	}
 
 	religionCounts := map[string]int{}
-	rows2, _ := db.Queryx("SELECT religion, COUNT(*) as total FROM staff_profiles GROUP BY religion")
-	for rows2.Next() {
-		var religion *string
-		var total int
-		_ = rows2.Scan(&religion, &total)
-		if religion != nil {
-			religionCounts[*religion] = total
+	religionRows, _ := dbrepo.ListStaffReligionCounts(db)
+	for _, row := range religionRows {
+		if row.Name != nil {
+			religionCounts[*row.Name] = row.Total
 		} else {
-			religionCounts["Belum Diisi"] = total
+			religionCounts["Belum Diisi"] = row.Total
 		}
 	}
 
@@ -108,15 +98,12 @@ func SuperAdminDashboard(c *gin.Context) {
 	}
 
 	genderCounts := map[string]int{}
-	rows3, _ := db.Queryx("SELECT gender, COUNT(*) as total FROM staff_profiles GROUP BY gender")
-	for rows3.Next() {
-		var gender *string
-		var total int
-		_ = rows3.Scan(&gender, &total)
-		if gender != nil {
-			genderCounts[*gender] = total
+	genderRows, _ := dbrepo.ListStaffGenderCounts(db)
+	for _, row := range genderRows {
+		if row.Name != nil {
+			genderCounts[*row.Name] = row.Total
 		} else {
-			genderCounts["Belum Diisi"] = total
+			genderCounts["Belum Diisi"] = row.Total
 		}
 	}
 
@@ -146,15 +133,12 @@ func SuperAdminDashboard(c *gin.Context) {
 	}
 
 	educationCounts := map[string]int{}
-	rows4, _ := db.Queryx("SELECT education_level, COUNT(*) as total FROM staff_profiles GROUP BY education_level")
-	for rows4.Next() {
-		var level *string
-		var total int
-		_ = rows4.Scan(&level, &total)
-		if level != nil {
-			educationCounts[*level] = total
+	educationRows, _ := dbrepo.ListStaffEducationCounts(db)
+	for _, row := range educationRows {
+		if row.Name != nil {
+			educationCounts[*row.Name] = row.Total
 		} else {
-			educationCounts["Belum Diisi"] = total
+			educationCounts["Belum Diisi"] = row.Total
 		}
 	}
 
@@ -167,17 +151,15 @@ func SuperAdminDashboard(c *gin.Context) {
 	}
 
 	divisionApplicants := []map[string]any{}
-	rows5, _ := db.Queryx("SELECT division, COUNT(*) as total FROM applications GROUP BY division ORDER BY division")
-	for rows5.Next() {
-		var division *string
-		var total int
-		_ = rows5.Scan(&division, &total)
+	divisionRows, _ := dbrepo.ListApplicationCountsByDivision(db)
+	for _, row := range divisionRows {
+		division := row.Division
+		total := row.Total
 		name := "Tidak ada divisi"
 		if division != nil {
 			name = *division
 		}
-		var newCount int
-		_ = db.Get(&newCount, "SELECT COUNT(*) FROM applications WHERE division = ? AND submitted_at BETWEEN ? AND ?", division, currentMonthStart, now)
+		newCount, _ := dbrepo.CountApplicationsByDivisionBetween(db, division, currentMonthStart, now)
 		divisionApplicants = append(divisionApplicants, map[string]any{
 			"id":    name,
 			"name":  name,
@@ -190,10 +172,8 @@ func SuperAdminDashboard(c *gin.Context) {
 	for i := 5; i >= 0; i-- {
 		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, -i, 0)
 		monthEnd := monthStart.AddDate(0, 1, 0).Add(-time.Second)
-		var registrations int
-		_ = db.Get(&registrations, "SELECT COUNT(*) FROM users WHERE COALESCE(registered_at, created_at) BETWEEN ? AND ?", monthStart, monthEnd)
-		var applications int
-		_ = db.Get(&applications, "SELECT COUNT(*) FROM applications WHERE COALESCE(submitted_at, created_at) BETWEEN ? AND ?", monthStart, monthEnd)
+		registrations, _ := dbrepo.CountRegisteredUsersBetween(db, nil, monthStart, monthEnd)
+		applications, _ := dbrepo.CountApplicationsSubmittedBetween(db, monthStart, monthEnd)
 		activityData = append(activityData, map[string]any{
 			"month":         monthStart.Format("Jan"),
 			"registrations": registrations,
@@ -229,37 +209,41 @@ func SuperAdminAdminHrDashboard(c *gin.Context) {
 	previousMonthStart := currentMonthStart.AddDate(0, -1, 0)
 	previousMonthEnd := currentMonthStart.Add(-time.Second)
 
-	monthDelta := func(query string, args ...any) int {
-		var current int
-		currentArgs := append([]any{}, args...)
-		currentArgs = append(currentArgs, currentMonthStart, now)
-		_ = db.Get(&current, query, currentArgs...)
-		var previous int
-		previousArgs := append([]any{}, args...)
-		previousArgs = append(previousArgs, previousMonthStart, previousMonthEnd)
-		_ = db.Get(&previous, query, previousArgs...)
+	monthDelta := func(counter func(start, end time.Time) int) int {
+		current := counter(currentMonthStart, now)
+		previous := counter(previousMonthStart, previousMonthEnd)
 		return current - previous
 	}
 
-	var activeEmployees int
-	_ = db.Get(&activeEmployees, "SELECT COUNT(*) FROM users WHERE status = 'Active'")
-	activeChange := monthDelta("SELECT COUNT(*) FROM users WHERE status = 'Active' AND created_at BETWEEN ? AND ?")
+	activeEmployees, _ := dbrepo.CountUsersByStatus(db, "Active")
+	activeChange := monthDelta(func(start, end time.Time) int {
+		count, _ := dbrepo.CountUsersByStatusCreatedBetween(db, "Active", start, end)
+		return count
+	})
 
-	var positionsOpen int
-	_ = db.Get(&positionsOpen, "SELECT COUNT(*) FROM staff_terminations WHERE status IN ('Diajukan','Proses')")
-	positionsChange := monthDelta("SELECT COUNT(*) FROM staff_terminations WHERE status IN ('Diajukan','Proses') AND request_date BETWEEN ? AND ?")
+	positionsOpen, _ := dbrepo.CountStaffTerminationsByStatuses(db, "Diajukan", "Proses")
+	positionsChange := monthDelta(func(start, end time.Time) int {
+		count, _ := dbrepo.CountStaffTerminationsByStatusesAndRequestDateBetween(db, start, end, "Diajukan", "Proses")
+		return count
+	})
 
-	var newApplicants int
-	_ = db.Get(&newApplicants, "SELECT COUNT(*) FROM applications WHERE submitted_at BETWEEN ? AND ?", currentMonthStart, now)
-	newApplicantsChange := monthDelta("SELECT COUNT(*) FROM applications WHERE submitted_at BETWEEN ? AND ?")
+	newApplicants, _ := dbrepo.CountApplicationsBySubmittedBetween(db, currentMonthStart, now)
+	newApplicantsChange := monthDelta(func(start, end time.Time) int {
+		count, _ := dbrepo.CountApplicationsBySubmittedBetween(db, start, end)
+		return count
+	})
 
-	var incomingLetters int
-	_ = db.Get(&incomingLetters, "SELECT COUNT(*) FROM surat WHERE tipe_surat = 'masuk' AND tanggal_surat BETWEEN ? AND ?", currentMonthStart, now)
-	lettersChange := monthDelta("SELECT COUNT(*) FROM surat WHERE tipe_surat = 'masuk' AND tanggal_surat BETWEEN ? AND ?")
+	incomingLetters, _ := dbrepo.CountIncomingLettersBetween(db, currentMonthStart, now)
+	lettersChange := monthDelta(func(start, end time.Time) int {
+		count, _ := dbrepo.CountIncomingLettersBetween(db, start, end)
+		return count
+	})
 
-	var activeComplaints int
-	_ = db.Get(&activeComplaints, "SELECT COUNT(*) FROM staff_terminations WHERE type = 'PHK' AND status IN ('Diajukan','Proses')")
-	complaintsChange := monthDelta("SELECT COUNT(*) FROM staff_terminations WHERE type = 'PHK' AND status IN ('Diajukan','Proses') AND request_date BETWEEN ? AND ?")
+	activeComplaints, _ := dbrepo.CountStaffTerminationsByTypeAndStatuses(db, "PHK", "Diajukan", "Proses")
+	complaintsChange := monthDelta(func(start, end time.Time) int {
+		count, _ := dbrepo.CountStaffTerminationsByTypeStatusesAndRequestDateBetween(db, "PHK", start, end, "Diajukan", "Proses")
+		return count
+	})
 
 	stats := []map[string]any{
 		statCard("Karyawan Aktif", "users", activeEmployees, activeChange),
@@ -273,10 +257,8 @@ func SuperAdminAdminHrDashboard(c *gin.Context) {
 	for i := 5; i >= 0; i-- {
 		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, -i, 0)
 		monthEnd := monthStart.AddDate(0, 1, 0).Add(-time.Second)
-		var applied int
-		_ = db.Get(&applied, "SELECT COUNT(*) FROM applications WHERE submitted_at BETWEEN ? AND ?", monthStart, monthEnd)
-		var hired int
-		_ = db.Get(&hired, "SELECT COUNT(*) FROM applications WHERE status = 'Hired' AND submitted_at BETWEEN ? AND ?", monthStart, monthEnd)
+		applied, _ := dbrepo.CountApplicationsBySubmittedBetween(db, monthStart, monthEnd)
+		hired, _ := dbrepo.CountApplicationsByStatusSubmittedBetween(db, "Hired", monthStart, monthEnd)
 		recruitmentData = append(recruitmentData, map[string]any{
 			"month":   monthStart.Format("Jan"),
 			"applied": applied,
@@ -293,8 +275,7 @@ func SuperAdminAdminHrDashboard(c *gin.Context) {
 	recentActivities := recentAdminHrActivities(db)
 
 	upcomingInterviews := []map[string]any{}
-	apps := []models.Application{}
-	_ = db.Select(&apps, "SELECT * FROM applications WHERE status = 'Interview' ORDER BY submitted_at DESC LIMIT 5")
+	apps, _ := dbrepo.ListApplicationsByStatus(db, "Interview", 5)
 	for _, app := range apps {
 		dt := app.SubmittedAt
 		if dt == nil {
@@ -333,16 +314,14 @@ func statCard(label string, icon string, value int, change int) map[string]any {
 }
 
 func countByTerminationType(db *sqlx.DB, terminationType string) int {
-	var count int
-	_ = db.Get(&count, "SELECT COUNT(*) FROM staff_terminations WHERE type = ? AND status = 'Selesai'", terminationType)
+	count, _ := dbrepo.CountStaffTerminationsByTypeAndCompleted(db, terminationType)
 	return count
 }
 
 func recentAdminHrActivities(db *sqlx.DB) []map[string]any {
 	activities := []map[string]any{}
 
-	apps := []models.Application{}
-	_ = db.Select(&apps, "SELECT * FROM applications ORDER BY submitted_at DESC LIMIT 5")
+	apps, _ := dbrepo.ListRecentApplicationsForDashboard(db, 5)
 	for _, app := range apps {
 		ts := app.SubmittedAt
 		if ts == nil {
@@ -367,8 +346,7 @@ func recentAdminHrActivities(db *sqlx.DB) []map[string]any {
 		})
 	}
 
-	letters := []models.Surat{}
-	_ = db.Select(&letters, "SELECT * FROM surat ORDER BY tanggal_surat DESC LIMIT 5")
+	letters, _ := dbrepo.ListRecentLetters(db, 5)
 	for _, surat := range letters {
 		activities = append(activities, map[string]any{
 			"title":     "Surat masuk",
@@ -379,8 +357,7 @@ func recentAdminHrActivities(db *sqlx.DB) []map[string]any {
 		})
 	}
 
-	terminations := []models.StaffTermination{}
-	_ = db.Select(&terminations, "SELECT * FROM staff_terminations ORDER BY updated_at DESC LIMIT 5")
+	terminations, _ := dbrepo.ListRecentStaffTerminations(db, 5)
 	for _, termination := range terminations {
 		activities = append(activities, map[string]any{
 			"title": func() string {

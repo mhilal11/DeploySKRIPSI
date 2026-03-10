@@ -2,6 +2,7 @@ package staff
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
 	"strings"
@@ -30,18 +31,16 @@ func StaffDashboard(c *gin.Context) {
 	}
 	db := middleware.GetDB(c)
 
-	var totalComplaints int
-	_ = db.Get(&totalComplaints, "SELECT COUNT(*) FROM complaints WHERE user_id = ?", user.ID)
-	var activeComplaints int
-	_ = db.Get(&activeComplaints, "SELECT COUNT(*) FROM complaints WHERE user_id = ? AND status IN (?, ?)", user.ID, models.ComplaintStatusNew, models.ComplaintStatusInProgress)
+	totalComplaints, _ := dbrepo.CountComplaintsByUserID(db, user.ID)
+	activeComplaints, _ := dbrepo.CountComplaintsByUserIDAndStatuses(db, user.ID, models.ComplaintStatusNew, models.ComplaintStatusInProgress)
 
 	var regulationsCount int
 	if user.Division != nil {
-		_ = db.Get(&regulationsCount, `SELECT COUNT(*) FROM surat WHERE tipe_surat = 'masuk' AND target_division = ? AND kategori IN ('Internal','Kebijakan','Operasional') AND tanggal_surat >= DATE_SUB(NOW(), INTERVAL 3 MONTH)`, *user.Division)
+		since := time.Now().AddDate(0, -3, 0)
+		regulationsCount, _ = dbrepo.CountDivisionIncomingRegulations(db, *user.Division, &since)
 	}
 
-	var terminationCount int
-	_ = db.Get(&terminationCount, "SELECT COUNT(*) FROM staff_terminations WHERE user_id = ?", user.ID)
+	terminationCount, _ := dbrepo.CountStaffTerminationsByUserID(db, user.ID)
 
 	stats := []map[string]any{
 		{"label": "Pengaduan Aktif", "value": activeComplaints, "icon": "alert"},
@@ -50,8 +49,7 @@ func StaffDashboard(c *gin.Context) {
 		{"label": "Pengajuan Resign", "value": terminationCount, "icon": "briefcase"},
 	}
 
-	complaints := []models.Complaint{}
-	_ = db.Select(&complaints, "SELECT * FROM complaints WHERE user_id = ? ORDER BY submitted_at DESC, id DESC LIMIT 5", user.ID)
+	complaints, _ := dbrepo.ListComplaintsByUserID(db, user.ID, 5)
 
 	recentComplaints := make([]map[string]any, 0, len(complaints))
 	for _, complaint := range complaints {
@@ -66,7 +64,7 @@ func StaffDashboard(c *gin.Context) {
 
 	regulations := []models.Surat{}
 	if user.Division != nil {
-		_ = db.Select(&regulations, `SELECT * FROM surat WHERE tipe_surat = 'masuk' AND target_division = ? AND kategori IN ('Internal','Kebijakan','Operasional') ORDER BY tanggal_surat DESC, surat_id DESC LIMIT 5`, *user.Division)
+		regulations, _ = dbrepo.ListDivisionIncomingRegulations(db, *user.Division, 5)
 	}
 	regulationsPayload := make([]map[string]any, 0, len(regulations))
 	for _, surat := range regulations {
@@ -79,8 +77,7 @@ func StaffDashboard(c *gin.Context) {
 		})
 	}
 
-	terminations := []models.StaffTermination{}
-	_ = db.Select(&terminations, "SELECT * FROM staff_terminations WHERE user_id = ? ORDER BY created_at DESC", user.ID)
+	terminations, _ := dbrepo.ListStaffTerminationsByUserID(db, user.ID)
 	var activeTermination *models.StaffTermination
 	if len(terminations) > 0 {
 		activeTermination = &terminations[0]
@@ -130,8 +127,7 @@ func StaffComplaintsIndex(c *gin.Context) {
 	}
 	db := middleware.GetDB(c)
 
-	complaints := []models.Complaint{}
-	_ = db.Select(&complaints, "SELECT * FROM complaints WHERE user_id = ? ORDER BY submitted_at DESC, id DESC", user.ID)
+	complaints, _ := dbrepo.ListComplaintsByUserID(db, user.ID, 0)
 
 	stats := map[string]int{
 		"new":        0,
@@ -150,8 +146,7 @@ func StaffComplaintsIndex(c *gin.Context) {
 	}
 
 	if user.Division != nil {
-		var regulationsCount int
-		_ = db.Get(&regulationsCount, `SELECT COUNT(*) FROM surat WHERE tipe_surat = 'masuk' AND target_division = ? AND kategori IN ('Internal','Kebijakan','Operasional')`, *user.Division)
+		regulationsCount, _ := dbrepo.CountDivisionIncomingRegulations(db, *user.Division, nil)
 		stats["regulations"] = regulationsCount
 	} else {
 		stats["regulations"] = 0
@@ -202,8 +197,8 @@ func StaffComplaintsIndex(c *gin.Context) {
 	regulations := []models.Surat{}
 	announcements := []models.Surat{}
 	if user.Division != nil {
-		_ = db.Select(&regulations, `SELECT * FROM surat WHERE tipe_surat = 'masuk' AND target_division = ? AND kategori IN ('Internal','Kebijakan','Operasional') ORDER BY tanggal_surat DESC, surat_id DESC LIMIT 10`, *user.Division)
-		_ = db.Select(&announcements, `SELECT * FROM surat WHERE tipe_surat = 'masuk' AND target_division = ? AND (kategori = 'Internal' OR jenis_surat = 'Pengumuman') ORDER BY tanggal_surat DESC, surat_id DESC LIMIT 5`, *user.Division)
+		regulations, _ = dbrepo.ListDivisionIncomingRegulations(db, *user.Division, 10)
+		announcements, _ = dbrepo.ListDivisionAnnouncements(db, *user.Division, 5)
 	}
 
 	regulationsPayload := make([]map[string]any, 0, len(regulations))
@@ -295,10 +290,23 @@ func StaffComplaintsStore(c *gin.Context) {
 	}
 
 	now := time.Now()
-	_, err = db.Exec(`INSERT INTO complaints (complaint_code, user_id, category, subject, description, status, priority, is_anonymous, attachment_path, attachment_name, attachment_mime, attachment_size, submitted_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		code, user.ID, category, subject, description, models.ComplaintStatusNew, priority, isAnonymous, attachmentPath, attachmentName, attachmentMime, attachmentSize, now, now, now)
-	if err != nil {
+	if err := dbrepo.InsertStaffComplaint(db, dbrepo.StaffComplaintCreateInput{
+		ComplaintCode:  code,
+		UserID:         user.ID,
+		Category:       category,
+		Subject:        subject,
+		Description:    description,
+		Status:         models.ComplaintStatusNew,
+		Priority:       priority,
+		IsAnonymous:    isAnonymous,
+		AttachmentPath: attachmentPath,
+		AttachmentName: attachmentName,
+		AttachmentMime: attachmentMime,
+		AttachmentSize: attachmentSize,
+		SubmittedAt:    now,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyimpan pengaduan")
 		return
 	}
@@ -314,8 +322,7 @@ func StaffResignationIndex(c *gin.Context) {
 	}
 	db := middleware.GetDB(c)
 
-	terminations := []models.StaffTermination{}
-	_ = db.Select(&terminations, "SELECT * FROM staff_terminations WHERE user_id = ? ORDER BY created_at DESC", user.ID)
+	terminations, _ := dbrepo.ListStaffTerminationsByUserID(db, user.ID)
 
 	var active any
 	for _, termination := range terminations {
@@ -388,8 +395,7 @@ func StaffResignationStore(c *gin.Context) {
 		return
 	}
 
-	var submittedCount int
-	_ = db.Get(&submittedCount, "SELECT COUNT(*) FROM staff_terminations WHERE user_id = ?", user.ID)
+	submittedCount, _ := dbrepo.CountStaffTerminationsByUserID(db, user.ID)
 	if submittedCount > 0 {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"effective_date": "Pengajuan resign hanya dapat dilakukan satu kali."})
 		return
@@ -402,10 +408,25 @@ func StaffResignationStore(c *gin.Context) {
 	}
 
 	now := time.Now()
-	_, err = db.Exec(`INSERT INTO staff_terminations (reference, user_id, requested_by, employee_code, employee_name, division, position, type, reason, suggestion, request_date, effective_date, status, progress, checklist, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'Resign', ?, ?, ?, ?, 'Diajukan', 0, ?, ?, ?)`,
-		reference, user.ID, user.ID, user.EmployeeCode, user.Name, user.Division, user.Role, reason, suggestion, now.Format("2006-01-02"), effectiveDate, "{}", now, now)
-	if err != nil {
+	if err := dbrepo.InsertStaffTermination(db, dbrepo.StaffTerminationCreateInput{
+		Reference:     reference,
+		UserID:        user.ID,
+		RequestedBy:   user.ID,
+		EmployeeCode:  user.EmployeeCode,
+		EmployeeName:  user.Name,
+		Division:      user.Division,
+		Position:      &user.Role,
+		Type:          "Resign",
+		Reason:        reason,
+		Suggestion:    suggestion,
+		RequestDate:   now,
+		EffectiveDate: effectiveDate,
+		Status:        "Diajukan",
+		Progress:      0,
+		ChecklistJSON: "{}",
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyimpan pengajuan")
 		return
 	}

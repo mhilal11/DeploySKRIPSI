@@ -2,9 +2,11 @@ package superadmin
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,8 +27,7 @@ func SuperAdminStaffIndex(c *gin.Context) {
 
 	db := middleware.GetDB(c)
 
-	terminations := []models.StaffTermination{}
-	_ = db.Select(&terminations, "SELECT * FROM staff_terminations ORDER BY effective_date DESC")
+	terminations, _ := dbrepo.ListStaffTerminationsByEffectiveDateDesc(db)
 
 	active := []models.StaffTermination{}
 	archive := []models.StaffTermination{}
@@ -45,28 +46,7 @@ func SuperAdminStaffIndex(c *gin.Context) {
 		"archived":           len(terminations),
 	}
 
-	type staffPickerRow struct {
-		ID           int64   `db:"id"`
-		EmployeeCode string  `db:"employee_code"`
-		Name         string  `db:"name"`
-		Division     *string `db:"division"`
-	}
-	staffRows := []staffPickerRow{}
-	_ = db.Select(&staffRows, `
-		SELECT u.id, u.employee_code, u.name, u.division
-		FROM users u
-		WHERE u.role = ?
-		  AND u.status = 'Active'
-		  AND u.employee_code IS NOT NULL
-		  AND u.employee_code <> ''
-		  AND NOT EXISTS (
-			  SELECT 1
-			  FROM staff_terminations st
-			  WHERE st.user_id = u.id
-			    AND st.status IN ('Diajukan', 'Proses')
-		  )
-		ORDER BY u.name ASC
-	`, models.RoleStaff)
+	staffRows, _ := dbrepo.ListEligibleActiveStaffRows(db)
 	staffOptions := make([]map[string]any, 0, len(staffRows))
 	for _, row := range staffRows {
 		staffOptions = append(staffOptions, map[string]any{
@@ -83,9 +63,10 @@ func SuperAdminStaffIndex(c *gin.Context) {
 			break
 		}
 		joinDate := "-"
-		var registeredAt time.Time
-		if err := db.Get(&registeredAt, "SELECT registered_at FROM users WHERE id = ?", t.UserID); err == nil {
-			joinDate = registeredAt.Format("02 Jan 2006")
+		if t.UserID != nil {
+			if registeredAt, err := dbrepo.GetUserRegisteredAtByID(db, *t.UserID); err == nil && registeredAt != nil {
+				joinDate = registeredAt.Format("02 Jan 2006")
+			}
 		}
 		inactiveEmployees = append(inactiveEmployees, map[string]any{
 			"id":           t.ID,
@@ -147,8 +128,8 @@ func SuperAdminStaffStore(c *gin.Context) {
 
 	db := middleware.GetDB(c)
 
-	var employee models.User
-	if err := db.Get(&employee, "SELECT * FROM users WHERE employee_code = ?", employeeCode); err != nil {
+	employee, err := dbrepo.GetUserByEmployeeCode(db, employeeCode)
+	if err != nil || employee == nil {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"employee_code": "Karyawan tidak ditemukan."})
 		return
 	}
@@ -161,9 +142,25 @@ func SuperAdminStaffStore(c *gin.Context) {
 	reference, _ := services.GenerateTerminationReference(db)
 
 	now := time.Now()
-	_, _ = db.Exec(`INSERT INTO staff_terminations (reference, user_id, requested_by, employee_code, employee_name, division, position, type, reason, suggestion, request_date, effective_date, status, progress, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Diajukan', 0, ?, ?)`,
-		reference, employee.ID, user.ID, employee.EmployeeCode, employee.Name, employee.Division, employee.Role, payload.Type, payload.Reason, payload.Suggestion, now.Format("2006-01-02"), payload.EffectiveDate, now, now)
+	position := employee.Role
+	_ = dbrepo.InsertStaffTermination(db, dbrepo.StaffTerminationCreateInput{
+		Reference:     reference,
+		UserID:        employee.ID,
+		RequestedBy:   user.ID,
+		EmployeeCode:  employee.EmployeeCode,
+		EmployeeName:  employee.Name,
+		Division:      employee.Division,
+		Position:      &position,
+		Type:          payload.Type,
+		Reason:        payload.Reason,
+		Suggestion:    payload.Suggestion,
+		RequestDate:   now,
+		EffectiveDate: payload.EffectiveDate,
+		Status:        "Diajukan",
+		Progress:      0,
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	})
 
 	c.JSON(http.StatusOK, gin.H{"status": "Pengajuan termination berhasil dibuat."})
 }
@@ -175,7 +172,11 @@ func SuperAdminStaffUpdate(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID pengajuan tidak valid")
+		return
+	}
 	var payload struct {
 		Notes     string          `form:"notes" json:"notes"`
 		Checklist map[string]bool `form:"checklist" json:"checklist"`
@@ -190,8 +191,8 @@ func SuperAdminStaffUpdate(c *gin.Context) {
 
 	db := middleware.GetDB(c)
 
-	var termination models.StaffTermination
-	if err := db.Get(&termination, "SELECT * FROM staff_terminations WHERE id = ?", id); err != nil {
+	termination, err := dbrepo.GetStaffTerminationByID(db, id)
+	if err != nil || termination == nil {
 		handlers.JSONError(c, http.StatusNotFound, "Pengajuan tidak ditemukan")
 		return
 	}
@@ -226,12 +227,16 @@ func SuperAdminStaffUpdate(c *gin.Context) {
 		progress = 100
 	}
 
-	mergedBytes, _ := json.Marshal(merged)
-	_, _ = db.Exec("UPDATE staff_terminations SET status = ?, notes = ?, checklist = ?, progress = ?, updated_at = ? WHERE id = ?", effectiveStatus, notes, mergedBytes, progress, time.Now(), id)
-
-	if effectiveStatus == "Selesai" && termination.UserID != nil {
-		_, _ = db.Exec("UPDATE users SET status = 'Inactive', inactive_at = ? WHERE id = ?", time.Now(), *termination.UserID)
-	}
+	_ = dbrepo.UpdateStaffTerminationAndDeactivateIfCompleted(
+		db,
+		id,
+		effectiveStatus,
+		notes,
+		merged,
+		progress,
+		termination.UserID,
+		time.Now(),
+	)
 
 	c.JSON(http.StatusOK, gin.H{"status": "Progress offboarding berhasil diperbarui."})
 }
@@ -243,9 +248,13 @@ func SuperAdminStaffDelete(c *gin.Context) {
 		return
 	}
 
-	id := c.Param("id")
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID pengajuan tidak valid")
+		return
+	}
 	db := middleware.GetDB(c)
-	_, _ = db.Exec("DELETE FROM staff_terminations WHERE id = ?", id)
+	_ = dbrepo.DeleteStaffTerminationByID(db, id)
 
 	c.JSON(http.StatusOK, gin.H{"status": "Offboarding berhasil dibatalkan."})
 }
@@ -288,7 +297,6 @@ func countTerminationsThisMonth(db *sqlx.DB) int {
 	now := time.Now()
 	start := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 	end := start.AddDate(0, 1, 0).Add(-time.Second)
-	var count int
-	_ = db.Get(&count, "SELECT COUNT(*) FROM staff_terminations WHERE status = 'Selesai' AND effective_date BETWEEN ? AND ?", start, end)
+	count, _ := dbrepo.CountCompletedStaffTerminationsBetween(db, start, end)
 	return count
 }

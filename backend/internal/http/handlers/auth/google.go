@@ -13,6 +13,7 @@ import (
 	"hris-backend/internal/config"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
+	dbrepo "hris-backend/internal/repository"
 	"hris-backend/internal/services"
 	"hris-backend/internal/utils"
 
@@ -156,12 +157,12 @@ func GoogleRegisterCallback(c *gin.Context) {
 		return
 	}
 
-	var existing int
-	if err := db.Get(&existing, "SELECT COUNT(*) FROM users WHERE email = ?", claims.Email); err != nil {
+	exists, err := dbrepo.UserEmailExists(db, claims.Email, nil)
+	if err != nil {
 		redirectGoogleRegisterError(c, cfg, "Gagal memeriksa akun pengguna.")
 		return
 	}
-	if existing > 0 {
+	if exists {
 		redirectGoogleRegisterErrorWithCode(c, cfg, "Email sudah terdaftar. Silakan login.", "email_exists")
 		return
 	}
@@ -226,22 +227,25 @@ func createGoogleRegisteredUser(c *gin.Context, claims googleTokenClaims) (*mode
 	}
 
 	now := time.Now()
-	res, err := db.Exec(`INSERT INTO users (employee_code, name, email, role, status, registered_at, email_verified_at, password, created_at, updated_at)
-		VALUES (?, ?, ?, ?, 'Active', ?, ?, ?, ?, ?)`,
-		employeeCode, displayName, claims.Email, models.RolePelamar, now.Format("2006-01-02"), now, string(hash), now, now)
+	userID, err := dbrepo.CreatePelamarUserWithProfile(
+		db,
+		employeeCode,
+		displayName,
+		claims.Email,
+		string(hash),
+		now,
+		&now,
+		now,
+	)
 	if err != nil {
 		return nil, errors.New("Gagal membuat akun baru.")
 	}
-	userID, _ := res.LastInsertId()
 
-	_, _ = db.Exec(`INSERT INTO applicant_profiles (user_id, full_name, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
-		userID, displayName, claims.Email, now, now)
-
-	var user models.User
-	if err := db.Get(&user, "SELECT * FROM users WHERE id = ? LIMIT 1", userID); err != nil {
+	user, err := dbrepo.GetUserByID(db, userID)
+	if err != nil || user == nil {
 		return nil, errors.New("Gagal memuat akun pengguna.")
 	}
-	return &user, nil
+	return user, nil
 }
 
 func sendGooglePasswordSetupEmail(c *gin.Context, email string) error {
@@ -260,8 +264,7 @@ func sendGooglePasswordSetupEmail(c *gin.Context, email string) error {
 		token = "setup-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	}
 
-	_, _ = db.Exec("DELETE FROM password_reset_tokens WHERE email = ?", email)
-	if _, err := db.Exec("INSERT INTO password_reset_tokens (email, token, created_at) VALUES (?, ?, ?)", email, token, time.Now()); err != nil {
+	if err := dbrepo.SavePasswordResetToken(db, email, token, time.Now()); err != nil {
 		return err
 	}
 

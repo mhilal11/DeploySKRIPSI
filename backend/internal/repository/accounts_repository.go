@@ -1,0 +1,345 @@
+package db
+
+import (
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"hris-backend/internal/models"
+
+	"github.com/jmoiron/sqlx"
+)
+
+type UserListFilters struct {
+	Search string
+	Role   string
+	Status string
+}
+
+type CreateUserInput struct {
+	EmployeeCode string
+	Name         string
+	Email        string
+	Role         string
+	Division     string
+	Status       string
+	RegisteredAt string
+	InactiveAt   *string
+	PasswordHash string
+	Now          time.Time
+}
+
+type UpdateUserInput struct {
+	ID           int64
+	Name         string
+	Email        string
+	Role         string
+	Division     string
+	Status       string
+	RegisteredAt string
+	InactiveAt   *string
+	PasswordHash *string
+	Now          time.Time
+}
+
+type UserRoleStats struct {
+	Total      int
+	SuperAdmin int
+	Admin      int
+	Staff      int
+	Pelamar    int
+}
+
+func ListUsers(db *sqlx.DB, filters UserListFilters, page, perPage int) ([]models.User, int, error) {
+	if db == nil {
+		return nil, 0, errors.New("database tidak tersedia")
+	}
+	if page < 1 {
+		page = 1
+	}
+	if perPage <= 0 {
+		perPage = 10
+	}
+
+	where, args := buildUsersWhereClause(filters)
+
+	countQuery := "SELECT COUNT(*) FROM users" + where
+	var total int
+	if err := db.Get(&total, countQuery, args...); err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * perPage
+	query := "SELECT * FROM users" + where + " ORDER BY id DESC LIMIT ? OFFSET ?"
+	queryArgs := append(append([]any{}, args...), perPage, offset)
+
+	rows := []models.User{}
+	if err := db.Select(&rows, query, queryArgs...); err != nil {
+		return nil, 0, err
+	}
+
+	return rows, total, nil
+}
+
+func CountUsersByRoleStats(db *sqlx.DB) (UserRoleStats, error) {
+	if db == nil {
+		return UserRoleStats{}, errors.New("database tidak tersedia")
+	}
+
+	out := UserRoleStats{}
+	query := `
+		SELECT
+			COUNT(*) AS total,
+			SUM(CASE WHEN role = ? THEN 1 ELSE 0 END) AS total_super_admin,
+			SUM(CASE WHEN role = ? THEN 1 ELSE 0 END) AS total_admin,
+			SUM(CASE WHEN role = ? THEN 1 ELSE 0 END) AS total_staff,
+			SUM(CASE WHEN role = ? THEN 1 ELSE 0 END) AS total_pelamar
+		FROM users
+	`
+
+	row := struct {
+		Total           int `db:"total"`
+		TotalSuperAdmin int `db:"total_super_admin"`
+		TotalAdmin      int `db:"total_admin"`
+		TotalStaff      int `db:"total_staff"`
+		TotalPelamar    int `db:"total_pelamar"`
+	}{}
+
+	if err := db.Get(&row, query, models.RoleSuperAdmin, models.RoleAdmin, models.RoleStaff, models.RolePelamar); err != nil {
+		return out, err
+	}
+
+	out.Total = row.Total
+	out.SuperAdmin = row.TotalSuperAdmin
+	out.Admin = row.TotalAdmin
+	out.Staff = row.TotalStaff
+	out.Pelamar = row.TotalPelamar
+	return out, nil
+}
+
+func GetUserByID(db *sqlx.DB, id int64) (*models.User, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	var user models.User
+	if err := db.Get(&user, "SELECT * FROM users WHERE id = ?", id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
+func GetStaffProfileByUserID(db *sqlx.DB, userID int64) (*models.StaffProfile, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	var profile models.StaffProfile
+	if err := db.Get(&profile, "SELECT * FROM staff_profiles WHERE user_id = ?", userID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &profile, nil
+}
+
+func UserEmailExists(db *sqlx.DB, email string, excludeID *int64) (bool, error) {
+	if db == nil {
+		return false, errors.New("database tidak tersedia")
+	}
+
+	var count int
+	if excludeID != nil && *excludeID > 0 {
+		err := db.Get(&count, "SELECT COUNT(*) FROM users WHERE email = ? AND id != ?", email, *excludeID)
+		if err != nil {
+			return false, err
+		}
+		return count > 0, nil
+	}
+
+	err := db.Get(&count, "SELECT COUNT(*) FROM users WHERE email = ?", email)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func CreateUser(db *sqlx.DB, input CreateUserInput) (int64, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+
+	result, err := db.Exec(`
+		INSERT INTO users (
+			employee_code, name, email, role, division, status,
+			registered_at, inactive_at, password, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`,
+		nullableString(input.EmployeeCode),
+		input.Name,
+		input.Email,
+		input.Role,
+		nullableString(input.Division),
+		input.Status,
+		input.RegisteredAt,
+		nullableStringPtr(input.InactiveAt),
+		input.PasswordHash,
+		input.Now,
+		input.Now,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
+}
+
+func UpdateUser(db *sqlx.DB, input UpdateUserInput) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+
+	if input.ID <= 0 {
+		return fmt.Errorf("id user tidak valid")
+	}
+
+	updateFields := []string{
+		"name = ?",
+		"email = ?",
+		"role = ?",
+		"division = ?",
+		"status = ?",
+		"registered_at = ?",
+		"inactive_at = ?",
+		"updated_at = ?",
+	}
+	args := []any{
+		input.Name,
+		input.Email,
+		input.Role,
+		nullableString(input.Division),
+		input.Status,
+		input.RegisteredAt,
+		nullableStringPtr(input.InactiveAt),
+		input.Now,
+	}
+	if input.PasswordHash != nil && strings.TrimSpace(*input.PasswordHash) != "" {
+		updateFields = append(updateFields, "password = ?")
+		args = append(args, *input.PasswordHash)
+	}
+	args = append(args, input.ID)
+
+	query := "UPDATE users SET " + strings.Join(updateFields, ", ") + " WHERE id = ?"
+	_, err := db.Exec(query, args...)
+	return err
+}
+
+func DeleteUserByID(db *sqlx.DB, id int64) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	_, err := db.Exec("DELETE FROM users WHERE id = ?", id)
+	return err
+}
+
+func UpdateUserStatus(db *sqlx.DB, id int64, status string, inactiveAt *string) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	_, err := db.Exec("UPDATE users SET status = ?, inactive_at = ? WHERE id = ?", status, nullableStringPtr(inactiveAt), id)
+	return err
+}
+
+func UpdateUserPassword(db *sqlx.DB, id int64, passwordHash string) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	_, err := db.Exec("UPDATE users SET password = ? WHERE id = ?", passwordHash, id)
+	return err
+}
+
+func InsertStaffProfile(db *sqlx.DB, userID int64, religion, gender, educationLevel string, now time.Time) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	_, err := db.Exec(`
+		INSERT INTO staff_profiles (user_id, religion, gender, education_level, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, userID, nullableString(religion), nullableString(gender), nullableString(educationLevel), now, now)
+	return err
+}
+
+func UpsertStaffProfile(db *sqlx.DB, userID int64, religion, gender, educationLevel string) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	_, err := db.Exec(`
+		INSERT INTO staff_profiles (user_id, religion, gender, education_level, created_at, updated_at)
+		VALUES (?, ?, ?, ?, NOW(), NOW())
+		ON DUPLICATE KEY UPDATE
+			religion = VALUES(religion),
+			gender = VALUES(gender),
+			education_level = VALUES(education_level),
+			updated_at = NOW()
+	`, userID, nullableString(religion), nullableString(gender), nullableString(educationLevel))
+	return err
+}
+
+func DeleteStaffProfileByUserID(db *sqlx.DB, userID int64) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	_, err := db.Exec("DELETE FROM staff_profiles WHERE user_id = ?", userID)
+	return err
+}
+
+func buildUsersWhereClause(filters UserListFilters) (string, []any) {
+	clauses := []string{}
+	args := []any{}
+
+	search := strings.TrimSpace(filters.Search)
+	if search != "" {
+		like := "%" + search + "%"
+		clauses = append(clauses, "(name LIKE ? OR email LIKE ? OR employee_code LIKE ?)")
+		args = append(args, like, like, like)
+	}
+
+	role := strings.TrimSpace(filters.Role)
+	if role != "" && !strings.EqualFold(role, "all") {
+		clauses = append(clauses, "role = ?")
+		args = append(args, role)
+	}
+
+	status := strings.TrimSpace(filters.Status)
+	if status != "" && !strings.EqualFold(status, "all") {
+		clauses = append(clauses, "status = ?")
+		args = append(args, status)
+	}
+
+	if len(clauses) == 0 {
+		return "", args
+	}
+	return " WHERE " + strings.Join(clauses, " AND "), args
+}
+
+func nullableString(value string) any {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return strings.TrimSpace(value)
+}
+
+func nullableStringPtr(value *string) any {
+	if value == nil {
+		return nil
+	}
+	return nullableString(*value)
+}

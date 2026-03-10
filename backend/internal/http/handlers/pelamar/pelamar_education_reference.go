@@ -2,8 +2,8 @@ package pelamar
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
-	"database/sql"
 	"encoding/json"
 	"os"
 	"sort"
@@ -29,11 +29,6 @@ type educationReferenceFile struct {
 	SourceURL    string                    `json:"source_url"`
 	LastUpdated  string                    `json:"last_updated"`
 	Institutions []educationReferenceEntry `json:"institutions"`
-}
-
-type customEducationReferenceRow struct {
-	Institution sql.NullString `db:"institution"`
-	Program     sql.NullString `db:"program"`
 }
 
 var defaultEducationReference = educationReferenceFile{
@@ -165,25 +160,14 @@ func respondEducationReferences(c *gin.Context) {
 	})
 }
 
-func loadCustomEducationReferenceRows(db *sqlx.DB, query string, limit int) []customEducationReferenceRow {
+func loadCustomEducationReferenceRows(db *sqlx.DB, query string, limit int) []dbrepo.EducationReferenceCustomRow {
 	if db == nil {
-		return []customEducationReferenceRow{}
+		return []dbrepo.EducationReferenceCustomRow{}
 	}
 
-	rows := make([]customEducationReferenceRow, 0)
-	sqlQuery := "SELECT institution, program FROM education_reference_custom"
-	args := make([]any, 0, 3)
-	if query != "" {
-		like := "%" + strings.ToLower(strings.TrimSpace(query)) + "%"
-		sqlQuery += " WHERE LOWER(institution) LIKE ? OR LOWER(program) LIKE ?"
-		args = append(args, like, like)
-	}
-	sqlQuery += " ORDER BY updated_at DESC, id DESC LIMIT ?"
-	args = append(args, limit)
-
-	if err := db.Select(&rows, sqlQuery, args...); err != nil {
-		// Table might not exist yet in some environments, keep API backward-compatible.
-		return []customEducationReferenceRow{}
+	rows, err := dbrepo.ListCustomEducationReferenceRows(db, query, limit)
+	if err != nil {
+		return []dbrepo.EducationReferenceCustomRow{}
 	}
 	return rows
 }
@@ -363,14 +347,7 @@ func persistCustomEducationReferences(db *sqlx.DB, userID int64, educations []ma
 		return nil
 	}
 
-	type referenceEntry struct {
-		institution           string
-		program               string
-		institutionNormalized string
-		programNormalized     string
-	}
-
-	entries := make([]referenceEntry, 0, len(educations))
+	entries := make([]dbrepo.EducationReferenceCustomUpsertEntry, 0, len(educations))
 	seen := map[string]struct{}{}
 
 	for _, education := range educations {
@@ -405,72 +382,16 @@ func persistCustomEducationReferences(db *sqlx.DB, userID int64, educations []ma
 		}
 		seen[entryKey] = struct{}{}
 
-		entries = append(entries, referenceEntry{
-			institution:           institution,
-			program:               program,
-			institutionNormalized: institutionNormalized,
-			programNormalized:     programNormalized,
+		entries = append(entries, dbrepo.EducationReferenceCustomUpsertEntry{
+			Institution:           institution,
+			Program:               program,
+			InstitutionNormalized: institutionNormalized,
+			ProgramNormalized:     programNormalized,
 		})
 	}
 
 	if len(entries) == 0 {
 		return nil
 	}
-
-	tx, err := db.Beginx()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	const query = `INSERT INTO education_reference_custom
-		(institution, program, institution_normalized, program_normalized, source_user_id, created_at, updated_at)
-	VALUES (?, ?, ?, ?, ?, ?, ?)
-	ON DUPLICATE KEY UPDATE
-		institution = CASE
-			WHEN VALUES(institution) = '' THEN institution
-			WHEN institution IS NULL OR institution = '' OR CHAR_LENGTH(VALUES(institution)) < CHAR_LENGTH(institution) THEN VALUES(institution)
-			ELSE institution
-		END,
-		program = CASE
-			WHEN VALUES(program) = '' THEN program
-			WHEN program IS NULL OR program = '' OR CHAR_LENGTH(VALUES(program)) < CHAR_LENGTH(program) THEN VALUES(program)
-			ELSE program
-		END,
-		source_user_id = VALUES(source_user_id),
-		updated_at = VALUES(updated_at)`
-
-	now := time.Now()
-	for _, entry := range entries {
-		if _, execErr := tx.Exec(
-			query,
-			entry.institution,
-			entry.program,
-			entry.institutionNormalized,
-			entry.programNormalized,
-			userID,
-			now,
-			now,
-		); execErr != nil {
-			if isMissingEducationReferenceCustomTableError(execErr) {
-				return nil
-			}
-			return execErr
-		}
-	}
-
-	return tx.Commit()
-}
-
-func isMissingEducationReferenceCustomTableError(err error) bool {
-	if err == nil {
-		return false
-	}
-	lower := strings.ToLower(err.Error())
-	if !strings.Contains(lower, "education_reference_custom") {
-		return false
-	}
-	return strings.Contains(lower, "doesn't exist") ||
-		strings.Contains(lower, "no such table") ||
-		strings.Contains(lower, "1146")
+	return dbrepo.UpsertEducationReferenceCustomEntries(db, userID, entries, time.Now())
 }

@@ -2,11 +2,12 @@ package public
 
 import (
 	"hris-backend/internal/http/handlers"
+	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
+	"time"
 
 	"hris-backend/internal/http/middleware"
-	"hris-backend/internal/models"
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -27,12 +28,11 @@ func LandingData(c *gin.Context) {
 
 	divisions := make([]map[string]any, 0, len(profiles))
 	for _, profile := range profiles {
-		var currentStaff int
-		_ = db.Get(&currentStaff, "SELECT COUNT(*) FROM users WHERE division = ? AND role IN (?, ?)", profile.Name, models.RoleAdmin, models.RoleStaff)
+		currentStaff, _ := dbrepo.CountActiveDivisionUsers(db, profile.Name)
 
 		if profile.Capacity < currentStaff {
 			profile.Capacity = currentStaff
-			_, _ = db.Exec("UPDATE division_profiles SET capacity = ? WHERE id = ?", profile.Capacity, profile.ID)
+			_ = dbrepo.UpdateDivisionProfileCapacity(db, profile.ID, profile.Capacity, time.Now())
 		}
 		availableSlots := profile.Capacity - currentStaff
 		if availableSlots < 0 {
