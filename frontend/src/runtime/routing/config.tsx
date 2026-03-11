@@ -29,7 +29,6 @@ const loadAdminStaffRecruitment = () => import('@/modules/AdminStaff/Recruitment
 const loadSuperAdminDashboard = () => import('@/modules/SuperAdmin/Dashboard');
 const loadSuperAdminAdminHRDashboard = () => import('@/modules/SuperAdmin/AdminHR/Dashboard');
 const loadSuperAdminRecruitment = () => import('@/modules/SuperAdmin/KelolaRekrutmen/Index');
-const loadSuperAdminRecruitmentAnalytics = () => import('@/modules/SuperAdmin/KelolaRekrutmen/Analytics');
 const loadSuperAdminDivisions = () => import('@/modules/SuperAdmin/KelolaDivisi/Index');
 const loadSuperAdminLetters = () => import('@/modules/SuperAdmin/KelolaSurat/Index');
 const loadSuperAdminStaff = () => import('@/modules/SuperAdmin/KelolaStaff/Index');
@@ -66,7 +65,6 @@ const AdminStaffRecruitment = lazy(loadAdminStaffRecruitment);
 const SuperAdminDashboard = lazy(loadSuperAdminDashboard);
 const SuperAdminAdminHRDashboard = lazy(loadSuperAdminAdminHRDashboard);
 const SuperAdminRecruitment = lazy(loadSuperAdminRecruitment);
-const SuperAdminRecruitmentAnalytics = lazy(loadSuperAdminRecruitmentAnalytics);
 const SuperAdminDivisions = lazy(loadSuperAdminDivisions);
 const SuperAdminLetters = lazy(loadSuperAdminLetters);
 const SuperAdminStaff = lazy(loadSuperAdminStaff);
@@ -225,12 +223,6 @@ export const ROUTES: RouteConfig[] = [
     api: '/super-admin/recruitment',
   },
   {
-    path: '/super-admin/recruitment/analytics',
-    name: 'super-admin.recruitment.analytics',
-    component: SuperAdminRecruitmentAnalytics,
-    api: '/super-admin/recruitment/analytics',
-  },
-  {
     path: '/super-admin/kelola-divisi',
     name: 'super-admin.divisions.index',
     component: SuperAdminDivisions,
@@ -295,7 +287,6 @@ export function getWarmupLoaders(user: any): Array<() => Promise<unknown>> {
     warmups.push(
       loadSuperAdminDashboard,
       loadSuperAdminRecruitment,
-      loadSuperAdminRecruitmentAnalytics,
       loadSuperAdminLetters,
       loadSuperAdminStaff,
       loadSuperAdminAuditLog,
@@ -306,7 +297,6 @@ export function getWarmupLoaders(user: any): Array<() => Promise<unknown>> {
       warmups.push(
         loadSuperAdminAdminHRDashboard,
         loadSuperAdminRecruitment,
-        loadSuperAdminRecruitmentAnalytics,
         loadSuperAdminLetters,
       );
     } else {
@@ -328,7 +318,6 @@ export function getWarmupApiEndpoints(user: any): string[] {
     endpoints.push(
       '/super-admin/dashboard',
       '/super-admin/recruitment',
-      '/super-admin/recruitment/analytics',
       '/super-admin/kelola-divisi',
       '/super-admin/kelola-surat',
       '/super-admin/kelola-staff',
@@ -341,7 +330,6 @@ export function getWarmupApiEndpoints(user: any): string[] {
       endpoints.push(
         '/super-admin/admin-hr/dashboard',
         '/super-admin/recruitment',
-        '/super-admin/recruitment/analytics',
         '/super-admin/kelola-divisi',
         '/super-admin/kelola-surat',
       );

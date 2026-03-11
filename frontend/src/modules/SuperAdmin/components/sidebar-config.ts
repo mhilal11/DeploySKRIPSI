@@ -45,25 +45,11 @@ export const defaultNavItems: NavItem[] = [
         superAdminOnly: true,
     },
     {
-        label: 'Recruitment',
+        label: 'Kelola Rekrutmen',
         icon: UserPlus,
         routeName: 'super-admin.recruitment',
-        pattern: ['super-admin.recruitment', 'super-admin.recruitment.analytics'],
+        pattern: 'super-admin.recruitment',
         badgeKey: 'super-admin.recruitment',
-        children: [
-            {
-                label: 'Kelola Rekrutmen',
-                routeName: 'super-admin.recruitment',
-                pattern: 'super-admin.recruitment',
-                exact: true,
-                badgeKey: 'super-admin.recruitment',
-            },
-            {
-                label: 'Analytics Rekrutmen',
-                href: '/super-admin/recruitment/analytics',
-                pattern: 'super-admin.recruitment.analytics',
-            },
-        ],
     },
     {
         label: 'Kelola Divisi',

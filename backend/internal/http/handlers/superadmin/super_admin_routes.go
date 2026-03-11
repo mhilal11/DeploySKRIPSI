@@ -14,7 +14,6 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 	rg.POST("/super-admin/audit-log/mark-viewed", SuperAdminAuditLogsMarkViewed)
 
 	rg.GET("/super-admin/recruitment", SuperAdminRecruitmentIndex)
-	rg.GET("/super-admin/recruitment/analytics", SuperAdminRecruitmentAnalyticsIndex)
 	rg.POST("/super-admin/recruitment/sla-settings", SuperAdminRecruitmentUpdateSLASettings)
 	rg.GET("/super-admin/recruitment/:id/cv", SuperAdminRecruitmentViewCV)
 	rg.GET("/super-admin/recruitment/:id/ai-screening", SuperAdminRecruitmentGetAIScreening)
@@ -25,8 +24,6 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 	rg.POST("/super-admin/recruitment/auto-shortlist", SuperAdminRecruitmentAutoShortlist)
 	rg.GET("/super-admin/recruitment/export-score-report", SuperAdminRecruitmentExportScoreReport)
 	rg.GET("/super-admin/recruitment/export-score-report-pdf", SuperAdminRecruitmentExportScoreReportPDF)
-	rg.GET("/super-admin/recruitment/scoring-evaluation", SuperAdminRecruitmentScoringEvaluation)
-	rg.GET("/super-admin/recruitment/scoring-analytics", SuperAdminRecruitmentScoringAnalytics)
 	rg.DELETE("/super-admin/recruitment/:id", SuperAdminRecruitmentDelete)
 	rg.POST("/super-admin/onboarding/:id/update-checklist", SuperAdminOnboardingUpdateChecklist)
 	rg.POST("/super-admin/onboarding/:id/convert-to-staff", SuperAdminOnboardingConvertToStaff)

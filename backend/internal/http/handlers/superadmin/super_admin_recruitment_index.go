@@ -301,19 +301,3 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 		"sidebarNotifications": handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
-
-func SuperAdminRecruitmentAnalyticsIndex(c *gin.Context) {
-	user := middleware.CurrentUser(c)
-	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
-		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
-		return
-	}
-
-	db := middleware.GetDB(c)
-	scoringAudits := loadRecruitmentScoringAudits(db, 25)
-
-	c.JSON(http.StatusOK, gin.H{
-		"scoringAudits":        scoringAudits,
-		"sidebarNotifications": handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
-	})
-}
