@@ -1,0 +1,15 @@
+export interface DashboardProps {
+    stats: Record<'totalUsers' | 'superAdmins' | 'admins' | 'staff' | 'pelamar', number>;
+    statChanges: Record<'totalUsers' | 'superAdmins' | 'admins' | 'staff' | 'pelamar', number>;
+    activityData: { month: string; registrations: number; applications: number }[];
+    staffStats: { total: number; active: number; inactive: number };
+    religionData: { name: string; value: number; color: string }[];
+    genderData: { name: string; value: number; percentage: number; color: string }[];
+    educationData: { level: string; value: number }[];
+    divisionApplicants: Array<{
+        id: string;
+        name: string;
+        count: number;
+        new: number;
+    }>;
+}

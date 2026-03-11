@@ -3,7 +3,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import StaffLayout from "@/modules/Staff/components/Layout";
-import { Badge } from "@/shared/components/ui/badge";
+import {
+    FormField,
+    InfoCard,
+    StatusBadge,
+    StatusItem,
+} from "@/modules/Staff/components/resignation/ResignationShared";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
 import { Checkbox } from "@/shared/components/ui/checkbox";
@@ -461,108 +466,6 @@ export default function StaffResignation() {
         </>
     );
 }
-
-/* ---------------- COMPONENTS ---------------- */
-
-interface FormFieldProps {
-    label: string;
-    value: string;
-    disabled?: boolean;
-    type?: string;
-}
-
-function FormField({ label, value, disabled, type = "text" }: FormFieldProps) {
-    return (
-        <div className="w-full">
-            <Label>{label}</Label>
-            <Input
-                type={type}
-                value={value}
-                disabled={disabled}
-                readOnly={disabled}
-            />
-        </div>
-    );
-}
-
-interface InfoCardProps {
-    icon: JSX.Element;
-    title: string;
-    description: string;
-    color: string;
-}
-
-function InfoCard({ icon, title, description, color }: InfoCardProps) {
-    return (
-        <div className={`rounded-lg border p-4 w-full ${color}`}>
-            <div className="flex gap-3">
-                {icon}
-                <div>
-                    <p className="font-semibold">{title}</p>
-                    <p className="text-xs text-slate-600">{description}</p>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-interface StatusItemProps {
-    label: string;
-    value: string;
-    highlight?: boolean;
-}
-
-function StatusItem({ label, value, highlight = false }: StatusItemProps) {
-    return (
-        <div className="flex flex-col">
-            <p className="text-xs uppercase text-slate-500 font-medium mb-1">
-                {label}
-            </p>
-
-            {highlight ? (
-                <Badge
-                    variant="outline"
-                    className="border-blue-500 text-blue-700 w-fit px-2 py-1"
-                >
-                    {value}
-                </Badge>
-            ) : (
-                <p className="text-sm font-semibold text-slate-900">{value}</p>
-            )}
-        </div>
-    );
-}
-
-interface StatusBadgeProps {
-    status: string;
-}
-
-function StatusBadge({ status }: StatusBadgeProps) {
-    const s = status.toLowerCase();
-
-    if (s.includes("selesai"))
-        return (
-            <Badge
-                variant="outline"
-                className="border-green-500 text-green-600"
-            >
-                {status}
-            </Badge>
-        );
-
-    if (s.includes("proses") || s.includes("menunggu"))
-        return (
-            <Badge
-                variant="outline"
-                className="border-amber-500 text-amber-600"
-            >
-                {status}
-            </Badge>
-        );
-
-    return <Badge variant="outline">{status}</Badge>;
-}
-
 
 
 

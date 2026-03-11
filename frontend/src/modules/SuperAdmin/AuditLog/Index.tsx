@@ -1,17 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 
+import {
+    extractChanges,
+    formatObjectLabel,
+} from '@/modules/SuperAdmin/AuditLog/audit-log-utils';
+import type {
+    AuditChange,
+    AuditDetailState,
+    AuditLogRecord,
+} from '@/modules/SuperAdmin/AuditLog/audit-log-utils';
+import { AuditChangesPreview } from '@/modules/SuperAdmin/AuditLog/AuditChangesPreview';
+import { AuditDetailDialog } from '@/modules/SuperAdmin/AuditLog/AuditDetailDialog';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/shared/components/ui/dialog';
 import { Input } from '@/shared/components/ui/input';
 import {
     Select,
@@ -32,23 +35,6 @@ import { api, apiUrl } from '@/shared/lib/api';
 import { Head, router, usePage, usePageManager } from '@/shared/lib/inertia';
 import type { PageProps } from '@/shared/types';
 
-type AuditLogRecord = {
-    id: number;
-    user_name?: string | null;
-    user_email?: string | null;
-    user_role?: string | null;
-    module: string;
-    action: string;
-    entity_type?: string | null;
-    entity_id?: string | null;
-    description?: string | null;
-    old_values?: unknown;
-    new_values?: unknown;
-    ip_address?: string | null;
-    user_agent?: string | null;
-    created_at: string;
-    is_viewed?: boolean;
-};
 
 type AuditLogPageProps = PageProps<{
     auditLogs: {
@@ -68,325 +54,6 @@ type AuditLogPageProps = PageProps<{
     moduleOptions: string[];
     actionOptions: string[];
 }>;
-
-type FlatRecord = Record<string, unknown>;
-type ChangeType = 'added' | 'removed' | 'changed';
-
-type AuditChange = {
-    key: string;
-    label: string;
-    type: ChangeType;
-    before: unknown;
-    after: unknown;
-};
-
-type AuditDetailState = {
-    item: AuditLogRecord;
-    changes: AuditChange[];
-};
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-    typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const parseAuditPayload = (value: unknown): unknown => {
-    if (typeof value !== 'string') {
-        return value;
-    }
-
-    const trimmed = value.trim();
-    if (!trimmed) {
-        return value;
-    }
-
-    if (
-        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-        (trimmed.startsWith('[') && trimmed.endsWith(']'))
-    ) {
-        try {
-            return JSON.parse(trimmed);
-        } catch {
-            return value;
-        }
-    }
-
-    return value;
-};
-
-const flattenValue = (path: string, value: unknown, target: FlatRecord) => {
-    if (isPlainObject(value)) {
-        const entries = Object.entries(value);
-        if (entries.length === 0) {
-            target[path] = value;
-            return;
-        }
-        entries.forEach(([nestedKey, nestedValue]) => {
-            flattenValue(path ? `${path}.${nestedKey}` : nestedKey, nestedValue, target);
-        });
-        return;
-    }
-
-    target[path] = value;
-};
-
-const toFlatRecord = (raw: unknown): FlatRecord => {
-    const parsed = parseAuditPayload(raw);
-
-    if (parsed == null) {
-        return {};
-    }
-    if (isPlainObject(parsed)) {
-        const output: FlatRecord = {};
-        Object.entries(parsed).forEach(([key, value]) => {
-            flattenValue(key, value, output);
-        });
-        return output;
-    }
-    if (Array.isArray(parsed)) {
-        return { data: parsed };
-    }
-    return { value: parsed };
-};
-
-const isEqualValue = (a: unknown, b: unknown): boolean => {
-    if (a === b) return true;
-    if (a == null || b == null) return a == null && b == null;
-    if (Array.isArray(a) && Array.isArray(b)) {
-        if (a.length !== b.length) return false;
-        for (let index = 0; index < a.length; index += 1) {
-            if (!isEqualValue(a[index], b[index])) return false;
-        }
-        return true;
-    }
-    if (isPlainObject(a) && isPlainObject(b)) {
-        const keysA = Object.keys(a);
-        const keysB = Object.keys(b);
-        if (keysA.length !== keysB.length) return false;
-        return keysA.every((key) => isEqualValue(a[key], b[key]));
-    }
-    return false;
-};
-
-const toTitleCase = (value: string) =>
-    value
-        .split(/[\s_-]+/)
-        .filter(Boolean)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-
-const formatFieldLabel = (path: string) =>
-    path
-        .split('.')
-        .map((segment) => toTitleCase(segment))
-        .join(' > ');
-
-const summarizeValue = (value: unknown): string => {
-    if (value == null) return '-';
-    if (typeof value === 'boolean') return value ? 'Ya' : 'Tidak';
-    if (typeof value === 'number') return String(value);
-    if (typeof value === 'string') {
-        return value.trim() ? value : '(kosong)';
-    }
-    if (Array.isArray(value)) {
-        if (value.length === 0) return '(kosong)';
-        const isSimple = value.every(
-            (item) =>
-                item == null ||
-                typeof item === 'string' ||
-                typeof item === 'number' ||
-                typeof item === 'boolean',
-        );
-        if (isSimple) {
-            return value.map((item) => summarizeValue(item)).join(', ');
-        }
-        return `${value.length} item data`;
-    }
-    if (isPlainObject(value)) {
-        const totalFields = Object.keys(value).length;
-        return `Objek (${totalFields} field)`;
-    }
-    return String(value);
-};
-
-const normalizeComparableValue = (value: unknown): unknown => {
-    if (value == null) return '';
-    if (typeof value === 'string') {
-        const normalized = value.trim();
-        return normalized === '' ? '' : normalized;
-    }
-    return value;
-};
-
-const extractChanges = (oldValues: unknown, newValues: unknown): AuditChange[] => {
-    const before = toFlatRecord(oldValues);
-    const after = toFlatRecord(newValues);
-    const allKeys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)])).sort();
-    const changes: AuditChange[] = [];
-
-    allKeys.forEach((key) => {
-        const hasBefore = Object.prototype.hasOwnProperty.call(before, key);
-        const hasAfter = Object.prototype.hasOwnProperty.call(after, key);
-        const beforeValue = before[key];
-        const afterValue = after[key];
-        const normalizedBefore = normalizeComparableValue(beforeValue);
-        const normalizedAfter = normalizeComparableValue(afterValue);
-
-        if (!hasBefore && hasAfter && normalizedAfter === '') {
-            return;
-        }
-        if (hasBefore && !hasAfter && normalizedBefore === '') {
-            return;
-        }
-        if (key === 'password_reset' && normalizedAfter !== true) {
-            return;
-        }
-
-        if (!hasBefore && hasAfter) {
-            changes.push({
-                key,
-                label: formatFieldLabel(key),
-                type: 'added',
-                before: null,
-                after: afterValue,
-            });
-            return;
-        }
-        if (hasBefore && !hasAfter) {
-            changes.push({
-                key,
-                label: formatFieldLabel(key),
-                type: 'removed',
-                before: beforeValue,
-                after: null,
-            });
-            return;
-        }
-        if (!isEqualValue(normalizedBefore, normalizedAfter)) {
-            changes.push({
-                key,
-                label: formatFieldLabel(key),
-                type: 'changed',
-                before: beforeValue,
-                after: afterValue,
-            });
-        }
-    });
-
-    return changes;
-};
-
-const asStringOrNull = (value: unknown): string | null => {
-    if (value == null) return null;
-    const normalized = String(value).trim();
-    return normalized === '' ? null : normalized;
-};
-
-const extractEntityName = (item: AuditLogRecord): string | null => {
-    const newValues = toFlatRecord(item.new_values);
-    const oldValues = toFlatRecord(item.old_values);
-    const candidates = [
-        'name',
-        'full_name',
-        'user_name',
-        'employee_name',
-        'applicant_name',
-        'division_name',
-        'title',
-        'subject',
-        'code',
-    ];
-
-    for (const key of candidates) {
-        const current = asStringOrNull(newValues[key]) ?? asStringOrNull(oldValues[key]);
-        if (current) {
-            return current;
-        }
-    }
-
-    return null;
-};
-
-const formatObjectLabel = (item: AuditLogRecord): string => {
-    const rawType = asStringOrNull(item.entity_type) ?? 'Objek';
-    const typeLabel = toTitleCase(rawType.replace(/[._-]+/g, ' '));
-    const idLabel = asStringOrNull(item.entity_id);
-    const suffix = idLabel ? `#${idLabel}` : '';
-    const displayName = extractEntityName(item);
-
-    if (/^user$/i.test(rawType)) {
-        if (displayName) {
-            return `${typeLabel}${suffix} - ${displayName}`;
-        }
-        return `${typeLabel}${suffix}`.trim();
-    }
-
-    if (displayName) {
-        return `${typeLabel}${suffix} - ${displayName}`;
-    }
-
-    return `${typeLabel}${suffix}`.trim();
-};
-
-const changeTypeMeta: Record<ChangeType, { label: string; className: string }> = {
-    added: {
-        label: 'Ditambah',
-        className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-    },
-    removed: {
-        label: 'Dihapus',
-        className: 'border-rose-200 bg-rose-50 text-rose-700',
-    },
-    changed: {
-        label: 'Diubah',
-        className: 'border-amber-200 bg-amber-50 text-amber-700',
-    },
-};
-
-const renderChangesContent = (
-    itemId: number,
-    changes: AuditChange[],
-    onOpenDetail: () => void,
-) => {
-    if (changes.length === 0) {
-        return (
-            <div className="space-y-2">
-                <p className="text-xs text-slate-500">
-                    Tidak ada perubahan field yang terdeteksi.
-                </p>
-                <Button type="button" variant="outline" size="sm" className="w-full justify-start text-xs" onClick={onOpenDetail}>
-                    Lihat detail log
-                </Button>
-            </div>
-        );
-    }
-
-    return (
-        <div className="space-y-2">
-            <div className="space-y-1 rounded-md border border-slate-200 bg-slate-50 p-2">
-                {changes.slice(0, 2).map((change) => (
-                    <div key={`${itemId}-${change.key}`} className="flex items-center justify-between gap-2 text-[11px]">
-                        <p className="truncate font-medium text-slate-700">{change.label}</p>
-                        <Badge
-                            variant="outline"
-                            className={changeTypeMeta[change.type].className}
-                        >
-                            {changeTypeMeta[change.type].label}
-                        </Badge>
-                    </div>
-                ))}
-                {changes.length > 2 && (
-                    <p className="text-[11px] text-slate-500">
-                        +{changes.length - 2} perubahan lainnya
-                    </p>
-                )}
-            </div>
-
-            <Button type="button" variant="outline" size="sm" className="w-full justify-start text-xs" onClick={onOpenDetail}>
-                Lihat detail perubahan ({changes.length})
-            </Button>
-        </div>
-    );
-};
-
 export default function AuditLogIndex(initialProps: AuditLogPageProps) {
     const { props } = usePage<Partial<AuditLogPageProps>>();
     const { setSidebarNotifications } = usePageManager();
@@ -610,7 +277,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                                     <p className="mt-1 text-xs text-slate-700">{item.description ?? '-'}</p>
                                 </div>
 
-                                {renderChangesContent(item.id, changes, () => handleOpenDetail(item, changes))}
+                                <AuditChangesPreview itemId={item.id} changes={changes} onOpenDetail={() => handleOpenDetail(item, changes)} />
                             </div>
                         );
                     })}
@@ -669,7 +336,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                                             {item.description ?? '-'}
                                         </TableCell>
                                         <TableCell className="max-w-[420px]">
-                                            {renderChangesContent(item.id, changes, () => handleOpenDetail(item, changes))}
+                                            <AuditChangesPreview itemId={item.id} changes={changes} onOpenDetail={() => handleOpenDetail(item, changes)} />
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -707,65 +374,13 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                     </div>
                 </div>
             </Card>
-
-            <Dialog open={Boolean(activeDetail)} onOpenChange={(open) => !open && setActiveDetail(null)}>
-                <DialogContent className="w-[92vw] max-w-4xl max-h-[90vh] overflow-hidden border-0 bg-white p-0">
-                    {activeDetail && (
-                        <>
-                            <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4 text-left">
-                                <DialogTitle>Detail Perubahan Log Aktivitas</DialogTitle>
-                                <DialogDescription className="space-y-1">
-                                    <span className="block text-xs text-slate-500">
-                                        {activeDetail.item.created_at}
-                                    </span>
-                                    <span className="block text-sm text-slate-700">
-                                        {formatObjectLabel(activeDetail.item)}
-                                    </span>
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="max-h-[65vh] space-y-3 overflow-y-auto px-6 py-4">
-                                {activeDetail.changes.length === 0 ? (
-                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                                        Log ini tidak memiliki perubahan field terstruktur, namun sudah ditandai sebagai dilihat.
-                                    </div>
-                                ) : (
-                                    activeDetail.changes.map((change) => (
-                                        <div key={`modal-${activeDetail.item.id}-${change.key}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                            <div className="mb-2 flex items-center justify-between gap-2">
-                                                <p className="text-sm font-semibold text-slate-800">{change.label}</p>
-                                                <Badge variant="outline" className={changeTypeMeta[change.type].className}>
-                                                    {changeTypeMeta[change.type].label}
-                                                </Badge>
-                                            </div>
-                                            <div className="grid gap-2 md:grid-cols-2">
-                                                <div className="rounded-md border border-slate-200 bg-white p-2">
-                                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Sebelum</p>
-                                                    <p className="mt-1 break-words text-xs text-slate-700">
-                                                        {summarizeValue(change.before)}
-                                                    </p>
-                                                </div>
-                                                <div className="rounded-md border border-slate-200 bg-white p-2">
-                                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Sesudah</p>
-                                                    <p className="mt-1 break-words text-xs text-slate-700">
-                                                        {summarizeValue(change.after)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-
-                            <DialogFooter className="border-t border-slate-100 px-6 py-4">
-                                <Button type="button" variant="outline" onClick={() => setActiveDetail(null)}>
-                                    Tutup
-                                </Button>
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <AuditDetailDialog
+                activeDetail={activeDetail}
+                onClose={() => setActiveDetail(null)}
+            />
         </SuperAdminLayout>
     );
 }
+
+
+

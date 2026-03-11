@@ -1,6 +1,8 @@
-import { Plus, Trash2, Filter, SlidersHorizontal, X } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 
+import { EligibilityCriteriaSection } from '@/modules/SuperAdmin/KelolaDivisi/components/job-dialog/EligibilityCriteriaSection';
+import { ScoringConfigSection } from '@/modules/SuperAdmin/KelolaDivisi/components/job-dialog/ScoringConfigSection';
 import { AutocompleteInput, type AutocompleteOption } from '@/shared/components/ui/autocomplete-input';
 import { Button } from '@/shared/components/ui/button';
 import {
@@ -30,20 +32,6 @@ const MAX_REQUIREMENTS = 5;
 const MAX_PROGRAM_STUDIES = 10;
 const EDUCATION_REFERENCE_LIMIT = 50;
 const MIN_SEARCH_CHARACTERS = 2;
-
-const EDUCATION_LEVELS = [
-    { value: 'SMA', label: 'SMA/SMK' },
-    { value: 'D3', label: 'Diploma (D3)' },
-    { value: 'S1', label: 'Sarjana (S1)' },
-    { value: 'S2', label: 'Magister (S2)' },
-    { value: 'S3', label: 'Doktor (S3)' },
-];
-
-const GENDER_OPTIONS = [
-    { value: 'none', label: 'Semua (Tidak Dibatasi)' },
-    { value: 'Laki-laki', label: 'Laki-laki' },
-    { value: 'Perempuan', label: 'Perempuan' },
-];
 
 const DEFAULT_SCORING_WEIGHTS = {
     education: 25,
@@ -414,281 +402,29 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                 )}
                             </div>
 
-                            {/* Eligibility Criteria Section */}
-                            <div className="space-y-4 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-                                <div className="flex items-center gap-2">
-                                    <Filter className="h-4 w-4 text-amber-600" />
-                                    <Label className="text-amber-900 font-semibold">Kriteria Kelayakan Otomatis</Label>
-                                </div>
-                                <p className="text-xs text-amber-700">
-                                    Pelamar yang tidak memenuhi kriteria akan ditolak otomatis dengan notifikasi spesifik.
-                                </p>
+                            <EligibilityCriteriaSection
+                                criteria={form.data.job_eligibility_criteria}
+                                normalizedProgramStudies={normalizedProgramStudies}
+                                programStudyInput={programStudyInput}
+                                programOptions={programOptions}
+                                programReferenceError={programReferenceError}
+                                minSearchCharacters={MIN_SEARCH_CHARACTERS}
+                                maxProgramStudies={MAX_PROGRAM_STUDIES}
+                                maxAgeError={form.errors['job_eligibility_criteria.max_age']}
+                                onProgramStudyInputChange={setProgramStudyInput}
+                                onProgramStudyQueryChange={setProgramStudyQuery}
+                                onAddProgramStudy={addProgramStudy}
+                                onRemoveProgramStudy={removeProgramStudy}
+                                onUpdateCriteria={updateCriteria}
+                            />
 
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    {/* Min Age */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="min-age" className="text-sm">Umur Minimal</Label>
-                                        <Input
-                                            id="min-age"
-                                            type="number"
-                                            min={17}
-                                            max={65}
-                                            value={form.data.job_eligibility_criteria?.min_age ?? ''}
-                                            onChange={(e) => updateCriteria('min_age', e.target.value ? Number(e.target.value) : null)}
-                                            placeholder="Contoh: 21"
-                                        />
-                                    </div>
-
-                                    {/* Max Age */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="max-age" className="text-sm">Umur Maksimal</Label>
-                                        <Input
-                                            id="max-age"
-                                            type="number"
-                                            min={form.data.job_eligibility_criteria?.min_age ?? 17}
-                                            max={65}
-                                            value={form.data.job_eligibility_criteria?.max_age ?? ''}
-                                            onChange={(e) => updateCriteria('max_age', e.target.value ? Number(e.target.value) : null)}
-                                            placeholder="Contoh: 35"
-                                            className={form.errors['job_eligibility_criteria.max_age'] ? 'border-red-500' : ''}
-                                        />
-                                        {form.errors['job_eligibility_criteria.max_age'] && (
-                                            <p className="text-xs text-red-600">{form.errors['job_eligibility_criteria.max_age']}</p>
-                                        )}
-                                    </div>
-
-                                    {/* Gender */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="gender" className="text-sm">Jenis Kelamin</Label>
-                                        <Select
-                                            value={form.data.job_eligibility_criteria?.gender ?? 'none'}
-                                            onValueChange={(value) => updateCriteria('gender', value === 'none' ? null : value)}
-                                        >
-                                            <SelectTrigger id="gender">
-                                                <SelectValue placeholder="Pilih jenis kelamin" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {GENDER_OPTIONS.map((option) => (
-                                                    <SelectItem key={option.value} value={option.value}>
-                                                        {option.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {/* Min Education */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="min-education" className="text-sm">Pendidikan Minimal</Label>
-                                        <Select
-                                            value={form.data.job_eligibility_criteria?.min_education ?? 'none'}
-                                            onValueChange={(value) => updateCriteria('min_education', value === 'none' ? null : value)}
-                                        >
-                                            <SelectTrigger id="min-education">
-                                                <SelectValue placeholder="Pilih tingkat pendidikan" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">Semua (Tidak Dibatasi)</SelectItem>
-                                                {EDUCATION_LEVELS.map((level) => (
-                                                    <SelectItem key={level.value} value={level.value}>
-                                                        {level.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <p className="text-xs text-muted-foreground">
-                                            Kosongkan field yang tidak ingin dijadikan kriteria filter.
-                                        </p>
-                                    </div>
-
-                                    {/* Preferred Study Programs */}
-                                    <div className="space-y-2 md:col-span-2">
-                                        <Label htmlFor="program-study-input" className="text-sm">Program Studi (Bisa Lebih dari 1)</Label>
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex-1">
-                                                <AutocompleteInput
-                                                    options={programOptions}
-                                                    value={programStudyInput}
-                                                    onValueChange={setProgramStudyInput}
-                                                    onInputChange={(value) => {
-                                                        setProgramStudyInput(value);
-                                                        setProgramStudyQuery(value);
-                                                    }}
-                                                    placeholder="Ketik program studi..."
-                                                    emptyText="Program studi tidak ditemukan"
-                                                    allowCustomValue
-                                                    disabled={normalizedProgramStudies.length >= MAX_PROGRAM_STUDIES}
-                                                />
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={addProgramStudy}
-                                                disabled={!programStudyInput.trim() || normalizedProgramStudies.length >= MAX_PROGRAM_STUDIES}
-                                            >
-                                                Tambah
-                                            </Button>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">
-                                            Sumber referensi: `education_reference_id.json`. Ketik minimal {MIN_SEARCH_CHARACTERS} karakter.
-                                        </p>
-                                        {programReferenceError && (
-                                            <p className="text-xs text-amber-600">{programReferenceError}</p>
-                                        )}
-                                        <p className="text-xs text-muted-foreground">
-                                            Maksimal {MAX_PROGRAM_STUDIES} prodi. Kriteria ini dipakai untuk penyesuaian skor pendidikan, bukan auto-reject.
-                                        </p>
-                                        {normalizedProgramStudies.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 pt-1">
-                                                {normalizedProgramStudies.map((program) => (
-                                                    <span
-                                                        key={program}
-                                                        className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-white px-3 py-1 text-xs text-amber-800"
-                                                    >
-                                                        {program}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeProgramStudy(program)}
-                                                            className="inline-flex h-4 w-4 items-center justify-center rounded-full text-amber-700 hover:bg-amber-100"
-                                                            aria-label={`Hapus ${program}`}
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Min Experience */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="min-experience" className="text-sm">Pengalaman Minimal (Tahun)</Label>
-                                        <Input
-                                            id="min-experience"
-                                            type="number"
-                                            min={0}
-                                            max={40}
-                                            value={form.data.job_eligibility_criteria?.min_experience_years ?? ''}
-                                            onChange={(e) =>
-                                                updateCriteria(
-                                                    'min_experience_years',
-                                                    e.target.value ? Number(e.target.value) : null,
-                                                )
-                                            }
-                                            placeholder="Contoh: 2"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Scoring Profile Section */}
-                            <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/50 p-4">
-                                <div className="flex items-center gap-2">
-                                    <SlidersHorizontal className="h-4 w-4 text-indigo-600" />
-                                    <Label className="text-indigo-900 font-semibold">Konfigurasi Explainable Scoring</Label>
-                                </div>
-                                <p className="text-xs text-indigo-700">
-                                    Atur bobot dan threshold rekomendasi per lowongan. Jika total bobot tidak 100, sistem akan menormalkan otomatis. Kecocokan skill tetap ditampilkan sebagai informasi, tetapi tidak dihitung ke skor total.
-                                </p>
-
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label className="text-sm">Bobot Pendidikan (%)</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={scoringWeights.education ?? ''}
-                                            onChange={(e) => updateScoringWeight('education', e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm">Bobot Pengalaman (%)</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={scoringWeights.experience ?? ''}
-                                            onChange={(e) => updateScoringWeight('experience', e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm">Bobot Sertifikasi (%)</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={scoringWeights.certification ?? ''}
-                                            onChange={(e) => updateScoringWeight('certification', e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm">Bobot Kelengkapan Profil (%)</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={scoringWeights.profile ?? ''}
-                                            onChange={(e) => updateScoringWeight('profile', e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm">Bobot AI CV Screening (%)</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={scoringWeights.ai_screening ?? ''}
-                                            onChange={(e) => updateScoringWeight('ai_screening', e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                        <p className="text-xs text-slate-500">
-                                            Mengatur pengaruh skor AI terhadap total nilai kandidat.
-                                        </p>
-                                    </div>
-                                    <div className="rounded-lg border border-indigo-200 bg-white p-3">
-                                        <p className="text-xs uppercase tracking-wide text-indigo-600">Total Bobot</p>
-                                        <p className="mt-1 text-lg font-semibold text-indigo-900">{totalWeight.toFixed(1)}%</p>
-                                        <p className="text-xs text-slate-500">
-                                            {Math.abs(totalWeight - 100) < 0.5
-                                                ? 'Sudah ideal.'
-                                                : 'Akan dinormalisasi otomatis saat scoring.'}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="grid gap-4 md:grid-cols-3">
-                                    <div className="space-y-2">
-                                        <Label className="text-sm">Threshold Prioritas Tinggi</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={scoringThresholds.priority ?? ''}
-                                            onChange={(e) => updateScoringThreshold('priority', e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm">Threshold Direkomendasikan</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={scoringThresholds.recommended ?? ''}
-                                            onChange={(e) => updateScoringThreshold('recommended', e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-sm">Threshold Pertimbangkan</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={scoringThresholds.consider ?? ''}
-                                            onChange={(e) => updateScoringThreshold('consider', e.target.value ? Number(e.target.value) : null)}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
+                            <ScoringConfigSection
+                                scoringWeights={scoringWeights}
+                                scoringThresholds={scoringThresholds}
+                                totalWeight={totalWeight}
+                                onUpdateScoringWeight={updateScoringWeight}
+                                onUpdateScoringThreshold={updateScoringThreshold}
+                            />
                         </div>
 
                         <DialogFooter className="flex justify-end gap-2 pt-2">

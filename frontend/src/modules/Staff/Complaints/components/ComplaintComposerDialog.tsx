@@ -2,6 +2,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+    FormField,
+    FormSelect,
+    FormTextarea,
+} from '@/modules/Staff/Complaints/components/ComplaintComposerFields';
 import { Button } from '@/shared/components/ui/button';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import {
@@ -12,18 +17,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/shared/components/ui/dialog';
-import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/shared/components/ui/select';
-import { Textarea } from '@/shared/components/ui/textarea';
 import { router, useForm } from '@/shared/lib/inertia';
 import { route } from '@/shared/lib/route';
+
 
 import type { ComplaintFiltersOptions } from '../types';
 import type { ChangeEvent, FormEvent } from 'react';
@@ -455,92 +452,6 @@ export default function ComplaintComposerDialog({
             </DialogContent>
         </Dialog>
     );
-}
-
-interface FormSelectProps {
-    label: string;
-    placeholder: string;
-    value: string;
-    onChange: (value: string) => void;
-    error?: string;
-    options: Array<{ value: string; label: string }>;
-}
-
-function FormSelect({
-    label,
-    placeholder,
-    value,
-    options,
-    onChange,
-    error,
-}: FormSelectProps) {
-    return (
-        <div>
-            <Label>{label}</Label>
-            <Select value={value} onValueChange={onChange}>
-                <SelectTrigger>
-                    <SelectValue placeholder={placeholder} />
-                </SelectTrigger>
-                <SelectContent>
-                    {options.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-        </div>
-    );
-}
-
-interface FormFieldProps {
-    label: string;
-    value: string;
-    placeholder: string;
-    error?: string;
-    onChange: (value: string) => void;
-}
-
-function FormField({ label, value, placeholder, error, onChange }: FormFieldProps) {
-    return (
-        <div>
-            <Label>{label}</Label>
-            <Input
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                placeholder={placeholder}
-            />
-            {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-        </div>
-    );
-}
-
-interface FormTextareaProps extends Omit<FormFieldProps, 'onChange'> {
-    onChange: (value: string) => void;
-}
-
-function FormTextarea({ label, value, placeholder, error, onChange }: FormTextareaProps) {
-    return (
-        <div>
-            <Label>{label}</Label>
-            <Textarea
-                rows={6}
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                placeholder={placeholder}
-            />
-            {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-        </div>
-    );
-}
-
-function applyFallback(values: string[], fallback: string[]) {
-    if (values.length > 0) {
-        return values.map((value) => ({ value, label: value }));
-    }
-
-    return fallback.map((value) => ({ value, label: value }));
 }
 
 

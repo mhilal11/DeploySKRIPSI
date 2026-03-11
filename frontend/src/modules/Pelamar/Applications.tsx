@@ -2,12 +2,7 @@
     Building2,
     Briefcase,
     Users,
-    CheckCircle,
-    CheckCircle2,
-    XCircle,
-    Send,
     X,
-    Loader2,
 } from 'lucide-react';
 import { useEffect, useState, FormEvent, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -18,11 +13,13 @@ import ApplicationForm, {
 import ApplicationHistory, {
     ApplicationHistoryItem,
 } from '@/modules/Pelamar/components/applications/ApplicationHistory';
+import ApplicationsDivisionCard from '@/modules/Pelamar/components/applications/ApplicationsDivisionCard';
+import ApplicationsStatCard from '@/modules/Pelamar/components/applications/ApplicationsStatCard';
 import EligibilityRejectDialog, {
     EligibilityCriteriaResult,
 } from '@/modules/Pelamar/components/applications/EligibilityRejectDialog';
+import type { DivisionSummary } from '@/modules/Pelamar/components/applications/types';
 import PelamarLayout from '@/modules/Pelamar/Layout';
-import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import {
@@ -36,30 +33,6 @@ import {
 import { api, apiUrl } from '@/shared/lib/api';
 import { Head, router, useForm } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
-
-type EligibilityCriteria = {
-    min_age?: number | null;
-    max_age?: number | null;
-    gender?: string | null;
-    min_education?: string | null;
-    program_studies?: string[] | null;
-    min_experience_years?: number | null;
-};
-
-type DivisionSummary = {
-    id: number;
-    name: string;
-    description: string | null;
-    manager_name: string | null;
-    capacity: number;
-    current_staff: number;
-    available_slots: number;
-    is_hiring: boolean;
-    job_title: string | null;
-    job_description: string | null;
-    job_requirements: string[];
-    job_eligibility_criteria?: EligibilityCriteria | null;
-};
 
 type ApplicationsPageProps = PageProps<{
     applications?: ApplicationHistoryItem[] | null;
@@ -268,19 +241,19 @@ export default function Applications({
                 breadcrumbs={['Recruitment', 'Lamaran Saya']}
             >
                 <div className="grid gap-4 md:grid-cols-3">
-                    <StatCard
+                    <ApplicationsStatCard
                         icon={Building2}
                         title="Total Divisi"
                         value={safeDivisions.length}
                         accent="bg-blue-100 text-blue-900"
                     />
-                    <StatCard
+                    <ApplicationsStatCard
                         icon={Briefcase}
                         title="Divisi Membuka Lowongan"
                         value={openDivisions.length}
                         accent="bg-green-100 text-green-900"
                     />
-                    <StatCard
+                    <ApplicationsStatCard
                         icon={Users}
                         title="Posisi Tersedia"
                         value={availableSlots}
@@ -307,7 +280,7 @@ export default function Applications({
                             );
 
                             return (
-                                <DivisionCard
+                                <ApplicationsDivisionCard
                                     key={division.id}
                                     division={division}
                                     isApplied={isApplied}
@@ -426,172 +399,5 @@ export default function Applications({
         </>
     );
 }
-
-function StatCard({
-    icon: Icon,
-    title,
-    value,
-    accent,
-}: {
-    icon: typeof Building2;
-    title: string;
-    value: number;
-    accent: string;
-}) {
-    return (
-        <Card className="p-4">
-            <div className="flex items-center gap-3">
-                <div className={`rounded-lg p-3 ${accent}`}>
-                    <Icon className="h-6 w-6" />
-                </div>
-                <div>
-                    <p className="text-sm text-slate-500">{title}</p>
-                    <p className="text-xl font-semibold text-slate-900">{value}</p>
-                </div>
-            </div>
-        </Card>
-    );
-}
-
-function DivisionCard({
-    division,
-    isApplied,
-    onApply,
-}: {
-    division: DivisionSummary;
-    isApplied: boolean;
-    onApply: () => void;
-}) {
-    const ratio =
-        division.capacity > 0
-            ? Math.min((division.current_staff / division.capacity) * 100, 100)
-            : 0;
-    const canApply = division.is_hiring && division.available_slots > 0 && !isApplied;
-    const disabled = !canApply;
-
-    let statusLabel;
-    if (isApplied) {
-        statusLabel = (
-            <Badge className="bg-blue-500 hover:bg-blue-500">
-                <CheckCircle className="mr-1 h-3 w-3" />
-                Sudah Dilamar
-            </Badge>
-        );
-    } else if (division.is_hiring) {
-        statusLabel = (
-            <Badge
-                className={
-                    canApply
-                        ? 'bg-green-600 hover:bg-green-600'
-                        : 'bg-orange-500 hover:bg-orange-500'
-                }
-            >
-                {division.available_slots > 0 ? (
-                    <>
-                        <CheckCircle className="mr-1 h-3 w-3" />
-                        Lowongan Terbuka
-                    </>
-                ) : (
-                    <>
-                        <XCircle className="mr-1 h-3 w-3" />
-                        Slot Terpenuhi
-                    </>
-                )}
-            </Badge>
-        );
-    } else {
-        statusLabel = (
-            <Badge variant="outline" className="border-slate-300 text-slate-500">
-                <XCircle className="mr-1 h-3 w-3" />
-                Tidak Ada Lowongan
-            </Badge>
-        );
-    }
-
-    return (
-        <button
-            type="button"
-            onClick={onApply}
-            disabled={disabled}
-            className={`rounded-2xl border p-4 text-left transition ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:border-blue-300'
-                } border-slate-200`}
-        >
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-blue-900 p-2 text-white">
-                        <Building2 className="h-5 w-5" />
-                    </div>
-                    <div>
-                        <p className="font-semibold text-blue-900">{division.name}</p>
-                        <p className="text-xs text-slate-500">
-                            Manager: {division.manager_name ?? 'Belum ditentukan'}
-                        </p>
-                    </div>
-                </div>
-                {statusLabel}
-            </div>
-            <p className="mt-3 line-clamp-2 text-sm text-slate-600">
-                {division.description ?? 'Belum ada deskripsi divisi.'}
-            </p>
-            <div className="mt-4">
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                    <span>Kapasitas</span>
-                    <span>
-                        {division.current_staff}/{division.capacity}
-                    </span>
-                </div>
-                <div className="mt-1 h-1.5 rounded-full bg-slate-200">
-                    <div
-                        className={`h-1.5 rounded-full ${division.available_slots === 0
-                            ? 'bg-red-500'
-                            : 'bg-gradient-to-r from-blue-600 to-cyan-500'
-                            }`}
-                        style={{ width: `${ratio}%` }}
-                    />
-                </div>
-            </div>
-
-            <div className="mt-4 rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm">
-                {division.is_hiring && division.job_title ? (
-                    <>
-                        <p className="font-semibold text-blue-900">{division.job_title}</p>
-                        <p className="text-xs text-slate-500">
-                            {division.available_slots} slot tersedia
-                        </p>
-                        {division.job_requirements.length > 0 && (
-                            <ul className="mt-3 space-y-1 text-xs text-slate-600">
-                                {division.job_requirements.map((requirement, index) => (
-                                    <li
-                                        key={`division-${division.id}-req-${index}`}
-                                        className="flex items-start gap-2"
-                                    >
-                                        <CheckCircle2 className="mt-0.5 h-3 w-3 text-blue-600" />
-                                        <span>{requirement}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </>
-                ) : (
-                    <p className="text-slate-500">Belum membuka lowongan.</p>
-                )}
-            </div>
-
-            {isApplied ? (
-                <p className="mt-3 text-center text-xs text-blue-600 font-medium">
-                    Anda sudah apply lowongan kerja ini
-                </p>
-            ) : canApply ? (
-                <p className="mt-3 text-center text-xs text-blue-600">
-                    <Send className="mr-1 inline h-3 w-3" />
-                    Klik untuk melamar ke divisi ini
-                </p>
-            ) : null}
-        </button>
-    );
-}
-
-
-
 
 
