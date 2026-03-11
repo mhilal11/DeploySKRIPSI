@@ -1,16 +1,64 @@
-﻿import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
+
+import {
+  consumeLandingSplashSkipOnce,
+  hasLandingSplashShown,
+  markLandingSplashShown,
+} from "@/shared/lib/landing-splash";
 
 const SESSION1_DURATION = 3000;
 const SESSION2_DURATION = 3000;
 
+function shouldShowLandingSplash(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (window.location.pathname !== "/") {
+    return false;
+  }
+
+  if (consumeLandingSplashSkipOnce()) {
+    markLandingSplashShown();
+    return false;
+  }
+
+  const navEntry = window.performance.getEntriesByType("navigation")[0] as
+    | PerformanceNavigationTiming
+    | undefined;
+  const navigationType = navEntry?.type ?? "navigate";
+
+  if (navigationType === "reload") {
+    return true;
+  }
+
+  if (navigationType !== "navigate") {
+    return false;
+  }
+
+  return !hasLandingSplashShown();
+}
+
 export default function SplashScreen() {
-  const [show, setShow] = useState(true);
+  const [show, setShow] = useState<boolean>(() => shouldShowLandingSplash());
   const [session, setSession] = useState<1 | 2>(1);
 
   const mainWords = ["Lintas", "Data", "Prima"];
 
   useEffect(() => {
+    if (!show) {
+      return;
+    }
+    markLandingSplashShown();
+    setSession(1);
+  }, [show]);
+
+  useEffect(() => {
+    if (!show) {
+      return;
+    }
+
     const toSession2 = setTimeout(() => setSession(2), SESSION1_DURATION);
     const endAll = setTimeout(
       () => setShow(false),
@@ -21,9 +69,8 @@ export default function SplashScreen() {
       clearTimeout(toSession2);
       clearTimeout(endAll);
     };
-  }, []);
+  }, [show]);
 
-  // Handle skip animation on click
   const handleSkip = () => {
     setShow(false);
   };
@@ -38,7 +85,6 @@ export default function SplashScreen() {
           transition={{ duration: 0.8 }}
           onClick={handleSkip}
         >
-          {/* ========== SESI 1 ========== */}
           {session === 1 && (
             <motion.div
               key="session1"
@@ -48,7 +94,6 @@ export default function SplashScreen() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.6 }}
             >
-              {/* Lintas Data Prima */}
               <motion.div
                 className="flex gap-3 text-white text-3xl md:text-5xl font-bold font-poppins tracking-wide"
                 initial="hidden"
@@ -77,7 +122,6 @@ export default function SplashScreen() {
                 ))}
               </motion.div>
 
-              {/* Enhance Your Business */}
               <motion.p
                 className="text-gray-400 text-sm md:text-xl mt-4 font-poppins"
                 initial={{ opacity: 0, y: 10 }}
@@ -89,7 +133,6 @@ export default function SplashScreen() {
             </motion.div>
           )}
 
-          {/* ========== SESI 2 ========== */}
           {session === 2 && (
             <motion.div
               key="session2"
@@ -100,15 +143,13 @@ export default function SplashScreen() {
               transition={{ duration: 0.6 }}
             >
               <div className="w-full max-w-xl h-10 md:h-12 px-6 md:px-12 relative overflow-hidden rounded flex items-center justify-center">
-
-                {/* BLOK UNGU (full responsive) */}
                 <motion.div
                   className="absolute inset-0 bg-[#800080]"
                   style={{ originX: 0 }}
                   initial={{ scaleX: 0, opacity: 1 }}
                   animate={{
-                    scaleX: [0, 1, 1, 0],  // muncul  penuh  shrink kirikanan
-                    opacity: [1, 1, 1, 0], // fade saat shrink
+                    scaleX: [0, 1, 1, 0],
+                    opacity: [1, 1, 1, 0],
                   }}
                   transition={{
                     duration: 2.8,
@@ -118,7 +159,6 @@ export default function SplashScreen() {
                   }}
                 />
 
-                {/* TEKS  masuk setelah blok penuh */}
                 <motion.span
                   className="relative z-10 text-white text-xl md:text-3xl font-mulish font-extralight tracking-widest text-center"
                   initial={{ x: "-100%", opacity: 0 }}
@@ -135,7 +175,6 @@ export default function SplashScreen() {
             </motion.div>
           )}
 
-          {/* Skip Hint */}
           <motion.p
             className="absolute bottom-8 text-gray-500 text-sm font-poppins"
             initial={{ opacity: 0 }}
@@ -149,5 +188,4 @@ export default function SplashScreen() {
     </AnimatePresence>
   );
 }
-
 

@@ -16,6 +16,7 @@ import {
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Head, Link, useForm } from '@/shared/lib/inertia';
+import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
 
 
 
@@ -46,6 +47,10 @@ export default function Login({
     const [showPassword, setShowPassword] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        markLandingSplashSkipOnce();
+    }, []);
 
     useEffect(() => {
         if (inactiveMessage) {

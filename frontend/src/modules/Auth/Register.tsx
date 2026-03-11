@@ -17,6 +17,7 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Head, Link, useForm } from "@/shared/lib/inertia";
+import { markLandingSplashSkipOnce } from "@/shared/lib/landing-splash";
 
 const logo = "/img/LogoLDP.png";
 
@@ -56,6 +57,10 @@ export default function Register({
 
     // Regex validasi nama: hanya huruf, spasi, petik atas, dan strip
     const nameRegex = /^[A-Za-z\s'-]+$/;
+
+    useEffect(() => {
+        markLandingSplashSkipOnce();
+    }, []);
 
     useEffect(() => {
         if (containerRef.current) {
