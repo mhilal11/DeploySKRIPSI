@@ -2,6 +2,7 @@
     ChevronDown,
     ChevronLeft,
     ChevronRight,
+    LayoutDashboard,
     LogOut,
     X,
 } from 'lucide-react';

@@ -52,6 +52,7 @@ function PageShell({
   const normalizedSearch = searchString ? `?${searchString}` : '';
   const routeKey = `${name}::${apiEndpoint ?? '__loader__'}::${normalizedSearch}`;
   const cacheKey = buildPageCacheKey(apiEndpoint ?? null, normalizedSearch);
+  const disableTransitionFallback = name === 'login' || name === 'register';
   const initialCachedProps = cacheKey ? pageDataCache.get(cacheKey) ?? null : null;
   const [pageProps, setPageProps] = useState<any>(initialCachedProps);
   const [renderedPage, setRenderedPage] = useState<RenderedPageSnapshot | null>(
@@ -74,8 +75,10 @@ function PageShell({
   useEffect(() => {
     let active = true;
     const currentRendered = renderedPageRef.current;
-    if (currentRendered && currentRendered.routeKey !== routeKey) {
+    if (!disableTransitionFallback && currentRendered && currentRendered.routeKey !== routeKey) {
       setTransitionFallbackPage(currentRendered);
+    } else if (disableTransitionFallback) {
+      setTransitionFallbackPage(null);
     }
 
     const fetchData = async () => {
@@ -155,7 +158,18 @@ function PageShell({
     return () => {
       active = false;
     };
-  }, [routeKey, apiEndpoint, cacheKey, searchString, authLoaded, loaderProps, router, setProps, Component]);
+  }, [
+    routeKey,
+    apiEndpoint,
+    cacheKey,
+    searchString,
+    authLoaded,
+    loaderProps,
+    router,
+    setProps,
+    Component,
+    disableTransitionFallback,
+  ]);
 
   const currentRenderedPage = renderedPage && renderedPage.routeKey === routeKey ? renderedPage : null;
   if (loadError && loaded && !currentRenderedPage) {
@@ -166,15 +180,16 @@ function PageShell({
     // Use transitionFallbackPage or the stale renderedPage (from the
     // previous route) to keep the old content visible while the new page
     // loads.  This eliminates the single-frame white flash.
-    const immediateFallback =
-      transitionFallbackPage ||
-      (renderedPage && renderedPage.routeKey !== routeKey ? renderedPage : null);
+    const immediateFallback = disableTransitionFallback
+      ? null
+      : transitionFallbackPage ||
+        (renderedPage && renderedPage.routeKey !== routeKey ? renderedPage : null);
 
     if (immediateFallback) {
       const FallbackComponent = immediateFallback.component as React.ComponentType<any>;
       return <FallbackComponent {...immediateFallback.props} />;
     }
-    if (apiEndpoint && !loaded && !pageProps) {
+    if (apiEndpoint && !loaded && !pageProps && !disableTransitionFallback) {
       return null;
     }
 
@@ -188,7 +203,7 @@ function PageShell({
   }
 
   const ResolvedComponent = currentRenderedPage.component as React.ComponentType<any>;
-  const suspenseFallback = transitionFallbackPage
+  const suspenseFallback = !disableTransitionFallback && transitionFallbackPage
     ? (() => {
       const FallbackComponent = transitionFallbackPage.component as React.ComponentType<any>;
       return <FallbackComponent {...transitionFallbackPage.props} />;

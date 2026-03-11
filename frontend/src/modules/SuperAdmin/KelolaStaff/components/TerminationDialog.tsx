@@ -144,9 +144,9 @@ export default function TerminationDialog({
                                     {selectedStaff && (
                                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
                                             <span className="font-medium text-slate-900">{selectedStaff.name}</span>
-                                            {' · '}
+                                            {' - '}
                                             {selectedStaff.employeeCode}
-                                            {' · '}
+                                            {' - '}
                                             {selectedStaff.division ?? '-'}
                                         </div>
                                     )}
@@ -266,7 +266,7 @@ export default function TerminationDialog({
                                                 {staff.name}
                                             </p>
                                             <p className="truncate text-xs text-slate-500">
-                                                {staff.employeeCode} · {staff.division ?? '-'}
+                                                {staff.employeeCode} - {staff.division ?? '-'}
                                             </p>
                                         </div>
                                         <Badge variant="outline" className="border-blue-200 text-blue-700">

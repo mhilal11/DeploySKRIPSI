@@ -177,7 +177,7 @@ export function RecruitmentApplicantsControls({
                         {item.name}
                       </p>
                       <p className="truncate text-[11px] text-slate-500">
-                        {item.position} · {item.stage}
+                        {item.position} - {item.stage}
                       </p>
                     </div>
                     {item.state === 'overdue' ? (

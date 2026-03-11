@@ -47,6 +47,10 @@ const DEFAULT_SCORING_THRESHOLDS = {
     consider: 55,
 } as const;
 
+function normalizeScoreValue(value: unknown, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
 export type JobFormFields = {
     job_id?: number | null;
     job_title: string;
@@ -217,12 +221,40 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
     };
 
     const scoringWeights = {
-        ...DEFAULT_SCORING_WEIGHTS,
-        ...(form.data.job_eligibility_criteria?.scoring_weights ?? {}),
+        education: normalizeScoreValue(
+            form.data.job_eligibility_criteria?.scoring_weights?.education,
+            DEFAULT_SCORING_WEIGHTS.education,
+        ),
+        experience: normalizeScoreValue(
+            form.data.job_eligibility_criteria?.scoring_weights?.experience,
+            DEFAULT_SCORING_WEIGHTS.experience,
+        ),
+        certification: normalizeScoreValue(
+            form.data.job_eligibility_criteria?.scoring_weights?.certification,
+            DEFAULT_SCORING_WEIGHTS.certification,
+        ),
+        profile: normalizeScoreValue(
+            form.data.job_eligibility_criteria?.scoring_weights?.profile,
+            DEFAULT_SCORING_WEIGHTS.profile,
+        ),
+        ai_screening: normalizeScoreValue(
+            form.data.job_eligibility_criteria?.scoring_weights?.ai_screening,
+            DEFAULT_SCORING_WEIGHTS.ai_screening,
+        ),
     };
     const scoringThresholds = {
-        ...DEFAULT_SCORING_THRESHOLDS,
-        ...(form.data.job_eligibility_criteria?.scoring_thresholds ?? {}),
+        priority: normalizeScoreValue(
+            form.data.job_eligibility_criteria?.scoring_thresholds?.priority,
+            DEFAULT_SCORING_THRESHOLDS.priority,
+        ),
+        recommended: normalizeScoreValue(
+            form.data.job_eligibility_criteria?.scoring_thresholds?.recommended,
+            DEFAULT_SCORING_THRESHOLDS.recommended,
+        ),
+        consider: normalizeScoreValue(
+            form.data.job_eligibility_criteria?.scoring_thresholds?.consider,
+            DEFAULT_SCORING_THRESHOLDS.consider,
+        ),
     };
     const totalWeight: number = [
         scoringWeights.education,

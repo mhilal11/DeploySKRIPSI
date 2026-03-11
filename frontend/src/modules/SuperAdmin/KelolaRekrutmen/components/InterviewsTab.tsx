@@ -137,7 +137,7 @@ export default function InterviewsTab({ interviews, onViewDetails }: InterviewsT
                 </div>
                 <div className="flex items-center gap-1">
                     <Button variant="outline" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="h-8 w-8 p-0">
-                        ‹
+                        {'<'}
                     </Button>
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                         <Button key={p} variant={page === p ? "default" : "outline"} size="sm" onClick={() => setPage(p)} className="h-8 w-8 p-0">
@@ -145,7 +145,7 @@ export default function InterviewsTab({ interviews, onViewDetails }: InterviewsT
                         </Button>
                     ))}
                     <Button variant="outline" size="sm" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="h-8 w-8 p-0">
-                        ›
+                        {'>'}
                     </Button>
                 </div>
             </div>
@@ -203,7 +203,6 @@ export default function InterviewsTab({ interviews, onViewDetails }: InterviewsT
         </Card>
     );
 }
-
 
 
 
