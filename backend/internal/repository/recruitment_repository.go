@@ -53,7 +53,7 @@ func ListRecruitmentApplications(db *sqlx.DB) ([]models.Application, error) {
 	}
 	rows := []models.Application{}
 	err := db.Select(&rows, "SELECT * FROM applications ORDER BY submitted_at DESC")
-	return rows, err
+	return rows, wrapRepoErr("list recruitment applications", err)
 }
 
 func UpsertRecruitmentSLASetting(db *sqlx.DB, stage string, targetDays int, now time.Time) error {
@@ -68,7 +68,7 @@ func UpsertRecruitmentSLASetting(db *sqlx.DB, stage string, targetDays int, now 
 		VALUES (?, ?, ?, ?)
 		ON DUPLICATE KEY UPDATE target_days = VALUES(target_days), updated_at = VALUES(updated_at)
 	`, stage, targetDays, now, now)
-	return err
+	return wrapRepoErr("upsert recruitment sla setting", err)
 }
 
 func ListRecruitmentSLASettings(db *sqlx.DB) ([]RecruitmentSLASettingRow, error) {
@@ -81,7 +81,7 @@ func ListRecruitmentSLASettings(db *sqlx.DB) ([]RecruitmentSLASettingRow, error)
 		if strings.Contains(err.Error(), "doesn't exist") {
 			return []RecruitmentSLASettingRow{}, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("list recruitment sla settings", err)
 	}
 	return rows, nil
 }
@@ -96,7 +96,7 @@ func GetRecruitmentApplicationStatusState(db *sqlx.DB, id int64) (*RecruitmentAp
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get recruitment application status state", err)
 	}
 	return &row, nil
 }
@@ -137,7 +137,7 @@ func UpdateRecruitmentApplicationStatus(db *sqlx.DB, id int64, status string, re
 	args = append(args, id)
 	query := "UPDATE applications SET " + strings.Join(updateFields, ", ") + " WHERE id = ?"
 	_, err := db.Exec(query, args...)
-	return err
+	return wrapRepoErr("update recruitment application status", err)
 }
 
 func GetRecruitmentApplicationRejectState(db *sqlx.DB, id int64) (*RecruitmentApplicationRejectState, error) {
@@ -150,7 +150,7 @@ func GetRecruitmentApplicationRejectState(db *sqlx.DB, id int64) (*RecruitmentAp
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get recruitment application reject state", err)
 	}
 	return &row, nil
 }
@@ -169,7 +169,7 @@ func RejectRecruitmentApplication(db *sqlx.DB, id int64, rejectionReason string,
 		now,
 		id,
 	)
-	return err
+	return wrapRepoErr("reject recruitment application", err)
 }
 
 func GetRecruitmentInterviewScheduleState(db *sqlx.DB, id int64) (*RecruitmentInterviewScheduleState, error) {
@@ -182,7 +182,7 @@ func GetRecruitmentInterviewScheduleState(db *sqlx.DB, id int64) (*RecruitmentIn
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get recruitment interview schedule state", err)
 	}
 	return &row, nil
 }
@@ -218,7 +218,7 @@ func SetRecruitmentInterviewSchedule(
 		now,
 		id,
 	)
-	return err
+	return wrapRepoErr("set recruitment interview schedule", err)
 }
 
 func GetRecruitmentApplicationSummary(db *sqlx.DB, id int64) (*RecruitmentApplicationSummary, error) {
@@ -231,7 +231,7 @@ func GetRecruitmentApplicationSummary(db *sqlx.DB, id int64) (*RecruitmentApplic
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get recruitment application summary", err)
 	}
 	return &row, nil
 }
@@ -241,7 +241,7 @@ func DeleteRecruitmentApplication(db *sqlx.DB, id int64) error {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("DELETE FROM applications WHERE id = ?", id)
-	return err
+	return wrapRepoErr("delete recruitment application", err)
 }
 
 func UpsertOnboardingChecklist(db *sqlx.DB, applicationID int64, contract, inventory, training int) error {
@@ -253,7 +253,7 @@ func UpsertOnboardingChecklist(db *sqlx.DB, applicationID int64, contract, inven
 		VALUES (?, ?, ?, ?, NOW(), NOW())
 		ON DUPLICATE KEY UPDATE contract_signed=VALUES(contract_signed), inventory_handover=VALUES(inventory_handover), training_orientation=VALUES(training_orientation), updated_at=NOW()
 	`, applicationID, contract, inventory, training)
-	return err
+	return wrapRepoErr("upsert onboarding checklist", err)
 }
 
 func GetOnboardingChecklistByApplicationID(db *sqlx.DB, applicationID int64) (*models.OnboardingChecklist, error) {
@@ -266,7 +266,7 @@ func GetOnboardingChecklistByApplicationID(db *sqlx.DB, applicationID int64) (*m
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get onboarding checklist by application id", err)
 	}
 	return &checklist, nil
 }
@@ -281,7 +281,7 @@ func GetUserRoleByID(db *sqlx.DB, userID int64) (string, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", nil
 		}
-		return "", err
+		return "", wrapRepoErr("get user role by id", err)
 	}
 	return role, nil
 }
@@ -292,7 +292,7 @@ func ListInterviewApplicationsByDate(db *sqlx.DB, currentID int64, date string) 
 	}
 	rows := []models.Application{}
 	err := db.Select(&rows, "SELECT * FROM applications WHERE id != ? AND interview_date = ? AND interview_time IS NOT NULL", currentID, date)
-	return rows, err
+	return rows, wrapRepoErr("list interview applications by date", err)
 }
 
 func UpdateUserToStaff(db *sqlx.DB, userID int64, employeeCode string, division *string) error {
@@ -300,7 +300,7 @@ func UpdateUserToStaff(db *sqlx.DB, userID int64, employeeCode string, division 
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("UPDATE users SET role = ?, employee_code = ?, division = ? WHERE id = ?", models.RoleStaff, employeeCode, recruitNullableStringPtr(division), userID)
-	return err
+	return wrapRepoErr("update user to staff", err)
 }
 
 func UpsertStaffProfileFromApplicant(db *sqlx.DB, userID int64, religion, gender *string, educationLevel string) error {
@@ -312,7 +312,7 @@ func UpsertStaffProfileFromApplicant(db *sqlx.DB, userID int64, religion, gender
 		VALUES (?, ?, ?, ?, NOW(), NOW())
 		ON DUPLICATE KEY UPDATE religion=VALUES(religion), gender=VALUES(gender), education_level=VALUES(education_level), updated_at=NOW()
 	`, userID, recruitNullableStringPtr(religion), recruitNullableStringPtr(gender), recruitNullableString(educationLevel))
-	return err
+	return wrapRepoErr("upsert staff profile from applicant", err)
 }
 
 func recruitNullableStringPtr(value *string) any {

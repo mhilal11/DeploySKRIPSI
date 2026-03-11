@@ -30,7 +30,7 @@ func ListApplicationsForScoring(db *sqlx.DB, statuses []string) ([]models.Applic
 	rows := []models.Application{}
 	if len(statuses) == 0 {
 		err := db.Select(&rows, "SELECT * FROM applications ORDER BY submitted_at DESC, id ASC")
-		return rows, err
+		return rows, wrapRepoErr("list applications for scoring", err)
 	}
 
 	query, args, err := sqlx.In(
@@ -38,11 +38,11 @@ func ListApplicationsForScoring(db *sqlx.DB, statuses []string) ([]models.Applic
 		statuses,
 	)
 	if err != nil {
-		return nil, err
+		return nil, wrapRepoErr("build applications for scoring query", err)
 	}
 	query = db.Rebind(query)
 	if err := db.Select(&rows, query, args...); err != nil {
-		return nil, err
+		return nil, wrapRepoErr("list applications for scoring", err)
 	}
 	return rows, nil
 }
@@ -58,13 +58,13 @@ func ListApplicantProfilesByUserIDs(db *sqlx.DB, userIDs []int64) (map[int64]*mo
 
 	query, args, err := sqlx.In("SELECT * FROM applicant_profiles WHERE user_id IN (?)", userIDs)
 	if err != nil {
-		return out, err
+		return out, wrapRepoErr("build applicant profiles by user ids query", err)
 	}
 	query = db.Rebind(query)
 
 	rows := []models.ApplicantProfile{}
 	if err := db.Select(&rows, query, args...); err != nil {
-		return out, err
+		return out, wrapRepoErr("list applicant profiles by user ids", err)
 	}
 	for i := range rows {
 		row := rows[i]
@@ -92,11 +92,11 @@ func PromoteApplicationToScreening(db *sqlx.DB, applicationID int64, at time.Tim
 		applicationID,
 	)
 	if err != nil {
-		return 0, err
+		return 0, wrapRepoErr("promote application to screening", err)
 	}
 	rows, err := result.RowsAffected()
 	if err != nil {
-		return 0, err
+		return 0, wrapRepoErr("promote application to screening rows affected", err)
 	}
 	return rows, nil
 }
@@ -130,7 +130,7 @@ func InsertRecruitmentScoringAudit(
 		detailsJSON,
 		createdAt,
 	)
-	return err
+	return wrapRepoErr("insert recruitment scoring audit", err)
 }
 
 func ListRecruitmentScoringAudits(db *sqlx.DB, limit int) ([]RecruitmentScoringAuditRecord, error) {
@@ -153,7 +153,7 @@ func ListRecruitmentScoringAudits(db *sqlx.DB, limit int) ([]RecruitmentScoringA
 		ORDER BY a.created_at DESC, a.id DESC
 		LIMIT ?`, limit)
 	if err != nil {
-		return nil, err
+		return nil, wrapRepoErr("list recruitment scoring audits", err)
 	}
 	return rows, nil
 }

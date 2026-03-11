@@ -63,7 +63,7 @@ func ListSuratByFilters(db *sqlx.DB, filters SuratListFilters) ([]models.Surat, 
 	query += " ORDER BY tanggal_surat DESC, surat_id DESC"
 	rows := []models.Surat{}
 	err := db.Select(&rows, query, args...)
-	return rows, err
+	return rows, wrapRepoErr("list surat by filters", err)
 }
 
 func InsertSuperAdminLetter(db *sqlx.DB, input SuperAdminLetterCreateInput) error {
@@ -113,7 +113,7 @@ func InsertSuperAdminLetter(db *sqlx.DB, input SuperAdminLetterCreateInput) erro
 		input.CreatedAt,
 		input.UpdatedAt,
 	)
-	return err
+	return wrapRepoErr("insert super admin letter", err)
 }
 
 func UpdateSuratDispositionToDivision(db *sqlx.DB, suratID int64, penerima string, note string, disposedBy int64, now time.Time) error {
@@ -125,7 +125,7 @@ func UpdateSuratDispositionToDivision(db *sqlx.DB, suratID int64, penerima strin
 	}
 	_, err := db.Exec(`UPDATE surat SET current_recipient='division', penerima=?, status_persetujuan='Didisposisi', disposition_note=?, disposed_by=?, disposed_at=?, updated_at=? WHERE surat_id=?`,
 		penerima, note, disposedBy, now, now, suratID)
-	return err
+	return wrapRepoErr("update surat disposition to division", err)
 }
 
 func BulkDispositionLetters(db *sqlx.DB, ids []int64, note string, disposedBy int64, now time.Time) error {
@@ -141,7 +141,7 @@ func BulkDispositionLetters(db *sqlx.DB, ids []int64, note string, disposedBy in
 		}
 		if _, err := db.Exec(`UPDATE surat SET current_recipient='division', penerima=COALESCE(target_division,penerima), status_persetujuan='Didisposisi', disposition_note=?, disposed_by=?, disposed_at=?, updated_at=? WHERE surat_id=?`,
 			note, disposedBy, now, now, id); err != nil {
-			return err
+			return wrapRepoErr("bulk disposition letters update", err)
 		}
 	}
 	return nil
@@ -156,7 +156,7 @@ func UpdateSuratRejectedToOrigin(db *sqlx.DB, suratID int64, originDivision, not
 	}
 	_, err := db.Exec(`UPDATE surat SET current_recipient='division', penerima=?, target_division=?, status_persetujuan='Ditolak HR', disposition_note=?, disposed_by=?, disposed_at=?, updated_at=? WHERE surat_id=?`,
 		originDivision, originDivision, note, disposedBy, now, now, suratID)
-	return err
+	return wrapRepoErr("update surat rejected to origin", err)
 }
 
 func UpdateSuratFinalDisposition(db *sqlx.DB, suratID int64, filePath, fileName *string, note *string, disposedBy int64, now time.Time) error {
@@ -168,7 +168,7 @@ func UpdateSuratFinalDisposition(db *sqlx.DB, suratID int64, filePath, fileName 
 	}
 	_, err := db.Exec(`UPDATE surat SET current_recipient='division', penerima=COALESCE(target_division,penerima), status_persetujuan='Didisposisi', is_finalized=1, disposition_document_path=?, disposition_document_name=?, disposition_note=?, disposed_by=?, disposed_at=?, updated_at=? WHERE surat_id=?`,
 		filePath, fileName, note, disposedBy, now, now, suratID)
-	return err
+	return wrapRepoErr("update surat final disposition", err)
 }
 
 func ArchiveSurat(db *sqlx.DB, suratID int64) error {
@@ -176,7 +176,7 @@ func ArchiveSurat(db *sqlx.DB, suratID int64) error {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec(`UPDATE surat SET status_persetujuan='Diarsipkan', current_recipient='archive' WHERE surat_id = ?`, suratID)
-	return err
+	return wrapRepoErr("archive surat", err)
 }
 
 func UnarchiveSurat(db *sqlx.DB, suratID int64) error {
@@ -184,5 +184,5 @@ func UnarchiveSurat(db *sqlx.DB, suratID int64) error {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec(`UPDATE surat SET status_persetujuan='Didisposisi', current_recipient='division' WHERE surat_id = ?`, suratID)
-	return err
+	return wrapRepoErr("unarchive surat", err)
 }

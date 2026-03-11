@@ -1,7 +1,8 @@
-package db
+package repository_test
 
 import (
 	"errors"
+	repository "hris-backend/internal/repository"
 	"regexp"
 	"strings"
 	"testing"
@@ -24,7 +25,7 @@ func TestSavePasswordResetToken_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	err := SavePasswordResetToken(db, "foo@example.com", "token-123", now)
+	err := repository.SavePasswordResetToken(db, "foo@example.com", "token-123", now)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -49,7 +50,7 @@ func TestSavePasswordResetToken_InsertFailRollback(t *testing.T) {
 		WillReturnError(insertErr)
 	mock.ExpectRollback()
 
-	err := SavePasswordResetToken(db, "foo@example.com", "token-123", now)
+	err := repository.SavePasswordResetToken(db, "foo@example.com", "token-123", now)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -79,7 +80,7 @@ func TestCreatePelamarUserWithProfile_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	userID, err := CreatePelamarUserWithProfile(db, "EMP-001", "Foo", "foo@example.com", "hash", now, nil, now)
+	userID, err := repository.CreatePelamarUserWithProfile(db, "EMP-001", "Foo", "foo@example.com", "hash", now, nil, now)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -107,7 +108,7 @@ func TestCreatePelamarUserWithProfile_ProfileInsertFailRollback(t *testing.T) {
 		WillReturnError(profileErr)
 	mock.ExpectRollback()
 
-	_, err := CreatePelamarUserWithProfile(db, "EMP-001", "Foo", "foo@example.com", "hash", now, nil, now)
+	_, err := repository.CreatePelamarUserWithProfile(db, "EMP-001", "Foo", "foo@example.com", "hash", now, nil, now)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}

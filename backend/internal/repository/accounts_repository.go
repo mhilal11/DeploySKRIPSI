@@ -68,7 +68,7 @@ func ListUsers(db *sqlx.DB, filters UserListFilters, page, perPage int) ([]model
 	countQuery := "SELECT COUNT(*) FROM users" + where
 	var total int
 	if err := db.Get(&total, countQuery, args...); err != nil {
-		return nil, 0, err
+		return nil, 0, wrapRepoErr("list users count", err)
 	}
 
 	offset := (page - 1) * perPage
@@ -77,7 +77,7 @@ func ListUsers(db *sqlx.DB, filters UserListFilters, page, perPage int) ([]model
 
 	rows := []models.User{}
 	if err := db.Select(&rows, query, queryArgs...); err != nil {
-		return nil, 0, err
+		return nil, 0, wrapRepoErr("list users select", err)
 	}
 
 	return rows, total, nil
@@ -108,7 +108,7 @@ func CountUsersByRoleStats(db *sqlx.DB) (UserRoleStats, error) {
 	}{}
 
 	if err := db.Get(&row, query, models.RoleSuperAdmin, models.RoleAdmin, models.RoleStaff, models.RolePelamar); err != nil {
-		return out, err
+		return out, wrapRepoErr("count users by role stats", err)
 	}
 
 	out.Total = row.Total
@@ -128,7 +128,7 @@ func GetUserByID(db *sqlx.DB, id int64) (*models.User, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get user by id", err)
 	}
 	return &user, nil
 }
@@ -142,7 +142,7 @@ func GetStaffProfileByUserID(db *sqlx.DB, userID int64) (*models.StaffProfile, e
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get staff profile by user id", err)
 	}
 	return &profile, nil
 }
@@ -156,14 +156,14 @@ func UserEmailExists(db *sqlx.DB, email string, excludeID *int64) (bool, error) 
 	if excludeID != nil && *excludeID > 0 {
 		err := db.Get(&count, "SELECT COUNT(*) FROM users WHERE email = ? AND id != ?", email, *excludeID)
 		if err != nil {
-			return false, err
+			return false, wrapRepoErr("user email exists with exclude id", err)
 		}
 		return count > 0, nil
 	}
 
 	err := db.Get(&count, "SELECT COUNT(*) FROM users WHERE email = ?", email)
 	if err != nil {
-		return false, err
+		return false, wrapRepoErr("user email exists", err)
 	}
 	return count > 0, nil
 }
@@ -192,12 +192,12 @@ func CreateUser(db *sqlx.DB, input CreateUserInput) (int64, error) {
 		input.Now,
 	)
 	if err != nil {
-		return 0, err
+		return 0, wrapRepoErr("create user insert", err)
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return 0, err
+		return 0, wrapRepoErr("create user last insert id", err)
 	}
 	return id, nil
 }
@@ -239,7 +239,7 @@ func UpdateUser(db *sqlx.DB, input UpdateUserInput) error {
 
 	query := "UPDATE users SET " + strings.Join(updateFields, ", ") + " WHERE id = ?"
 	_, err := db.Exec(query, args...)
-	return err
+	return wrapRepoErr("update user", err)
 }
 
 func DeleteUserByID(db *sqlx.DB, id int64) error {
@@ -247,7 +247,7 @@ func DeleteUserByID(db *sqlx.DB, id int64) error {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("DELETE FROM users WHERE id = ?", id)
-	return err
+	return wrapRepoErr("delete user by id", err)
 }
 
 func UpdateUserStatus(db *sqlx.DB, id int64, status string, inactiveAt *string) error {
@@ -255,7 +255,7 @@ func UpdateUserStatus(db *sqlx.DB, id int64, status string, inactiveAt *string) 
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("UPDATE users SET status = ?, inactive_at = ? WHERE id = ?", status, nullableStringPtr(inactiveAt), id)
-	return err
+	return wrapRepoErr("update user status", err)
 }
 
 func UpdateUserPassword(db *sqlx.DB, id int64, passwordHash string) error {
@@ -263,7 +263,7 @@ func UpdateUserPassword(db *sqlx.DB, id int64, passwordHash string) error {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("UPDATE users SET password = ? WHERE id = ?", passwordHash, id)
-	return err
+	return wrapRepoErr("update user password", err)
 }
 
 func InsertStaffProfile(db *sqlx.DB, userID int64, religion, gender, educationLevel string, now time.Time) error {
@@ -274,7 +274,7 @@ func InsertStaffProfile(db *sqlx.DB, userID int64, religion, gender, educationLe
 		INSERT INTO staff_profiles (user_id, religion, gender, education_level, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`, userID, nullableString(religion), nullableString(gender), nullableString(educationLevel), now, now)
-	return err
+	return wrapRepoErr("insert staff profile", err)
 }
 
 func UpsertStaffProfile(db *sqlx.DB, userID int64, religion, gender, educationLevel string) error {
@@ -290,7 +290,7 @@ func UpsertStaffProfile(db *sqlx.DB, userID int64, religion, gender, educationLe
 			education_level = VALUES(education_level),
 			updated_at = NOW()
 	`, userID, nullableString(religion), nullableString(gender), nullableString(educationLevel))
-	return err
+	return wrapRepoErr("upsert staff profile", err)
 }
 
 func DeleteStaffProfileByUserID(db *sqlx.DB, userID int64) error {
@@ -298,7 +298,7 @@ func DeleteStaffProfileByUserID(db *sqlx.DB, userID int64) error {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("DELETE FROM staff_profiles WHERE user_id = ?", userID)
-	return err
+	return wrapRepoErr("delete staff profile by user id", err)
 }
 
 func buildUsersWhereClause(filters UserListFilters) (string, []any) {

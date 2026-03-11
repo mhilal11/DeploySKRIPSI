@@ -44,7 +44,7 @@ func ListApplicationsByUserID(db *sqlx.DB, userID int64) ([]models.Application, 
 	}
 	applications := []models.Application{}
 	err := db.Select(&applications, "SELECT * FROM applications WHERE user_id = ? ORDER BY submitted_at DESC", userID)
-	return applications, err
+	return applications, wrapRepoErr("list applications by user id", err)
 }
 
 func CountActiveApplicationsByUserID(db *sqlx.DB, userID int64) (int, error) {
@@ -53,7 +53,7 @@ func CountActiveApplicationsByUserID(db *sqlx.DB, userID int64) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM applications WHERE user_id = ? AND status IN ('Applied','Screening','Interview','Offering')", userID)
-	return count, err
+	return count, wrapRepoErr("count active applications by user id", err)
 }
 
 func CountCompletedApplicationsByUserID(db *sqlx.DB, userID int64) (int, error) {
@@ -62,7 +62,7 @@ func CountCompletedApplicationsByUserID(db *sqlx.DB, userID int64) (int, error) 
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM applications WHERE user_id = ? AND status IN ('Hired','Rejected')", userID)
-	return count, err
+	return count, wrapRepoErr("count completed applications by user id", err)
 }
 
 func UpdateUserNameEmailByID(db *sqlx.DB, userID int64, fullName, email *string) error {
@@ -70,7 +70,7 @@ func UpdateUserNameEmailByID(db *sqlx.DB, userID int64, fullName, email *string)
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("UPDATE users SET name = COALESCE(?, name), email = COALESCE(?, email) WHERE id = ?", fullName, email, userID)
-	return err
+	return wrapRepoErr("update user name email by id", err)
 }
 
 func UpdateApplicantProfileByUserID(db *sqlx.DB, profile *models.ApplicantProfile, updatedAt time.Time) error {
@@ -102,7 +102,7 @@ func UpdateApplicantProfileByUserID(db *sqlx.DB, profile *models.ApplicantProfil
 		updatedAt,
 		profile.UserID,
 	)
-	return err
+	return wrapRepoErr("update applicant profile by user id", err)
 }
 
 func CountApplicationsByUserDivisionPosition(db *sqlx.DB, userID int64, division string, position string) (int, error) {
@@ -111,7 +111,7 @@ func CountApplicationsByUserDivisionPosition(db *sqlx.DB, userID int64, division
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM applications WHERE user_id = ? AND division = ? AND position = ?", userID, division, position)
-	return count, err
+	return count, wrapRepoErr("count applications by user division position", err)
 }
 
 func InsertApplication(db *sqlx.DB, input ApplicationCreateInput) (int64, error) {
@@ -142,11 +142,11 @@ func InsertApplication(db *sqlx.DB, input ApplicationCreateInput) (int64, error)
 		input.UpdatedAt,
 	)
 	if err != nil {
-		return 0, err
+		return 0, wrapRepoErr("insert application", err)
 	}
 	applicationID, err := insertResult.LastInsertId()
 	if err != nil {
-		return 0, err
+		return 0, wrapRepoErr("insert application last insert id", err)
 	}
 	return applicationID, nil
 }
@@ -159,7 +159,7 @@ func InsertApplicantProfile(db *sqlx.DB, userID int64, fullName, email string, n
 		now = time.Now()
 	}
 	_, err := db.Exec(`INSERT INTO applicant_profiles (user_id, full_name, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`, userID, fullName, email, now, now)
-	return err
+	return wrapRepoErr("insert applicant profile", err)
 }
 
 func CountUsersByDivisionAndRoles(db *sqlx.DB, division string, roles ...string) (int, error) {
@@ -181,7 +181,7 @@ func CountUsersByDivisionAndRoles(db *sqlx.DB, division string, roles ...string)
 
 	var count int
 	err := db.Get(&count, query, args...)
-	return count, err
+	return count, wrapRepoErr("count users by division and roles", err)
 }
 
 func ListCustomEducationReferenceRows(db *sqlx.DB, query string, limit int) ([]EducationReferenceCustomRow, error) {
@@ -207,7 +207,7 @@ func ListCustomEducationReferenceRows(db *sqlx.DB, query string, limit int) ([]E
 	if err != nil && IsMissingEducationReferenceCustomTableError(err) {
 		return []EducationReferenceCustomRow{}, nil
 	}
-	return rows, err
+	return rows, wrapRepoErr("list custom education reference rows", err)
 }
 
 func UpsertEducationReferenceCustomEntries(db *sqlx.DB, userID int64, entries []EducationReferenceCustomUpsertEntry, now time.Time) error {
@@ -220,7 +220,7 @@ func UpsertEducationReferenceCustomEntries(db *sqlx.DB, userID int64, entries []
 
 	tx, err := db.Beginx()
 	if err != nil {
-		return err
+		return wrapRepoErr("begin upsert education reference custom tx", err)
 	}
 	defer tx.Rollback()
 
@@ -256,11 +256,14 @@ func UpsertEducationReferenceCustomEntries(db *sqlx.DB, userID int64, entries []
 			if IsMissingEducationReferenceCustomTableError(execErr) {
 				return nil
 			}
-			return execErr
+			return wrapRepoErr("upsert education reference custom entry", execErr)
 		}
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return wrapRepoErr("commit upsert education reference custom tx", err)
+	}
+	return nil
 }
 
 func IsMissingEducationReferenceCustomTableError(err error) bool {

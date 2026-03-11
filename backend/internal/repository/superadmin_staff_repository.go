@@ -24,7 +24,7 @@ func ListStaffTerminationsByEffectiveDateDesc(db *sqlx.DB) ([]models.StaffTermin
 	}
 	rows := []models.StaffTermination{}
 	err := db.Select(&rows, "SELECT * FROM staff_terminations ORDER BY effective_date DESC")
-	return rows, err
+	return rows, wrapRepoErr("list staff terminations by effective date desc", err)
 }
 
 func ListEligibleActiveStaffRows(db *sqlx.DB) ([]StaffPickerRow, error) {
@@ -47,7 +47,7 @@ func ListEligibleActiveStaffRows(db *sqlx.DB) ([]StaffPickerRow, error) {
 		  )
 		ORDER BY u.name ASC
 	`, models.RoleStaff)
-	return rows, err
+	return rows, wrapRepoErr("list eligible active staff rows", err)
 }
 
 func GetUserRegisteredAtByID(db *sqlx.DB, userID int64) (*time.Time, error) {
@@ -60,7 +60,7 @@ func GetUserRegisteredAtByID(db *sqlx.DB, userID int64) (*time.Time, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get user registered at by id", err)
 	}
 	return &registeredAt, nil
 }
@@ -74,7 +74,7 @@ func GetUserByEmployeeCode(db *sqlx.DB, employeeCode string) (*models.User, erro
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get user by employee code", err)
 	}
 	return &user, nil
 }
@@ -88,7 +88,7 @@ func GetStaffTerminationByID(db *sqlx.DB, id int64) (*models.StaffTermination, e
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get staff termination by id", err)
 	}
 	return &termination, nil
 }

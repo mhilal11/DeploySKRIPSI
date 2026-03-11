@@ -43,7 +43,7 @@ func CountActiveDivisionUsers(db *sqlx.DB, divisionName string) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM users WHERE division = ? AND role IN (?, ?)", divisionName, models.RoleAdmin, models.RoleStaff)
-	return count, err
+	return count, wrapRepoErr("count active division users", err)
 }
 
 func UpdateDivisionProfileCapacity(db *sqlx.DB, id int64, capacity int, updatedAt time.Time) error {
@@ -54,7 +54,7 @@ func UpdateDivisionProfileCapacity(db *sqlx.DB, id int64, capacity int, updatedA
 		updatedAt = time.Now()
 	}
 	_, err := db.Exec("UPDATE division_profiles SET capacity = ?, updated_at = ? WHERE id = ?", capacity, updatedAt, id)
-	return err
+	return wrapRepoErr("update division profile capacity", err)
 }
 
 func FindDivisionProfileIDByName(db *sqlx.DB, name string) (*int64, error) {
@@ -67,7 +67,7 @@ func FindDivisionProfileIDByName(db *sqlx.DB, name string) (*int64, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("find division profile id by name", err)
 	}
 	return &id, nil
 }
@@ -89,11 +89,11 @@ func CreateDivisionProfile(db *sqlx.DB, input CreateDivisionProfileInput) (int64
 		input.Now,
 	)
 	if err != nil {
-		return 0, err
+		return 0, wrapRepoErr("create division profile insert", err)
 	}
 	id, err := result.LastInsertId()
 	if err != nil {
-		return 0, err
+		return 0, wrapRepoErr("create division profile last insert id", err)
 	}
 	return id, nil
 }
@@ -104,7 +104,7 @@ func CountDepartemenByName(db *sqlx.DB, name string) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM departemen WHERE LOWER(TRIM(nama)) = LOWER(TRIM(?))", name)
-	return count, err
+	return count, wrapRepoErr("count departemen by name", err)
 }
 
 func CreateDepartemen(db *sqlx.DB, name, code string, now time.Time) error {
@@ -115,7 +115,7 @@ func CreateDepartemen(db *sqlx.DB, name, code string, now time.Time) error {
 		now = time.Now()
 	}
 	_, err := db.Exec("INSERT INTO departemen (nama, kode, created_at, updated_at) VALUES (?, ?, ?, ?)", name, code, now, now)
-	return err
+	return wrapRepoErr("create departemen", err)
 }
 
 func GetDivisionProfileByID(db *sqlx.DB, id int64) (*models.DivisionProfile, error) {
@@ -128,7 +128,7 @@ func GetDivisionProfileByID(db *sqlx.DB, id int64) (*models.DivisionProfile, err
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get division profile by id", err)
 	}
 	return &row, nil
 }
@@ -148,7 +148,7 @@ func UpdateDivisionProfile(db *sqlx.DB, input UpdateDivisionProfileInput) error 
 		input.UpdatedAt,
 		input.ID,
 	)
-	return err
+	return wrapRepoErr("update division profile", err)
 }
 
 func DeleteDivisionProfileByID(db *sqlx.DB, id int64) error {
@@ -156,7 +156,7 @@ func DeleteDivisionProfileByID(db *sqlx.DB, id int64) error {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("DELETE FROM division_profiles WHERE id = ?", id)
-	return err
+	return wrapRepoErr("delete division profile by id", err)
 }
 
 func GetActiveDivisionJobByID(db *sqlx.DB, jobID, divisionID int64) (*models.DivisionJob, error) {
@@ -169,7 +169,7 @@ func GetActiveDivisionJobByID(db *sqlx.DB, jobID, divisionID int64) (*models.Div
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get active division job by id", err)
 	}
 	return &row, nil
 }
@@ -193,7 +193,7 @@ func UpdateDivisionJob(db *sqlx.DB, input DivisionJobMutationInput) error {
 		input.ID,
 		input.DivisionProfileID,
 	)
-	return err
+	return wrapRepoErr("update division job", err)
 }
 
 func CreateDivisionJob(db *sqlx.DB, input DivisionJobMutationInput) (int64, error) {
@@ -216,11 +216,11 @@ func CreateDivisionJob(db *sqlx.DB, input DivisionJobMutationInput) (int64, erro
 		input.Now,
 	)
 	if err != nil {
-		return 0, err
+		return 0, wrapRepoErr("create division job insert", err)
 	}
 	id, err := result.LastInsertId()
 	if err != nil {
-		return 0, err
+		return 0, wrapRepoErr("create division job last insert id", err)
 	}
 	return id, nil
 }
@@ -239,7 +239,7 @@ func DeactivateDivisionJob(db *sqlx.DB, divisionID, jobID int64, at time.Time) e
 		jobID,
 		divisionID,
 	)
-	return err
+	return wrapRepoErr("deactivate division job", err)
 }
 
 func DeactivateAllDivisionJobs(db *sqlx.DB, divisionID int64, at time.Time) error {
@@ -255,7 +255,7 @@ func DeactivateAllDivisionJobs(db *sqlx.DB, divisionID int64, at time.Time) erro
 		at,
 		divisionID,
 	)
-	return err
+	return wrapRepoErr("deactivate all division jobs", err)
 }
 
 func ListActiveDivisionJobs(db *sqlx.DB) ([]models.DivisionJob, error) {
@@ -268,7 +268,7 @@ func ListActiveDivisionJobs(db *sqlx.DB) ([]models.DivisionJob, error) {
 		if strings.Contains(err.Error(), "doesn't exist") {
 			return []models.DivisionJob{}, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("list active division jobs", err)
 	}
 	return rows, nil
 }
@@ -283,7 +283,7 @@ func GetPrimaryActiveDivisionJob(db *sqlx.DB, divisionID int64) (*models.Divisio
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get primary active division job", err)
 	}
 	return &row, nil
 }
@@ -308,7 +308,7 @@ func ClearDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64, updatedAt tim
 		updatedAt,
 		divisionID,
 	)
-	return err
+	return wrapRepoErr("clear division profile primary job", err)
 }
 
 func SetDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64, job models.DivisionJob, updatedAt time.Time) error {
@@ -340,5 +340,5 @@ func SetDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64, job models.Divi
 		updatedAt,
 		divisionID,
 	)
-	return err
+	return wrapRepoErr("set division profile primary job", err)
 }

@@ -1,7 +1,8 @@
-package db
+package repository_test
 
 import (
 	"errors"
+	repository "hris-backend/internal/repository"
 	"regexp"
 	"strings"
 	"testing"
@@ -26,7 +27,7 @@ func TestReplySuratToHRWithHistory_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	err := ReplySuratToHRWithHistory(db, 99, "ok", 7, now, &nextTarget, "IT")
+	err := repository.ReplySuratToHRWithHistory(db, 99, "ok", 7, now, &nextTarget, "IT")
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -52,7 +53,7 @@ func TestReplySuratToHRWithHistory_HistoryFailRollback(t *testing.T) {
 		WillReturnError(historyErr)
 	mock.ExpectRollback()
 
-	err := ReplySuratToHRWithHistory(db, 99, "ok", 7, now, &nextTarget, "IT")
+	err := repository.ReplySuratToHRWithHistory(db, 99, "ok", 7, now, &nextTarget, "IT")
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -72,7 +73,7 @@ func TestCreateAndActivateLetterTemplate_Success(t *testing.T) {
 	defer cleanup()
 
 	now := time.Date(2026, 3, 11, 10, 0, 0, 0, time.UTC)
-	input := LetterTemplateCreateInput{
+	input := repository.LetterTemplateCreateInput{
 		Name:       "Template A",
 		FilePath:   "letter-templates/a.docx",
 		FileName:   "a.docx",
@@ -91,7 +92,7 @@ func TestCreateAndActivateLetterTemplate_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 3))
 	mock.ExpectCommit()
 
-	err := CreateAndActivateLetterTemplate(db, input)
+	err := repository.CreateAndActivateLetterTemplate(db, input)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}

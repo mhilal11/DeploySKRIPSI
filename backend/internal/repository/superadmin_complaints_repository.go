@@ -79,7 +79,7 @@ func ListComplaintsByFilters(db *sqlx.DB, filters ComplaintListFilters) ([]model
 
 	rows := []models.Complaint{}
 	err := db.Select(&rows, query, args...)
-	return rows, err
+	return rows, wrapRepoErr("list complaints by filters", err)
 }
 
 func GetComplaintByID(db *sqlx.DB, id int64) (*models.Complaint, error) {
@@ -91,7 +91,7 @@ func GetComplaintByID(db *sqlx.DB, id int64) (*models.Complaint, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get complaint by id", err)
 	}
 	return &complaint, nil
 }
@@ -106,5 +106,5 @@ func UpdateComplaint(db *sqlx.DB, input ComplaintUpdateInput) error {
 	}
 	_, err := db.Exec(`UPDATE complaints SET status = ?, priority = ?, resolution_notes = ?, handled_by_id = ?, resolved_at = ? WHERE id = ?`,
 		input.Status, input.Priority, input.ResolutionNotes, input.HandledByID, resolvedAt, input.ID)
-	return err
+	return wrapRepoErr("update complaint", err)
 }

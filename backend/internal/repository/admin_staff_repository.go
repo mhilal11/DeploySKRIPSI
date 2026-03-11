@@ -36,7 +36,7 @@ func CountDivisionInboxLetters(db *sqlx.DB, division *string) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?)", division, division)
-	return count, err
+	return count, wrapRepoErr("count division inbox letters", err)
 }
 
 func CountUserOutboxLetters(db *sqlx.DB, userID int64) (int, error) {
@@ -45,7 +45,7 @@ func CountUserOutboxLetters(db *sqlx.DB, userID int64) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM surat WHERE user_id = ?", userID)
-	return count, err
+	return count, wrapRepoErr("count user outbox letters", err)
 }
 
 func CountDivisionPendingLetters(db *sqlx.DB, division *string) (int, error) {
@@ -54,7 +54,7 @@ func CountDivisionPendingLetters(db *sqlx.DB, division *string) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?) AND status_persetujuan IN ('Menunggu HR','Diajukan','Diproses')", division, division)
-	return count, err
+	return count, wrapRepoErr("count division pending letters", err)
 }
 
 func ListDivisionIncomingLetters(db *sqlx.DB, division *string, limit int) ([]models.Surat, error) {
@@ -66,7 +66,7 @@ func ListDivisionIncomingLetters(db *sqlx.DB, division *string, limit int) ([]mo
 	}
 	rows := []models.Surat{}
 	err := db.Select(&rows, "SELECT * FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?) ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ?", division, division, limit)
-	return rows, err
+	return rows, wrapRepoErr("list division incoming letters", err)
 }
 
 func ListUserOutgoingLetters(db *sqlx.DB, userID int64, limit int) ([]models.Surat, error) {
@@ -78,7 +78,7 @@ func ListUserOutgoingLetters(db *sqlx.DB, userID int64, limit int) ([]models.Sur
 	}
 	rows := []models.Surat{}
 	err := db.Select(&rows, "SELECT * FROM surat WHERE user_id = ? ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ?", userID, limit)
-	return rows, err
+	return rows, wrapRepoErr("list user outgoing letters", err)
 }
 
 func ListUserOutgoingLettersAll(db *sqlx.DB, userID int64) ([]models.Surat, error) {
@@ -87,7 +87,7 @@ func ListUserOutgoingLettersAll(db *sqlx.DB, userID int64) ([]models.Surat, erro
 	}
 	rows := []models.Surat{}
 	err := db.Select(&rows, "SELECT * FROM surat WHERE user_id = ? ORDER BY tanggal_surat DESC, surat_id DESC", userID)
-	return rows, err
+	return rows, wrapRepoErr("list user outgoing letters all", err)
 }
 
 func ListInternalAnnouncements(db *sqlx.DB, limit int) ([]models.Surat, error) {
@@ -99,7 +99,7 @@ func ListInternalAnnouncements(db *sqlx.DB, limit int) ([]models.Surat, error) {
 	}
 	rows := []models.Surat{}
 	err := db.Select(&rows, "SELECT * FROM surat WHERE kategori = 'Internal' ORDER BY tanggal_surat DESC LIMIT ?", limit)
-	return rows, err
+	return rows, wrapRepoErr("list internal announcements", err)
 }
 
 func ListRecentApplications(db *sqlx.DB, limit int) ([]models.Application, error) {
@@ -111,7 +111,7 @@ func ListRecentApplications(db *sqlx.DB, limit int) ([]models.Application, error
 	}
 	rows := []models.Application{}
 	err := db.Select(&rows, "SELECT * FROM applications ORDER BY submitted_at DESC LIMIT ?", limit)
-	return rows, err
+	return rows, wrapRepoErr("list recent applications", err)
 }
 
 func CountApplicationsByStatus(db *sqlx.DB, status string) (int, error) {
@@ -120,7 +120,7 @@ func CountApplicationsByStatus(db *sqlx.DB, status string) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM applications WHERE status = ?", status)
-	return count, err
+	return count, wrapRepoErr("count applications by status", err)
 }
 
 func ListDivisionInboxLettersAll(db *sqlx.DB, division *string) ([]models.Surat, error) {
@@ -129,7 +129,7 @@ func ListDivisionInboxLettersAll(db *sqlx.DB, division *string) ([]models.Surat,
 	}
 	rows := []models.Surat{}
 	err := db.Select(&rows, "SELECT * FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?) ORDER BY tanggal_surat DESC, surat_id DESC", division, division)
-	return rows, err
+	return rows, wrapRepoErr("list division inbox letters all", err)
 }
 
 func ListDivisionArchiveLettersAll(db *sqlx.DB, division *string, userID int64) ([]models.Surat, error) {
@@ -138,7 +138,7 @@ func ListDivisionArchiveLettersAll(db *sqlx.DB, division *string, userID int64) 
 	}
 	rows := []models.Surat{}
 	err := db.Select(&rows, "SELECT * FROM surat WHERE status_persetujuan = 'Diarsipkan' AND (target_division = ? OR penerima = ? OR user_id = ?) ORDER BY tanggal_surat DESC, surat_id DESC", division, division, userID)
-	return rows, err
+	return rows, wrapRepoErr("list division archive letters all", err)
 }
 
 func InsertAdminStaffLetter(db *sqlx.DB, input AdminStaffLetterCreateInput) error {
@@ -174,7 +174,7 @@ func InsertAdminStaffLetter(db *sqlx.DB, input AdminStaffLetterCreateInput) erro
 		input.Now,
 		input.Now,
 	)
-	return err
+	return wrapRepoErr("insert admin staff letter", err)
 }
 
 func GetSuratByID(db *sqlx.DB, id int64) (*models.Surat, error) {
@@ -187,7 +187,7 @@ func GetSuratByID(db *sqlx.DB, id int64) (*models.Surat, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get surat by id", err)
 	}
 	return &surat, nil
 }
@@ -201,7 +201,7 @@ func UpdateSuratReplyToHR(db *sqlx.DB, suratID int64, replyNote string, replyBy 
 	}
 	_, err := db.Exec(`UPDATE surat SET reply_note=?, reply_by=?, reply_at=?, current_recipient='hr', penerima='Admin HR', target_division=?, previous_division=?, status_persetujuan='Menunggu HR', updated_at=? WHERE surat_id = ?`,
 		replyNote, replyBy, repliedAt, nextTarget, currentDivision, repliedAt, suratID)
-	return err
+	return wrapRepoErr("update surat reply to hr", err)
 }
 
 func InsertSuratReplyHistory(db *sqlx.DB, suratID int64, repliedBy int64, fromDivision string, toDivision *string, note string, repliedAt time.Time) error {
@@ -213,7 +213,7 @@ func InsertSuratReplyHistory(db *sqlx.DB, suratID int64, repliedBy int64, fromDi
 	}
 	_, err := db.Exec(`INSERT INTO surat_reply_histories (surat_id, replied_by, from_division, to_division, note, replied_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		suratID, repliedBy, fromDivision, toDivision, note, repliedAt, repliedAt, repliedAt)
-	return err
+	return wrapRepoErr("insert surat reply history", err)
 }
 
 func ReplySuratToHRWithHistory(
@@ -276,7 +276,7 @@ func ArchiveSuratByID(db *sqlx.DB, id int64) error {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("UPDATE surat SET status_persetujuan='Diarsipkan', current_recipient='archive' WHERE surat_id = ?", id)
-	return err
+	return wrapRepoErr("archive surat by id", err)
 }
 
 func UnarchiveSuratByID(db *sqlx.DB, id int64) error {
@@ -284,7 +284,7 @@ func UnarchiveSuratByID(db *sqlx.DB, id int64) error {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("UPDATE surat SET status_persetujuan='Didisposisi', current_recipient='division' WHERE surat_id = ?", id)
-	return err
+	return wrapRepoErr("unarchive surat by id", err)
 }
 
 func ListAppliedOrScreeningApplications(db *sqlx.DB, limit int) ([]models.Application, error) {
@@ -296,7 +296,7 @@ func ListAppliedOrScreeningApplications(db *sqlx.DB, limit int) ([]models.Applic
 	}
 	rows := []models.Application{}
 	err := db.Select(&rows, "SELECT * FROM applications WHERE status IN ('Applied','Screening') ORDER BY submitted_at DESC LIMIT ?", limit)
-	return rows, err
+	return rows, wrapRepoErr("list applied or screening applications", err)
 }
 
 func GetDepartemenByName(db *sqlx.DB, nama string) (*models.Departemen, error) {
@@ -309,7 +309,7 @@ func GetDepartemenByName(db *sqlx.DB, nama string) (*models.Departemen, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get departemen by name", err)
 	}
 	return &row, nil
 }
@@ -320,11 +320,11 @@ func CreateDepartemenAndReturnID(db *sqlx.DB, nama, kode string) (*int64, error)
 	}
 	res, err := db.Exec("INSERT INTO departemen (nama, kode, created_at, updated_at) VALUES (?, ?, NOW(), NOW())", nama, kode)
 	if err != nil {
-		return nil, err
+		return nil, wrapRepoErr("create departemen and return id insert", err)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
-		return nil, err
+		return nil, wrapRepoErr("create departemen and return id last insert id", err)
 	}
 	out := id
 	return &out, nil
@@ -340,7 +340,7 @@ func GetDepartemenNameByID(db *sqlx.DB, id int64) (string, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", nil
 		}
-		return "", err
+		return "", wrapRepoErr("get departemen name by id", err)
 	}
 	return name, nil
 }
@@ -355,7 +355,7 @@ func GetUserDivisionByID(db *sqlx.DB, userID int64) (string, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", nil
 		}
-		return "", err
+		return "", wrapRepoErr("get user division by id", err)
 	}
 	return division, nil
 }
@@ -370,7 +370,7 @@ func GetUserNameByID(db *sqlx.DB, userID int64) (string, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", nil
 		}
-		return "", err
+		return "", wrapRepoErr("get user name by id", err)
 	}
 	return name, nil
 }
@@ -381,5 +381,5 @@ func ListSuratReplyHistories(db *sqlx.DB, suratID int64) ([]models.SuratReplyHis
 	}
 	rows := []models.SuratReplyHistory{}
 	err := db.Select(&rows, "SELECT * FROM surat_reply_histories WHERE surat_id = ? ORDER BY replied_at", suratID)
-	return rows, err
+	return rows, wrapRepoErr("list surat reply histories", err)
 }

@@ -1,7 +1,10 @@
-package db
+package repository_test
 
 import (
+	"errors"
+	repository "hris-backend/internal/repository"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,7 +28,7 @@ func TestUpdateStaffTerminationAndDeactivateIfCompleted_Selesai(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	err := UpdateStaffTerminationAndDeactivateIfCompleted(db, 9, "Selesai", "done", checklist, 100, &userID, now)
+	err := repository.UpdateStaffTerminationAndDeactivateIfCompleted(db, 9, "Selesai", "done", checklist, 100, &userID, now)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -47,11 +50,32 @@ func TestUpdateStaffTerminationAndDeactivateIfCompleted_ProsesNoDeactivate(t *te
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	err := UpdateStaffTerminationAndDeactivateIfCompleted(db, 9, "Proses", "ongoing", checklist, 50, nil, now)
+	err := repository.UpdateStaffTerminationAndDeactivateIfCompleted(db, 9, "Proses", "ongoing", checklist, 50, nil, now)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestGetUserByEmployeeCode_ErrorWrapped(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	queryErr := errors.New("get user fail")
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM users WHERE employee_code = ?")).
+		WithArgs("EMP-001").
+		WillReturnError(queryErr)
+
+	_, err := repository.GetUserByEmployeeCode(db, "EMP-001")
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !errors.Is(err, queryErr) {
+		t.Fatalf("expected wrapped query error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "get user by employee code") {
+		t.Fatalf("expected contextual error, got %v", err)
 	}
 }

@@ -81,7 +81,7 @@ func GetLetterTemplateIsActive(db *sqlx.DB, id int64) (bool, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
-		return false, err
+		return false, wrapRepoErr("get letter template is_active", err)
 	}
 	return active, nil
 }
@@ -91,7 +91,7 @@ func DeactivateAllLetterTemplates(db *sqlx.DB) error {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec("UPDATE letter_templates SET is_active = 0")
-	return err
+	return wrapRepoErr("deactivate all letter templates", err)
 }
 
 func SetLetterTemplateActive(db *sqlx.DB, id int64, active bool) error {
@@ -111,7 +111,7 @@ func GetLetterTemplateByID(db *sqlx.DB, id int64) (*models.LetterTemplate, error
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get letter template by id", err)
 	}
 	return &row, nil
 }
@@ -125,7 +125,7 @@ func GetActiveLetterTemplate(db *sqlx.DB) (*models.LetterTemplate, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get active letter template", err)
 	}
 	return &row, nil
 }
@@ -147,7 +147,7 @@ func UpdateLetterTemplate(db *sqlx.DB, input LetterTemplateUpdateInput) error {
 		input.UpdatedAt,
 		input.ID,
 	)
-	return err
+	return wrapRepoErr("update letter template", err)
 }
 
 func DeleteLetterTemplateByID(db *sqlx.DB, id int64) error {

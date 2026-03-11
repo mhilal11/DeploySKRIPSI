@@ -54,7 +54,7 @@ func CountComplaintsByUserID(db *sqlx.DB, userID int64) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM complaints WHERE user_id = ?", userID)
-	return count, err
+	return count, wrapRepoErr("count complaints by user id", err)
 }
 
 func CountComplaintsByUserIDAndStatuses(db *sqlx.DB, userID int64, statuses ...string) (int, error) {
@@ -74,7 +74,7 @@ func CountComplaintsByUserIDAndStatuses(db *sqlx.DB, userID int64, statuses ...s
 	}
 	var count int
 	err := db.Get(&count, query, args...)
-	return count, err
+	return count, wrapRepoErr("count complaints by user id and statuses", err)
 }
 
 func CountDivisionIncomingRegulations(db *sqlx.DB, division string, since *time.Time) (int, error) {
@@ -84,10 +84,10 @@ func CountDivisionIncomingRegulations(db *sqlx.DB, division string, since *time.
 	var count int
 	if since != nil {
 		err := db.Get(&count, `SELECT COUNT(*) FROM surat WHERE tipe_surat = 'masuk' AND target_division = ? AND kategori IN ('Internal','Kebijakan','Operasional') AND tanggal_surat >= ?`, division, *since)
-		return count, err
+		return count, wrapRepoErr("count division incoming regulations with since", err)
 	}
 	err := db.Get(&count, `SELECT COUNT(*) FROM surat WHERE tipe_surat = 'masuk' AND target_division = ? AND kategori IN ('Internal','Kebijakan','Operasional')`, division)
-	return count, err
+	return count, wrapRepoErr("count division incoming regulations", err)
 }
 
 func CountStaffTerminationsByUserID(db *sqlx.DB, userID int64) (int, error) {
@@ -96,7 +96,7 @@ func CountStaffTerminationsByUserID(db *sqlx.DB, userID int64) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM staff_terminations WHERE user_id = ?", userID)
-	return count, err
+	return count, wrapRepoErr("count staff terminations by user id", err)
 }
 
 func ListComplaintsByUserID(db *sqlx.DB, userID int64, limit int) ([]models.Complaint, error) {
@@ -106,10 +106,10 @@ func ListComplaintsByUserID(db *sqlx.DB, userID int64, limit int) ([]models.Comp
 	rows := []models.Complaint{}
 	if limit > 0 {
 		err := db.Select(&rows, "SELECT * FROM complaints WHERE user_id = ? ORDER BY submitted_at DESC, id DESC LIMIT ?", userID, limit)
-		return rows, err
+		return rows, wrapRepoErr("list complaints by user id with limit", err)
 	}
 	err := db.Select(&rows, "SELECT * FROM complaints WHERE user_id = ? ORDER BY submitted_at DESC, id DESC", userID)
-	return rows, err
+	return rows, wrapRepoErr("list complaints by user id", err)
 }
 
 func ListStaffTerminationsByUserID(db *sqlx.DB, userID int64) ([]models.StaffTermination, error) {
@@ -118,7 +118,7 @@ func ListStaffTerminationsByUserID(db *sqlx.DB, userID int64) ([]models.StaffTer
 	}
 	rows := []models.StaffTermination{}
 	err := db.Select(&rows, "SELECT * FROM staff_terminations WHERE user_id = ? ORDER BY created_at DESC", userID)
-	return rows, err
+	return rows, wrapRepoErr("list staff terminations by user id", err)
 }
 
 func ListDivisionIncomingRegulations(db *sqlx.DB, division string, limit int) ([]models.Surat, error) {
@@ -128,10 +128,10 @@ func ListDivisionIncomingRegulations(db *sqlx.DB, division string, limit int) ([
 	rows := []models.Surat{}
 	if limit > 0 {
 		err := db.Select(&rows, `SELECT * FROM surat WHERE tipe_surat = 'masuk' AND target_division = ? AND kategori IN ('Internal','Kebijakan','Operasional') ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ?`, division, limit)
-		return rows, err
+		return rows, wrapRepoErr("list division incoming regulations with limit", err)
 	}
 	err := db.Select(&rows, `SELECT * FROM surat WHERE tipe_surat = 'masuk' AND target_division = ? AND kategori IN ('Internal','Kebijakan','Operasional') ORDER BY tanggal_surat DESC, surat_id DESC`, division)
-	return rows, err
+	return rows, wrapRepoErr("list division incoming regulations", err)
 }
 
 func ListDivisionAnnouncements(db *sqlx.DB, division string, limit int) ([]models.Surat, error) {
@@ -143,7 +143,7 @@ func ListDivisionAnnouncements(db *sqlx.DB, division string, limit int) ([]model
 	}
 	rows := []models.Surat{}
 	err := db.Select(&rows, `SELECT * FROM surat WHERE tipe_surat = 'masuk' AND target_division = ? AND (kategori = 'Internal' OR jenis_surat = 'Pengumuman') ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ?`, division, limit)
-	return rows, err
+	return rows, wrapRepoErr("list division announcements", err)
 }
 
 func InsertStaffComplaint(db *sqlx.DB, input StaffComplaintCreateInput) error {
@@ -177,7 +177,7 @@ func InsertStaffComplaint(db *sqlx.DB, input StaffComplaintCreateInput) error {
 		input.CreatedAt,
 		input.UpdatedAt,
 	)
-	return err
+	return wrapRepoErr("insert staff complaint", err)
 }
 
 func InsertStaffTermination(db *sqlx.DB, input StaffTerminationCreateInput) error {
@@ -222,5 +222,5 @@ func InsertStaffTermination(db *sqlx.DB, input StaffTerminationCreateInput) erro
 		input.CreatedAt,
 		input.UpdatedAt,
 	)
-	return err
+	return wrapRepoErr("insert staff termination", err)
 }

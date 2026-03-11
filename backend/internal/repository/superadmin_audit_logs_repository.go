@@ -48,7 +48,7 @@ func CountAuditLogs(db *sqlx.DB, filters AuditLogFilters) (int, error) {
 	query := "SELECT COUNT(*) FROM audit_logs al" + where
 	var total int
 	err := db.Get(&total, query, args...)
-	return total, err
+	return total, wrapRepoErr("count audit logs", err)
 }
 
 func ListAuditLogs(db *sqlx.DB, userID int64, filters AuditLogFilters, limit, offset int) ([]AuditLogListRow, error) {
@@ -67,7 +67,7 @@ func ListAuditLogs(db *sqlx.DB, userID int64, filters AuditLogFilters, limit, of
 	argsWithLimit = append(argsWithLimit, limit, offset)
 	rows := []AuditLogListRow{}
 	err := db.Select(&rows, query, argsWithLimit...)
-	return rows, err
+	return rows, wrapRepoErr("list audit logs", err)
 }
 
 func ListAuditLogModules(db *sqlx.DB) ([]string, error) {
@@ -76,7 +76,7 @@ func ListAuditLogModules(db *sqlx.DB) ([]string, error) {
 	}
 	rows := []string{}
 	err := db.Select(&rows, "SELECT DISTINCT module FROM audit_logs WHERE module IS NOT NULL AND module <> '' ORDER BY module ASC")
-	return rows, err
+	return rows, wrapRepoErr("list audit log modules", err)
 }
 
 func ListAuditLogActions(db *sqlx.DB) ([]string, error) {
@@ -85,7 +85,7 @@ func ListAuditLogActions(db *sqlx.DB) ([]string, error) {
 	}
 	rows := []string{}
 	err := db.Select(&rows, "SELECT DISTINCT action FROM audit_logs WHERE action IS NOT NULL AND action <> '' ORDER BY action ASC")
-	return rows, err
+	return rows, wrapRepoErr("list audit log actions", err)
 }
 
 func ListExistingAuditLogIDs(db *sqlx.DB, ids []int64) ([]int64, error) {
@@ -97,12 +97,12 @@ func ListExistingAuditLogIDs(db *sqlx.DB, ids []int64) ([]int64, error) {
 	}
 	query, args, err := sqlx.In("SELECT id FROM audit_logs WHERE id IN (?)", ids)
 	if err != nil {
-		return nil, err
+		return nil, wrapRepoErr("build existing audit log ids query", err)
 	}
 	query = db.Rebind(query)
 	rows := []int64{}
 	err = db.Select(&rows, query, args...)
-	return rows, err
+	return rows, wrapRepoErr("list existing audit log ids", err)
 }
 
 func UpsertAuditLogView(db *sqlx.DB, auditLogID int64, userID int64) error {
@@ -114,7 +114,7 @@ func UpsertAuditLogView(db *sqlx.DB, auditLogID int64, userID int64) error {
 		VALUES (?, ?, NOW())
 		ON DUPLICATE KEY UPDATE viewed_at = VALUES(viewed_at)
 	`, auditLogID, userID)
-	return err
+	return wrapRepoErr("upsert audit log view", err)
 }
 
 func InsertAuditLog(db *sqlx.DB, input AuditLogInsertInput) error {
@@ -148,7 +148,7 @@ func InsertAuditLog(db *sqlx.DB, input AuditLogInsertInput) error {
 		input.UserAgent,
 		input.CreatedAt,
 	)
-	return err
+	return wrapRepoErr("insert audit log", err)
 }
 
 func buildAuditLogWhere(filters AuditLogFilters) (string, []any) {

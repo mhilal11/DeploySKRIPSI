@@ -55,7 +55,7 @@ func GetApplicationByID(db *sqlx.DB, applicationID int64) (*models.Application, 
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get application by id", err)
 	}
 	return &app, nil
 }
@@ -69,7 +69,7 @@ func GetApplicantProfileByUserID(db *sqlx.DB, userID int64) (*models.ApplicantPr
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get applicant profile by user id", err)
 	}
 	return &profile, nil
 }
@@ -97,7 +97,7 @@ func GetJobDescriptionByApplication(db *sqlx.DB, division *string, position stri
 			trimmedPos,
 		)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return "", err
+			return "", wrapRepoErr("get job description by application with division", err)
 		}
 		if desc.Valid {
 			return strings.TrimSpace(desc.String), nil
@@ -116,7 +116,7 @@ func GetJobDescriptionByApplication(db *sqlx.DB, division *string, position stri
 		if errors.Is(err, sql.ErrNoRows) {
 			return "", nil
 		}
-		return "", err
+		return "", wrapRepoErr("get job description by application", err)
 	}
 	if desc.Valid {
 		return strings.TrimSpace(desc.String), nil
@@ -130,7 +130,7 @@ func ListDivisionProfiles(db *sqlx.DB) ([]models.DivisionProfile, error) {
 	}
 	rows := []models.DivisionProfile{}
 	if err := db.Select(&rows, "SELECT * FROM division_profiles"); err != nil {
-		return nil, err
+		return nil, wrapRepoErr("list division profiles", err)
 	}
 	return rows, nil
 }
@@ -152,13 +152,13 @@ func GetLatestRecruitmentAIScreeningsByApplicationIDs(db *sqlx.DB, applicationID
 		) latest ON latest.latest_id = s.id
 	`, applicationIDs)
 	if err != nil {
-		return out, err
+		return out, wrapRepoErr("build latest ai screening query", err)
 	}
 	query = db.Rebind(query)
 
 	rows := []models.RecruitmentAIScreening{}
 	if err := db.Select(&rows, query, args...); err != nil {
-		return out, err
+		return out, wrapRepoErr("get latest ai screenings by application ids", err)
 	}
 	for _, row := range rows {
 		out[row.ApplicationID] = row
@@ -182,7 +182,7 @@ func GetLatestRecruitmentAIScreeningByApplicationID(db *sqlx.DB, applicationID i
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, wrapRepoErr("get latest ai screening by application id", err)
 	}
 	return &row, nil
 }
@@ -218,7 +218,7 @@ func InsertRecruitmentAIScreeningFailure(db *sqlx.DB, input RecruitmentAIScreeni
 		input.Now,
 		input.Now,
 	)
-	return err
+	return wrapRepoErr("insert recruitment ai screening failure", err)
 }
 
 func InsertRecruitmentAIScreeningSuccess(db *sqlx.DB, input RecruitmentAIScreeningSuccessInput) (*models.RecruitmentAIScreening, error) {
@@ -263,10 +263,14 @@ func InsertRecruitmentAIScreeningSuccess(db *sqlx.DB, input RecruitmentAIScreeni
 		input.Now,
 	)
 	if err != nil {
-		return nil, err
+		return nil, wrapRepoErr("insert recruitment ai screening success", err)
 	}
 
-	return GetLatestRecruitmentAIScreeningByApplicationID(db, input.ApplicationID)
+	latest, getErr := GetLatestRecruitmentAIScreeningByApplicationID(db, input.ApplicationID)
+	if getErr != nil {
+		return nil, wrapRepoErr("load latest recruitment ai screening after insert", getErr)
+	}
+	return latest, nil
 }
 
 func GetLatestSuccessfulAIScoresByApplicationIDs(db *sqlx.DB, applicationIDs []int64) (map[int64]float64, error) {
@@ -288,7 +292,7 @@ func GetLatestSuccessfulAIScoresByApplicationIDs(db *sqlx.DB, applicationIDs []i
 		) latest ON latest.latest_id = s.id
 	`, applicationIDs)
 	if err != nil {
-		return out, err
+		return out, wrapRepoErr("build latest successful ai scores query", err)
 	}
 	query = db.Rebind(query)
 
@@ -297,7 +301,7 @@ func GetLatestSuccessfulAIScoresByApplicationIDs(db *sqlx.DB, applicationIDs []i
 		MatchScore    sql.NullFloat64 `db:"match_score"`
 	}{}
 	if err := db.Select(&rows, query, args...); err != nil {
-		return out, err
+		return out, wrapRepoErr("get latest successful ai scores by application ids", err)
 	}
 
 	for _, row := range rows {
