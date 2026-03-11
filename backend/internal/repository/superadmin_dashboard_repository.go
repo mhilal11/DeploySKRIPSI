@@ -31,7 +31,7 @@ func ListUserRoleCounts(db *sqlx.DB) ([]RoleCountRow, error) {
 	}
 	rows := []RoleCountRow{}
 	err := db.Select(&rows, "SELECT role, COUNT(*) as total FROM users GROUP BY role")
-	return rows, err
+	return rows, wrapRepoErr("list user role counts", err)
 }
 
 func CountRegisteredUsersBetween(db *sqlx.DB, role *string, start, end time.Time) (int, error) {
@@ -46,7 +46,7 @@ func CountRegisteredUsersBetween(db *sqlx.DB, role *string, start, end time.Time
 	}
 	var count int
 	err := db.Get(&count, query, args...)
-	return count, err
+	return count, wrapRepoErr("count registered users between", err)
 }
 
 func CountUsersByRoleAndStatus(db *sqlx.DB, role string, status *string) (int, error) {
@@ -61,7 +61,7 @@ func CountUsersByRoleAndStatus(db *sqlx.DB, role string, status *string) (int, e
 	}
 	var count int
 	err := db.Get(&count, query, args...)
-	return count, err
+	return count, wrapRepoErr("count users by role and status", err)
 }
 
 func CountUsersByStatus(db *sqlx.DB, status string) (int, error) {
@@ -70,7 +70,7 @@ func CountUsersByStatus(db *sqlx.DB, status string) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM users WHERE status = ?", status)
-	return count, err
+	return count, wrapRepoErr("count users by status", err)
 }
 
 func CountUsersByStatusCreatedBetween(db *sqlx.DB, status string, start, end time.Time) (int, error) {
@@ -79,7 +79,7 @@ func CountUsersByStatusCreatedBetween(db *sqlx.DB, status string, start, end tim
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM users WHERE status = ? AND created_at BETWEEN ? AND ?", status, start, end)
-	return count, err
+	return count, wrapRepoErr("count users by status created between", err)
 }
 
 func ListStaffReligionCounts(db *sqlx.DB) ([]KeyCountRow, error) {
@@ -88,7 +88,7 @@ func ListStaffReligionCounts(db *sqlx.DB) ([]KeyCountRow, error) {
 	}
 	rows := []KeyCountRow{}
 	err := db.Select(&rows, "SELECT religion as name, COUNT(*) as total FROM staff_profiles GROUP BY religion")
-	return rows, err
+	return rows, wrapRepoErr("list staff religion counts", err)
 }
 
 func ListStaffGenderCounts(db *sqlx.DB) ([]KeyCountRow, error) {
@@ -97,7 +97,7 @@ func ListStaffGenderCounts(db *sqlx.DB) ([]KeyCountRow, error) {
 	}
 	rows := []KeyCountRow{}
 	err := db.Select(&rows, "SELECT gender as name, COUNT(*) as total FROM staff_profiles GROUP BY gender")
-	return rows, err
+	return rows, wrapRepoErr("list staff gender counts", err)
 }
 
 func ListStaffEducationCounts(db *sqlx.DB) ([]KeyCountRow, error) {
@@ -106,7 +106,7 @@ func ListStaffEducationCounts(db *sqlx.DB) ([]KeyCountRow, error) {
 	}
 	rows := []KeyCountRow{}
 	err := db.Select(&rows, "SELECT education_level as name, COUNT(*) as total FROM staff_profiles GROUP BY education_level")
-	return rows, err
+	return rows, wrapRepoErr("list staff education counts", err)
 }
 
 func ListApplicationCountsByDivision(db *sqlx.DB) ([]DivisionApplicationCountRow, error) {
@@ -115,7 +115,7 @@ func ListApplicationCountsByDivision(db *sqlx.DB) ([]DivisionApplicationCountRow
 	}
 	rows := []DivisionApplicationCountRow{}
 	err := db.Select(&rows, "SELECT division, COUNT(*) as total FROM applications GROUP BY division ORDER BY division")
-	return rows, err
+	return rows, wrapRepoErr("list application counts by division", err)
 }
 
 func CountApplicationsByDivisionBetween(db *sqlx.DB, division *string, start, end time.Time) (int, error) {
@@ -125,10 +125,10 @@ func CountApplicationsByDivisionBetween(db *sqlx.DB, division *string, start, en
 	var count int
 	if division == nil {
 		err := db.Get(&count, "SELECT COUNT(*) FROM applications WHERE division IS NULL AND submitted_at BETWEEN ? AND ?", start, end)
-		return count, err
+		return count, wrapRepoErr("count applications by nil division between", err)
 	}
 	err := db.Get(&count, "SELECT COUNT(*) FROM applications WHERE division = ? AND submitted_at BETWEEN ? AND ?", *division, start, end)
-	return count, err
+	return count, wrapRepoErr("count applications by division between", err)
 }
 
 func CountApplicationsSubmittedBetween(db *sqlx.DB, start, end time.Time) (int, error) {
@@ -137,7 +137,7 @@ func CountApplicationsSubmittedBetween(db *sqlx.DB, start, end time.Time) (int, 
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM applications WHERE COALESCE(submitted_at, created_at) BETWEEN ? AND ?", start, end)
-	return count, err
+	return count, wrapRepoErr("count applications submitted between", err)
 }
 
 func CountApplicationsBySubmittedBetween(db *sqlx.DB, start, end time.Time) (int, error) {
@@ -146,7 +146,7 @@ func CountApplicationsBySubmittedBetween(db *sqlx.DB, start, end time.Time) (int
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM applications WHERE submitted_at BETWEEN ? AND ?", start, end)
-	return count, err
+	return count, wrapRepoErr("count applications by submitted between", err)
 }
 
 func CountApplicationsByStatusSubmittedBetween(db *sqlx.DB, status string, start, end time.Time) (int, error) {
@@ -155,7 +155,7 @@ func CountApplicationsByStatusSubmittedBetween(db *sqlx.DB, status string, start
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM applications WHERE status = ? AND submitted_at BETWEEN ? AND ?", status, start, end)
-	return count, err
+	return count, wrapRepoErr("count applications by status submitted between", err)
 }
 
 func CountStaffTerminationsByStatuses(db *sqlx.DB, statuses ...string) (int, error) {
@@ -174,7 +174,7 @@ func CountStaffTerminationsByStatuses(db *sqlx.DB, statuses ...string) (int, err
 	}
 	var count int
 	err := db.Get(&count, query, args...)
-	return count, err
+	return count, wrapRepoErr("count staff terminations by statuses", err)
 }
 
 func CountStaffTerminationsByStatusesAndRequestDateBetween(db *sqlx.DB, start, end time.Time, statuses ...string) (int, error) {
@@ -194,7 +194,7 @@ func CountStaffTerminationsByStatusesAndRequestDateBetween(db *sqlx.DB, start, e
 	args = append(args, start, end)
 	var count int
 	err := db.Get(&count, query, args...)
-	return count, err
+	return count, wrapRepoErr("count staff terminations by statuses and request date between", err)
 }
 
 func CountStaffTerminationsByTypeAndStatuses(db *sqlx.DB, terminationType string, statuses ...string) (int, error) {
@@ -214,7 +214,7 @@ func CountStaffTerminationsByTypeAndStatuses(db *sqlx.DB, terminationType string
 	}
 	var count int
 	err := db.Get(&count, query, args...)
-	return count, err
+	return count, wrapRepoErr("count staff terminations by type and statuses", err)
 }
 
 func CountStaffTerminationsByTypeStatusesAndRequestDateBetween(db *sqlx.DB, terminationType string, start, end time.Time, statuses ...string) (int, error) {
@@ -235,7 +235,7 @@ func CountStaffTerminationsByTypeStatusesAndRequestDateBetween(db *sqlx.DB, term
 	args = append(args, start, end)
 	var count int
 	err := db.Get(&count, query, args...)
-	return count, err
+	return count, wrapRepoErr("count staff terminations by type statuses and request date between", err)
 }
 
 func CountStaffTerminationsByTypeAndCompleted(db *sqlx.DB, terminationType string) (int, error) {
@@ -244,7 +244,7 @@ func CountStaffTerminationsByTypeAndCompleted(db *sqlx.DB, terminationType strin
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM staff_terminations WHERE type = ? AND status = 'Selesai'", terminationType)
-	return count, err
+	return count, wrapRepoErr("count staff terminations by type and completed", err)
 }
 
 func CountIncomingLettersBetween(db *sqlx.DB, start, end time.Time) (int, error) {
@@ -253,7 +253,7 @@ func CountIncomingLettersBetween(db *sqlx.DB, start, end time.Time) (int, error)
 	}
 	var count int
 	err := db.Get(&count, "SELECT COUNT(*) FROM surat WHERE tipe_surat = 'masuk' AND tanggal_surat BETWEEN ? AND ?", start, end)
-	return count, err
+	return count, wrapRepoErr("count incoming letters between", err)
 }
 
 func ListApplicationsByStatus(db *sqlx.DB, status string, limit int) ([]models.Application, error) {
@@ -265,7 +265,7 @@ func ListApplicationsByStatus(db *sqlx.DB, status string, limit int) ([]models.A
 	}
 	rows := []models.Application{}
 	err := db.Select(&rows, "SELECT * FROM applications WHERE status = ? ORDER BY submitted_at DESC LIMIT ?", status, limit)
-	return rows, err
+	return rows, wrapRepoErr("list applications by status", err)
 }
 
 func ListRecentApplicationsForDashboard(db *sqlx.DB, limit int) ([]models.Application, error) {
@@ -277,7 +277,7 @@ func ListRecentApplicationsForDashboard(db *sqlx.DB, limit int) ([]models.Applic
 	}
 	rows := []models.Application{}
 	err := db.Select(&rows, "SELECT * FROM applications ORDER BY submitted_at DESC LIMIT ?", limit)
-	return rows, err
+	return rows, wrapRepoErr("list recent applications for dashboard", err)
 }
 
 func ListRecentLetters(db *sqlx.DB, limit int) ([]models.Surat, error) {
@@ -289,7 +289,7 @@ func ListRecentLetters(db *sqlx.DB, limit int) ([]models.Surat, error) {
 	}
 	rows := []models.Surat{}
 	err := db.Select(&rows, "SELECT * FROM surat ORDER BY tanggal_surat DESC LIMIT ?", limit)
-	return rows, err
+	return rows, wrapRepoErr("list recent letters", err)
 }
 
 func ListRecentStaffTerminations(db *sqlx.DB, limit int) ([]models.StaffTermination, error) {
@@ -301,5 +301,5 @@ func ListRecentStaffTerminations(db *sqlx.DB, limit int) ([]models.StaffTerminat
 	}
 	rows := []models.StaffTermination{}
 	err := db.Select(&rows, "SELECT * FROM staff_terminations ORDER BY updated_at DESC LIMIT ?", limit)
-	return rows, err
+	return rows, wrapRepoErr("list recent staff terminations", err)
 }

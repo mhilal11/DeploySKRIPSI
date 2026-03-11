@@ -9,6 +9,26 @@ import (
 	"time"
 )
 
+func TestListLetterTemplates_ErrorWrapped(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	queryErr := errors.New("list templates fail")
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM letter_templates ORDER BY created_at DESC")).
+		WillReturnError(queryErr)
+
+	_, err := repository.ListLetterTemplates(db)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !errors.Is(err, queryErr) {
+		t.Fatalf("expected wrapped query error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "list letter templates") {
+		t.Fatalf("expected contextual error, got %v", err)
+	}
+}
+
 func TestCreateAndActivateLetterTemplate_DeactivateFailRollback(t *testing.T) {
 	db, mock, cleanup := newSQLXMock(t)
 	defer cleanup()

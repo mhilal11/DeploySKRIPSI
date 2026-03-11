@@ -38,7 +38,7 @@ func ListLetterTemplates(db *sqlx.DB) ([]models.LetterTemplate, error) {
 	}
 	rows := []models.LetterTemplate{}
 	err := db.Select(&rows, "SELECT * FROM letter_templates ORDER BY created_at DESC")
-	return rows, err
+	return rows, wrapRepoErr("list letter templates", err)
 }
 
 func CreateLetterTemplate(db *sqlx.DB, input LetterTemplateCreateInput) error {

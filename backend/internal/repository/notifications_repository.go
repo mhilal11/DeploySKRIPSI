@@ -18,7 +18,7 @@ func CountPendingHRLetters(db *sqlx.DB) (int, error) {
 		WHERE LOWER(status_persetujuan) IN ('menunggu hr', 'diajukan', 'diproses')
 		  AND LOWER(current_recipient) = 'hr'
 	`)
-	return count, err
+	return count, wrapRepoErr("count pending hr letters", err)
 }
 
 func CountPendingRecruitmentApplications(db *sqlx.DB) (int, error) {
@@ -27,7 +27,7 @@ func CountPendingRecruitmentApplications(db *sqlx.DB) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, `SELECT COUNT(*) FROM applications WHERE LOWER(status) IN ('applied', 'screening')`)
-	return count, err
+	return count, wrapRepoErr("count pending recruitment applications", err)
 }
 
 func CountPendingStaffTerminations(db *sqlx.DB) (int, error) {
@@ -36,7 +36,7 @@ func CountPendingStaffTerminations(db *sqlx.DB) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, `SELECT COUNT(*) FROM staff_terminations WHERE status IN ('Diajukan', 'Proses', 'Diproses')`)
-	return count, err
+	return count, wrapRepoErr("count pending staff terminations", err)
 }
 
 func CountNewComplaints(db *sqlx.DB) (int, error) {
@@ -45,7 +45,7 @@ func CountNewComplaints(db *sqlx.DB) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, `SELECT COUNT(*) FROM complaints WHERE LOWER(status) IN ('new', 'baru')`)
-	return count, err
+	return count, wrapRepoErr("count new complaints", err)
 }
 
 func CountUnreadRecentAuditLogs(db *sqlx.DB, userID int64) (int, error) {
@@ -62,7 +62,7 @@ func CountUnreadRecentAuditLogs(db *sqlx.DB, userID int64) (int, error) {
 		WHERE al.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
 		  AND av.id IS NULL
 	`, userID)
-	return count, err
+	return count, wrapRepoErr("count unread recent audit logs", err)
 }
 
 func CountRecentAuditLogs(db *sqlx.DB) (int, error) {
@@ -71,7 +71,7 @@ func CountRecentAuditLogs(db *sqlx.DB) (int, error) {
 	}
 	var count int
 	err := db.Get(&count, `SELECT COUNT(*) FROM audit_logs WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`)
-	return count, err
+	return count, wrapRepoErr("count recent audit logs", err)
 }
 
 func ListPendingHRLetters(db *sqlx.DB) ([]models.Surat, error) {
@@ -85,7 +85,7 @@ func ListPendingHRLetters(db *sqlx.DB) ([]models.Surat, error) {
 		  AND LOWER(status_persetujuan) IN ('menunggu hr','diajukan','diproses')
 		ORDER BY created_at DESC
 	`)
-	return rows, err
+	return rows, wrapRepoErr("list pending hr letters", err)
 }
 
 func ListPendingRecruitmentApplications(db *sqlx.DB) ([]models.Application, error) {
@@ -98,7 +98,7 @@ func ListPendingRecruitmentApplications(db *sqlx.DB) ([]models.Application, erro
 		WHERE LOWER(status) IN ('applied','screening')
 		ORDER BY created_at DESC
 	`)
-	return rows, err
+	return rows, wrapRepoErr("list pending recruitment applications", err)
 }
 
 func ListPendingStaffTerminations(db *sqlx.DB) ([]models.StaffTermination, error) {
@@ -111,7 +111,7 @@ func ListPendingStaffTerminations(db *sqlx.DB) ([]models.StaffTermination, error
 		WHERE status IN ('Diajukan','Proses','Diproses')
 		ORDER BY request_date DESC
 	`)
-	return rows, err
+	return rows, wrapRepoErr("list pending staff terminations", err)
 }
 
 func ListNewComplaints(db *sqlx.DB) ([]models.Complaint, error) {
@@ -124,7 +124,7 @@ func ListNewComplaints(db *sqlx.DB) ([]models.Complaint, error) {
 		WHERE LOWER(status) IN ('new', 'baru')
 		ORDER BY created_at DESC
 	`)
-	return rows, err
+	return rows, wrapRepoErr("list new complaints", err)
 }
 
 func ListUnreadAuditLogs(db *sqlx.DB, userID int64) ([]models.AuditLog, error) {
@@ -143,5 +143,5 @@ func ListUnreadAuditLogs(db *sqlx.DB, userID int64) ([]models.AuditLog, error) {
 		  )
 		ORDER BY created_at DESC
 	`, userID)
-	return rows, err
+	return rows, wrapRepoErr("list unread audit logs", err)
 }
