@@ -15,7 +15,6 @@ export { default as PrimaryButton } from './PrimaryButton';
 export { default as ResponsiveNavLink } from './ResponsiveNavLink';
 export { default as SecondaryButton } from './SecondaryButton';
 export { default as ShinyText } from './ShinyText';
-export { default as SplashCursor } from './SplashCursor';
 export { default as SplashScreen } from './SplashScreen';
 export { default as SpotlightCard } from './SpotlightCard';
 export { default as TextInput } from './TextInput';

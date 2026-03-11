@@ -1,6 +1,5 @@
 import 'aos/dist/aos.css';
 
-import SplashCursor from '@/shared/components/SplashCursor';
 import SplashScreen from '@/shared/components/SplashScreen';
 import { Head } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
@@ -47,9 +46,6 @@ export default function LandingPage({
 
       {/* Splash Screen modern */}
       <SplashScreen />
-
-      {/* Cursor efek */}
-      <SplashCursor />
 
       <div className="bg-gradient-to-br from-[#05070f] via-[#0b1024] to-[#050a16] text-white min-h-screen overflow-x-hidden relative">
         <Navbar canLogin={canLogin} canRegister={canRegister} />
