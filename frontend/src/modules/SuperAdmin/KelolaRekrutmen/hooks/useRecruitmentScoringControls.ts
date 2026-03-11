@@ -91,9 +91,15 @@ export function useRecruitmentScoringControls({
       });
       const data = response.data ?? {};
       const summary = data.summary ?? {};
+      const shortlistedCount = Number(summary.shortlisted_count ?? 0);
+      const updatedCount = Number(summary.updated_count ?? 0);
+      const groupCount = Number(summary.group_count ?? 0);
 
       toast.success(data.status || 'Auto-shortlist selesai.', {
-        description: `Terpilih ${summary.shortlisted_count ?? 0} kandidat dari ${summary.group_count ?? 0} kelompok lowongan.`,
+        description:
+          updatedCount > 0
+            ? `Terpilih ${shortlistedCount} kandidat dari ${groupCount} kelompok lowongan. ${updatedCount} kandidat dipindahkan ke status Screening.`
+            : `Terpilih ${shortlistedCount} kandidat dari ${groupCount} kelompok lowongan, tetapi belum ada perubahan status (umumnya karena kandidat sudah di tahap Screening).`,
       });
 
       router.reload({

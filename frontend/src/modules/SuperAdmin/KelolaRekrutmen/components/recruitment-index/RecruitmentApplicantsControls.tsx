@@ -282,11 +282,8 @@ export function RecruitmentApplicantsControls({
           </Button>
         </div>
         <p className="text-[11px] text-slate-500">
-          Untuk evaluasi model, fairness, drift, dan audit trail, buka menu{' '}
-          <span className="font-semibold text-slate-700">
-            Recruitment &gt; Analytics Rekrutmen
-          </span>
-          .
+          Auto-shortlist memilih kandidat terbaik per lowongan berdasarkan skor. Perubahan otomatis
+          hanya berlaku untuk kandidat berstatus Applied (dipindahkan ke Screening).
         </p>
       </Card>
     </div>

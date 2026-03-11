@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
     extractChanges,
@@ -183,40 +183,44 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
             <Head title="Log Aktivitas" />
 
             <Card className="space-y-4 p-4 md:p-6">
-                <div className="grid gap-3 md:grid-cols-5">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
                     <Input
                         placeholder="Cari user, deskripsi, entity ID..."
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        className="md:col-span-2"
+                        className="md:col-span-2 xl:col-span-4"
                     />
-                    <Select value={module} onValueChange={setModule}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Semua Modul" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Semua Modul</SelectItem>
-                            {moduleOptions.map((item) => (
-                                <SelectItem key={item} value={item}>
-                                    {item}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select value={action} onValueChange={setAction}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Semua Aksi" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Semua Aksi</SelectItem>
-                            {actionOptions.map((item) => (
-                                <SelectItem key={item} value={item}>
-                                    {item}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="xl:col-span-2">
+                        <Select value={module} onValueChange={setModule}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Semua Modul" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Semua Modul</SelectItem>
+                                {moduleOptions.map((item) => (
+                                    <SelectItem key={item} value={item}>
+                                        {item}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="xl:col-span-2">
+                        <Select value={action} onValueChange={setAction}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Semua Aksi" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Semua Aksi</SelectItem>
+                                {actionOptions.map((item) => (
+                                    <SelectItem key={item} value={item}>
+                                        {item}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-2 xl:col-span-3">
                         <Input
                             type="date"
                             value={dateFrom}
@@ -230,7 +234,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                     </div>
                 </div>
 
-                <div className="space-y-3 md:hidden">
+                <div className="space-y-3 lg:hidden">
                     {auditLogs.data.length === 0 && (
                         <div className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
                             Belum ada data log aktivitas.
@@ -242,24 +246,28 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                         return (
                             <div
                                 key={`mobile-${item.id}`}
-                                className={`rounded-xl border p-3 shadow-sm ${viewed
+                                className={`min-w-0 overflow-hidden rounded-xl border p-3 shadow-sm ${viewed
                                     ? 'border-slate-200 bg-white'
                                     : 'border-amber-200 bg-amber-50/40'
                                     }`}
                             >
-                                <div className="mb-2 flex items-start justify-between gap-2">
-                                    <div>
+                                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="min-w-0">
                                         <p className="text-xs text-slate-500">{item.created_at}</p>
                                         <p className="text-sm font-semibold text-slate-900">{item.user_name ?? '-'}</p>
                                         <p className="text-xs text-slate-500">{item.user_email ?? '-'}</p>
                                     </div>
-                                    <div className="flex flex-col items-end gap-1">
+                                    <div className="flex flex-wrap items-center gap-1 sm:justify-end">
                                         {!viewed && (
                                             <Badge variant="outline" className="border-amber-300 bg-amber-100 text-amber-700">
                                                 Belum dilihat
                                             </Badge>
                                         )}
-                                        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                                        <Badge
+                                            variant="outline"
+                                            title={item.action}
+                                            className="max-w-[12rem] truncate border-blue-200 bg-blue-50 text-blue-700"
+                                        >
                                             {item.action}
                                         </Badge>
                                     </div>
@@ -267,9 +275,12 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
 
                                 <div className="mb-2 flex flex-wrap items-center gap-2">
                                     <Badge variant="outline">{item.module}</Badge>
-                                    <Badge variant="outline" className="text-slate-600">
+                                    <span
+                                        title={formatObjectLabel(item)}
+                                        className="inline-flex max-w-full rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 break-words"
+                                    >
                                         {formatObjectLabel(item)}
-                                    </Badge>
+                                    </span>
                                 </div>
 
                                 <div className="mb-2 rounded-md border border-slate-200 bg-slate-50 p-2">
@@ -283,17 +294,17 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                     })}
                 </div>
 
-                <div className="hidden overflow-hidden rounded-xl border border-slate-200 md:block">
-                    <Table>
+                <div className="hidden overflow-x-auto rounded-xl border border-slate-200 lg:block">
+                    <Table className="min-w-[900px]">
                         <TableHeader className="bg-slate-50">
                             <TableRow>
-                                <TableHead>Waktu</TableHead>
-                                <TableHead>Aktor</TableHead>
-                                <TableHead>Modul</TableHead>
-                                <TableHead>Aksi</TableHead>
-                                <TableHead>Objek</TableHead>
-                                <TableHead>Deskripsi</TableHead>
-                                <TableHead>Perubahan</TableHead>
+                                <TableHead className="whitespace-nowrap">Waktu</TableHead>
+                                <TableHead className="whitespace-nowrap">Aktor</TableHead>
+                                <TableHead className="whitespace-nowrap">Modul</TableHead>
+                                <TableHead className="whitespace-nowrap">Aksi</TableHead>
+                                <TableHead className="whitespace-nowrap">Objek</TableHead>
+                                <TableHead className="min-w-[200px]">Deskripsi</TableHead>
+                                <TableHead className="min-w-[220px]">Perubahan</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -309,7 +320,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                                 const viewed = isViewed(item);
                                 return (
                                     <TableRow key={item.id} className={viewed ? '' : 'bg-amber-50/40'}>
-                                        <TableCell className="text-xs text-slate-600">
+                                        <TableCell className="whitespace-nowrap text-xs text-slate-600">
                                             <p>{item.created_at}</p>
                                             {!viewed && (
                                                 <Badge variant="outline" className="mt-1 border-amber-300 bg-amber-100 text-amber-700">
@@ -326,16 +337,18 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
-                                                {item.action}
+                                                <span title={item.action} className="inline-block max-w-[11rem] truncate align-bottom">
+                                                    {item.action}
+                                                </span>
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-xs text-slate-600">
+                                        <TableCell className="max-w-[240px] break-words text-xs text-slate-600">
                                             {formatObjectLabel(item)}
                                         </TableCell>
-                                        <TableCell className="max-w-[260px] text-xs text-slate-700">
+                                        <TableCell className="min-w-[200px] max-w-[260px] break-words text-xs text-slate-700">
                                             {item.description ?? '-'}
                                         </TableCell>
-                                        <TableCell className="max-w-[420px]">
+                                        <TableCell className="min-w-[220px] max-w-[420px]">
                                             <AuditChangesPreview itemId={item.id} changes={changes} onOpenDetail={() => handleOpenDetail(item, changes)} />
                                         </TableCell>
                                     </TableRow>
@@ -349,7 +362,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                     <p className="text-xs text-slate-500">
                         Total {auditLogs.total} log.
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                         <Button
                             type="button"
                             variant="outline"

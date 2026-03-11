@@ -369,14 +369,28 @@ func SuperAdminRecruitmentExportScoreReportPDF(c *gin.Context) {
 	pdf.CellFormat(0, 5, fmt.Sprintf("Eligible Candidates: %d", eligibleCount), "", 1, "L", false, 0, "")
 	pdf.Ln(1)
 
+	type tableColumn struct {
+		Header string
+		Width  float64
+		Align  string
+	}
+	columns := []tableColumn{
+		{Header: "No", Width: 8, Align: "C"},
+		{Header: "Candidate", Width: 32, Align: "L"},
+		{Header: "Division", Width: 24, Align: "L"},
+		{Header: "Position", Width: 32, Align: "L"},
+		{Header: "Status", Width: 17, Align: "L"},
+		{Header: "Score", Width: 14, Align: "C"},
+		{Header: "Rank", Width: 10, Align: "C"},
+		{Header: "Recommendation", Width: 53, Align: "L"},
+	}
+
 	drawTableHeader := func() {
 		pdf.SetFillColor(37, 99, 235)
 		pdf.SetTextColor(255, 255, 255)
 		pdf.SetFont("Arial", "B", 8)
-		headers := []string{"No", "Candidate", "Division", "Position", "Status", "Score", "Rank", "Recommendation"}
-		widths := []float64{8, 34, 22, 30, 18, 14, 10, 54}
-		for i := range headers {
-			pdf.CellFormat(widths[i], 6, headers[i], "1", 0, "C", true, 0, "")
+		for _, column := range columns {
+			pdf.CellFormat(column.Width, 6, column.Header, "1", 0, "C", true, 0, "")
 		}
 		pdf.Ln(-1)
 		pdf.SetTextColor(0, 0, 0)
@@ -393,22 +407,18 @@ func SuperAdminRecruitmentExportScoreReportPDF(c *gin.Context) {
 
 		values := []string{
 			strconv.Itoa(i + 1),
-			trimToLength(item.Application.FullName, 28),
-			trimToLength(item.Division, 18),
-			trimToLength(item.Position, 24),
-			trimToLength(item.Application.Status, 12),
+			item.Application.FullName,
+			item.Division,
+			item.Position,
+			item.Application.Status,
 			fmt.Sprintf("%.1f", item.Score.Total),
 			strconv.Itoa(item.Score.Rank),
-			trimToLength(item.Score.Recommendation, 33),
+			item.Score.Recommendation,
 		}
-		widths := []float64{8, 34, 22, 30, 18, 14, 10, 54}
 
 		for col := range values {
-			align := "L"
-			if col == 0 || col == 5 || col == 6 {
-				align = "C"
-			}
-			pdf.CellFormat(widths[col], 5.5, values[col], "1", 0, align, false, 0, "")
+			cellText := fitPDFCellText(pdf, values[col], columns[col].Width)
+			pdf.CellFormat(columns[col].Width, 5.5, cellText, "1", 0, columns[col].Align, false, 0, "")
 		}
 		pdf.Ln(-1)
 	}
@@ -439,4 +449,35 @@ func SuperAdminRecruitmentExportScoreReportPDF(c *gin.Context) {
 	c.Header("Content-Type", "application/pdf")
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
 	c.Data(http.StatusOK, "application/pdf", out.Bytes())
+}
+
+func fitPDFCellText(pdf *gofpdf.Fpdf, value string, width float64) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return "-"
+	}
+
+	maxWidth := width - 1.6
+	if maxWidth <= 0 {
+		return ""
+	}
+	if pdf.GetStringWidth(trimmed) <= maxWidth {
+		return trimmed
+	}
+
+	const ellipsis = "..."
+	if pdf.GetStringWidth(ellipsis) > maxWidth {
+		return ""
+	}
+
+	runes := []rune(trimmed)
+	for len(runes) > 0 {
+		candidate := string(runes) + ellipsis
+		if pdf.GetStringWidth(candidate) <= maxWidth {
+			return candidate
+		}
+		runes = runes[:len(runes)-1]
+	}
+
+	return ellipsis
 }
