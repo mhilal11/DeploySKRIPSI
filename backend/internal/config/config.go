@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -25,9 +28,12 @@ type Config struct {
 	DBPassword              string
 	DBName                  string
 	SessionSecret           string
+	SessionSecretFromEnv    bool
 	CSRFSecret              string
+	CSRFSecretFromEnv       bool
 	StoragePath             string
 	CookieSecure            bool
+	MaxRequestBodyBytes     int64
 	SMTPHost                string
 	SMTPPort                int
 	SMTPUser                string
@@ -53,6 +59,8 @@ func Load() Config {
 		groqModelChain = parseCSVUnique(strings.Join([]string{groqModel, groqFallbackModel}, ","))
 	}
 	storagePath := resolveStoragePath(getenv("STORAGE_PATH", "./storage"))
+	sessionSecret, sessionSecretFromEnv := getenvSecret("SESSION_SECRET", 48)
+	csrfSecret, csrfSecretFromEnv := getenvSecret("CSRF_SECRET", 48)
 	return Config{
 		Env:                     getenv("APP_ENV", "development"),
 		Address:                 getenv("APP_ADDR", ":8080"),
@@ -70,10 +78,13 @@ func Load() Config {
 		DBUser:                  getenv("DB_USER", "root"),
 		DBPassword:              getenv("DB_PASSWORD", ""),
 		DBName:                  getenv("DB_NAME", "hris"),
-		SessionSecret:           getenv("SESSION_SECRET", "change-me"),
-		CSRFSecret:              getenv("CSRF_SECRET", "change-me"),
+		SessionSecret:           sessionSecret,
+		SessionSecretFromEnv:    sessionSecretFromEnv,
+		CSRFSecret:              csrfSecret,
+		CSRFSecretFromEnv:       csrfSecretFromEnv,
 		StoragePath:             storagePath,
 		CookieSecure:            getenvBool("COOKIE_SECURE", false),
+		MaxRequestBodyBytes:     int64(getenvInt("MAX_REQUEST_BODY_MB", 25)) * 1024 * 1024,
 		SMTPHost:                getenv("SMTP_HOST", ""),
 		SMTPPort:                getenvInt("SMTP_PORT", 587),
 		SMTPUser:                getenv("SMTP_USER", ""),
@@ -84,6 +95,45 @@ func Load() Config {
 		GoogleOAuthClientSecret: getenv("GOOGLE_OAUTH_CLIENT_SECRET", ""),
 		GoogleOAuthRedirectURL:  getenv("GOOGLE_OAUTH_REDIRECT_URL", strings.TrimRight(primaryFrontendURL, "/")+"/api/auth/google/register/callback"),
 	}
+}
+
+func (c Config) ValidateForServer() error {
+	weakSecrets := map[string]struct{}{
+		"change-me":   {},
+		"changeme":    {},
+		"default":     {},
+		"secret":      {},
+		"password":    {},
+		"123456":      {},
+		"session":     {},
+		"csrf":        {},
+		"development": {},
+	}
+
+	validateSecret := func(name, value string, fromEnv bool) error {
+		trimmed := strings.TrimSpace(value)
+		if len(trimmed) < 32 {
+			return fmt.Errorf("%s minimal 32 karakter", name)
+		}
+		if _, weak := weakSecrets[strings.ToLower(trimmed)]; weak {
+			return fmt.Errorf("%s menggunakan nilai lemah", name)
+		}
+		if strings.EqualFold(c.Env, "production") && !fromEnv {
+			return fmt.Errorf("%s wajib diset via environment variable di production", name)
+		}
+		return nil
+	}
+
+	if err := validateSecret("SESSION_SECRET", c.SessionSecret, c.SessionSecretFromEnv); err != nil {
+		return err
+	}
+	if err := validateSecret("CSRF_SECRET", c.CSRFSecret, c.CSRFSecretFromEnv); err != nil {
+		return err
+	}
+	if c.MaxRequestBodyBytes <= 0 {
+		return fmt.Errorf("MAX_REQUEST_BODY_MB harus lebih dari 0")
+	}
+	return nil
 }
 
 func resolveStoragePath(raw string) string {
@@ -171,4 +221,22 @@ func parseCSVUnique(value string) []string {
 		out = append(out, trimmed)
 	}
 	return out
+}
+
+func getenvSecret(key string, minBytes int) (string, bool) {
+	if v, ok := os.LookupEnv(key); ok && strings.TrimSpace(v) != "" {
+		return strings.TrimSpace(v), true
+	}
+	return randomSecret(minBytes), false
+}
+
+func randomSecret(minBytes int) string {
+	if minBytes < 32 {
+		minBytes = 32
+	}
+	buf := make([]byte, minBytes)
+	if _, err := rand.Read(buf); err != nil {
+		return strings.Repeat("x", minBytes)
+	}
+	return base64.RawURLEncoding.EncodeToString(buf)
 }

@@ -5,7 +5,6 @@ import (
 	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
-	"time"
 
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/services"
@@ -29,12 +28,11 @@ func LandingData(c *gin.Context) {
 	divisions := make([]map[string]any, 0, len(profiles))
 	for _, profile := range profiles {
 		currentStaff, _ := dbrepo.CountActiveDivisionUsers(db, profile.Name)
-
-		if profile.Capacity < currentStaff {
-			profile.Capacity = currentStaff
-			_ = dbrepo.UpdateDivisionProfileCapacity(db, profile.ID, profile.Capacity, time.Now())
+		effectiveCapacity := profile.Capacity
+		if effectiveCapacity < currentStaff {
+			effectiveCapacity = currentStaff
 		}
-		availableSlots := profile.Capacity - currentStaff
+		availableSlots := effectiveCapacity - currentStaff
 		if availableSlots < 0 {
 			availableSlots = 0
 		}
@@ -44,7 +42,7 @@ func LandingData(c *gin.Context) {
 			"name":             profile.Name,
 			"description":      profile.Description,
 			"manager_name":     profile.ManagerName,
-			"capacity":         profile.Capacity,
+			"capacity":         effectiveCapacity,
 			"current_staff":    currentStaff,
 			"available_slots":  availableSlots,
 			"is_hiring":        profile.IsHiring && profile.JobTitle != nil,

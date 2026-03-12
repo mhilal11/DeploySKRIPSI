@@ -13,6 +13,9 @@ import (
 func main() {
 	_ = godotenv.Load()
 	cfg := config.Load()
+	if err := cfg.ValidateForServer(); err != nil {
+		log.Fatalf("config validation failed: %v", err)
+	}
 
 	database, err := db.Connect(cfg)
 	if err != nil {

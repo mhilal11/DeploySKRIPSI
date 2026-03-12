@@ -89,7 +89,10 @@ func GoogleRegisterCallback(c *gin.Context) {
 	issuedAt := sessionInt64(session.Get(googleOAuthIssuedAtKey))
 
 	clearGoogleOAuthSession(session)
-	_ = session.Save()
+	if err := session.Save(); err != nil {
+		redirectGoogleRegisterError(c, cfg, "Gagal membersihkan sesi pendaftaran Google.")
+		return
+	}
 
 	queryState := strings.TrimSpace(c.Query("state"))
 	code := strings.TrimSpace(c.Query("code"))

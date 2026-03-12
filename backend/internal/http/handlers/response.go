@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -18,4 +20,13 @@ func ValidationErrors(c *gin.Context, errs FieldErrors) {
 
 func Ok(c *gin.Context, data gin.H) {
 	c.JSON(http.StatusOK, data)
+}
+
+func ValidateFieldLength(errs FieldErrors, field, label, value string, max int) {
+	if errs == nil || max <= 0 {
+		return
+	}
+	if len([]rune(strings.TrimSpace(value))) > max {
+		errs[field] = label + " melebihi batas maksimum " + strconv.Itoa(max) + " karakter."
+	}
 }

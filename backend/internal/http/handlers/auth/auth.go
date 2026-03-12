@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -52,21 +54,91 @@ type confirmPasswordRequest struct {
 	Password string `form:"password" json:"password"`
 }
 
+type authRepository interface {
+	GetUserByEmail(email string) (*models.User, error)
+	SetUserLastLogin(userID int64, at time.Time) error
+	UserEmailExists(email string, excludeID *int64) (bool, error)
+	CreatePelamarUserWithProfile(employeeCode, name, email, passwordHash string, registeredAt time.Time, emailVerifiedAt *time.Time, now time.Time) (int64, error)
+	SavePasswordResetToken(email, token string, now time.Time) error
+	GetPasswordResetTokenByEmail(email string) (*dbrepo.PasswordResetTokenRecord, error)
+	DeletePasswordResetTokenByEmail(email string) error
+	UpdateUserPasswordByEmail(email, passwordHash string) error
+	GetUserByID(userID int64) (*models.User, error)
+	MarkUserEmailVerified(userID int64, now time.Time) error
+}
+
+type sqlAuthRepository struct {
+	db *sqlx.DB
+}
+
+func newAuthRepository(db *sqlx.DB) authRepository {
+	return &sqlAuthRepository{db: db}
+}
+
+func (r *sqlAuthRepository) GetUserByEmail(email string) (*models.User, error) {
+	return dbrepo.GetUserByEmail(r.db, email)
+}
+
+func (r *sqlAuthRepository) SetUserLastLogin(userID int64, at time.Time) error {
+	return dbrepo.SetUserLastLogin(r.db, userID, at)
+}
+
+func (r *sqlAuthRepository) UserEmailExists(email string, excludeID *int64) (bool, error) {
+	return dbrepo.UserEmailExists(r.db, email, excludeID)
+}
+
+func (r *sqlAuthRepository) CreatePelamarUserWithProfile(employeeCode, name, email, passwordHash string, registeredAt time.Time, emailVerifiedAt *time.Time, now time.Time) (int64, error) {
+	return dbrepo.CreatePelamarUserWithProfile(r.db, employeeCode, name, email, passwordHash, registeredAt, emailVerifiedAt, now)
+}
+
+func (r *sqlAuthRepository) SavePasswordResetToken(email, token string, now time.Time) error {
+	return dbrepo.SavePasswordResetToken(r.db, email, token, now)
+}
+
+func (r *sqlAuthRepository) GetPasswordResetTokenByEmail(email string) (*dbrepo.PasswordResetTokenRecord, error) {
+	return dbrepo.GetPasswordResetTokenByEmail(r.db, email)
+}
+
+func (r *sqlAuthRepository) DeletePasswordResetTokenByEmail(email string) error {
+	return dbrepo.DeletePasswordResetTokenByEmail(r.db, email)
+}
+
+func (r *sqlAuthRepository) UpdateUserPasswordByEmail(email, passwordHash string) error {
+	return dbrepo.UpdateUserPasswordByEmail(r.db, email, passwordHash)
+}
+
+func (r *sqlAuthRepository) GetUserByID(userID int64) (*models.User, error) {
+	return dbrepo.GetUserByID(r.db, userID)
+}
+
+func (r *sqlAuthRepository) MarkUserEmailVerified(userID int64, now time.Time) error {
+	return dbrepo.MarkUserEmailVerified(r.db, userID, now)
+}
+
+const (
+	maxEmailLength    = 254
+	maxNameLength     = 120
+	maxPasswordLength = 128
+	maxTokenLength    = 255
+)
+
 func RegisterAuthRoutes(rg *gin.RouterGroup) {
 	rg.GET("/me", GetMe)
 	rg.GET("/login", AuthInfo)
 	rg.GET("/register", AuthInfo)
 	rg.GET("/auth/google/register", GoogleRegister)
 	rg.GET("/auth/google/register/callback", GoogleRegisterCallback)
-	rg.POST("/login", Login)
 	rg.POST("/logout", Logout)
-	rg.POST("/register", Register)
-	rg.POST("/forgot-password", ForgotPassword)
-	rg.POST("/reset-password", ResetPassword)
 	rg.POST("/confirm-password", ConfirmPassword)
 	rg.POST("/email/verification-notification", VerificationNotification)
 	rg.GET("/verify-email", VerifyEmail)
 	rg.GET("/verify-email/:id/:hash", VerifyEmail)
+
+	authLimiter := middleware.RateLimit(8, time.Minute)
+	rg.POST("/login", authLimiter, Login)
+	rg.POST("/register", authLimiter, Register)
+	rg.POST("/forgot-password", authLimiter, ForgotPassword)
+	rg.POST("/reset-password", authLimiter, ResetPassword)
 }
 
 func AuthInfo(c *gin.Context) {
@@ -88,7 +160,7 @@ func GetMe(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"user": nil})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": sanitizeUser(user)})
+	c.JSON(http.StatusOK, gin.H{"user": dto.UserFromModel(user)})
 }
 
 func Login(c *gin.Context) {
@@ -102,9 +174,18 @@ func Login(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"credentials": "Email atau kata sandi salah."})
 		return
 	}
+	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": msg})
+		return
+	}
+	if field, msg := validateAuthFieldLengths(req.Password, maxPasswordLength, "Password"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"password": msg})
+		return
+	}
 
 	db := middleware.GetDB(c)
-	user, err := dbrepo.GetUserByEmail(db, req.Email)
+	repo := newAuthRepository(db)
+	user, err := repo.GetUserByEmail(req.Email)
 	if err != nil || user == nil {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"credentials": "Email atau kata sandi salah."})
 		return
@@ -121,14 +202,16 @@ func Login(c *gin.Context) {
 	}
 
 	now := time.Now()
-	_ = dbrepo.SetUserLastLogin(db, user.ID, now)
+	_ = repo.SetUserLastLogin(user.ID, now)
 
 	session := sessions.Default(c)
-	session.Set("user_id", user.ID)
-	_ = session.Save()
+	if err := renewAuthenticatedSession(session, user.ID); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyimpan sesi login.")
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"user":        sanitizeUser(user),
+		"user":        dto.UserFromModel(user),
 		"redirect_to": dashboardPathFor(*user),
 	})
 }
@@ -136,7 +219,10 @@ func Login(c *gin.Context) {
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
 	session.Clear()
-	_ = session.Save()
+	if err := session.Save(); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menghapus sesi.")
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"redirect_to": "/"})
 }
 
@@ -147,13 +233,30 @@ func Register(c *gin.Context) {
 		return
 	}
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	if field, msg := validateAuthFieldLengths(req.Name, maxNameLength, "Nama"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"name": msg})
+		return
+	}
+	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": msg})
+		return
+	}
+	if field, msg := validateAuthFieldLengths(req.Password, maxPasswordLength, "Password"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"password": msg})
+		return
+	}
+	if field, msg := validateAuthFieldLengths(req.PasswordConfirmation, maxPasswordLength, "Konfirmasi password"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"password_confirmation": msg})
+		return
+	}
 	if req.Password != req.PasswordConfirmation {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"password_confirmation": "Konfirmasi password tidak sama."})
 		return
 	}
 
 	db := middleware.GetDB(c)
-	exists, _ := dbrepo.UserEmailExists(db, req.Email, nil)
+	repo := newAuthRepository(db)
+	exists, _ := repo.UserEmailExists(req.Email, nil)
 	if exists {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email sudah digunakan."})
 		return
@@ -172,8 +275,7 @@ func Register(c *gin.Context) {
 	}
 
 	now := time.Now()
-	userID, err := dbrepo.CreatePelamarUserWithProfile(
-		db,
+	userID, err := repo.CreatePelamarUserWithProfile(
 		employeeCode,
 		req.Name,
 		req.Email,
@@ -202,9 +304,14 @@ func ForgotPassword(c *gin.Context) {
 		return
 	}
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": msg})
+		return
+	}
 
 	db := middleware.GetDB(c)
-	exists, _ := dbrepo.UserEmailExists(db, req.Email, nil)
+	repo := newAuthRepository(db)
+	exists, _ := repo.UserEmailExists(req.Email, nil)
 
 	var token string
 	if exists {
@@ -212,7 +319,7 @@ func ForgotPassword(c *gin.Context) {
 		if token == "" {
 			token = "reset-token"
 		}
-		_ = dbrepo.SavePasswordResetToken(db, req.Email, token, time.Now())
+		_ = repo.SavePasswordResetToken(req.Email, token, time.Now())
 
 		cfg := middleware.GetConfig(c)
 		resetURL := cfg.FrontendURL + "/reset-password/" + token + "?email=" + url.QueryEscape(req.Email)
@@ -232,29 +339,46 @@ func ResetPassword(c *gin.Context) {
 		return
 	}
 	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": msg})
+		return
+	}
+	if field, msg := validateAuthFieldLengths(req.Token, maxTokenLength, "Token"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"token": msg})
+		return
+	}
+	if field, msg := validateAuthFieldLengths(req.Password, maxPasswordLength, "Password"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"password": msg})
+		return
+	}
+	if field, msg := validateAuthFieldLengths(req.PasswordConfirmation, maxPasswordLength, "Konfirmasi password"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"password_confirmation": msg})
+		return
+	}
 	if req.Password == "" || req.Password != req.PasswordConfirmation {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"password_confirmation": "Konfirmasi password tidak sama."})
 		return
 	}
 
 	db := middleware.GetDB(c)
-	record, err := dbrepo.GetPasswordResetTokenByEmail(db, req.Email)
+	repo := newAuthRepository(db)
+	record, err := repo.GetPasswordResetTokenByEmail(req.Email)
 	if err != nil || record == nil || record.Token != req.Token {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"token": "Token reset tidak valid."})
 		return
 	}
 	if time.Since(record.CreatedAt) > 60*time.Minute {
-		_ = dbrepo.DeletePasswordResetTokenByEmail(db, req.Email)
+		_ = repo.DeletePasswordResetTokenByEmail(req.Email)
 		handlers.ValidationErrors(c, handlers.FieldErrors{"token": "Token reset sudah kedaluwarsa."})
 		return
 	}
 
 	hash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	if err := dbrepo.UpdateUserPasswordByEmail(db, req.Email, string(hash)); err != nil {
+	if err := repo.UpdateUserPasswordByEmail(req.Email, string(hash)); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui password")
 		return
 	}
-	_ = dbrepo.DeletePasswordResetTokenByEmail(db, req.Email)
+	_ = repo.DeletePasswordResetTokenByEmail(req.Email)
 
 	c.JSON(http.StatusOK, gin.H{"status": "Password berhasil diperbarui.", "redirect_to": "/login"})
 }
@@ -310,7 +434,10 @@ func VerificationNotification(c *gin.Context) {
 
 	sendVerificationEmail(c, user)
 	session.Set("verification_sent_at", time.Now().Unix())
-	_ = session.Save()
+	if err := session.Save(); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui status verifikasi.")
+		return
+	}
 
 	redirectURL := statusRedirectFromReferer(c, "verification-link-sent", "/verify-email")
 	c.JSON(http.StatusOK, gin.H{
@@ -350,14 +477,16 @@ func VerifyEmail(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	user, err := dbrepo.GetUserByID(db, userID)
+	repo := newAuthRepository(db)
+	user, err := repo.GetUserByID(userID)
 	if err != nil || user == nil {
 		handlers.JSONError(c, http.StatusNotFound, "User tidak ditemukan")
 		return
 	}
 
-	expectedHash := sha1Hex(user.Email)
-	if hash != expectedHash {
+	expectedHash := sha256Hex(user.Email)
+	legacyHash := sha1LegacyHex(user.Email)
+	if hash != expectedHash && hash != legacyHash {
 		handlers.JSONError(c, http.StatusBadRequest, "Invalid verification request")
 		return
 	}
@@ -367,7 +496,7 @@ func VerifyEmail(c *gin.Context) {
 	}
 
 	if user.EmailVerifiedAt == nil {
-		_ = dbrepo.MarkUserEmailVerified(db, userID, time.Now())
+		_ = repo.MarkUserEmailVerified(userID, time.Now())
 	}
 
 	redirectURL := "/dashboard"
@@ -396,33 +525,35 @@ func dashboardPathFor(user models.User) string {
 	}
 }
 
-func sanitizeUser(user *models.User) gin.H {
-	if user == nil {
-		return nil
-	}
-	return gin.H{
-		"id":                user.ID,
-		"employee_code":     user.EmployeeCode,
-		"name":              user.Name,
-		"email":             user.Email,
-		"role":              user.Role,
-		"division":          user.Division,
-		"status":            user.Status,
-		"registered_at":     user.RegisteredAt,
-		"inactive_at":       user.InactiveAt,
-		"last_login_at":     user.LastLoginAt,
-		"email_verified_at": user.EmailVerifiedAt,
-	}
-}
-
 func buildVerificationLink(c *gin.Context, user *models.User) (string, error) {
 	cfg := middleware.GetConfig(c)
 	expires := time.Now().Add(60 * time.Minute).Unix()
-	hash := sha1Hex(user.Email)
+	hash := sha256Hex(user.Email)
 	signature := signVerification(cfg.CSRFSecret, user.ID, hash, expires)
 	path := "/verify-email/" + strconv.FormatInt(user.ID, 10) + "/" + hash
 	link := cfg.BaseURL + path + "?expires=" + strconv.FormatInt(expires, 10) + "&signature=" + signature
 	return link, nil
+}
+
+func renewAuthenticatedSession(session sessions.Session, userID int64) error {
+	csrfToken, err := utils.RandomToken(32)
+	if err != nil || strings.TrimSpace(csrfToken) == "" {
+		return fmt.Errorf("failed to rotate csrf token")
+	}
+
+	session.Clear()
+	session.Set("user_id", userID)
+	session.Set("session_rotated_at", time.Now().Unix())
+	session.Set("csrf_token", csrfToken)
+	return session.Save()
+}
+
+func validateAuthFieldLengths(value string, maxLen int, label string) (string, string) {
+	trimmed := strings.TrimSpace(value)
+	if maxLen > 0 && len([]rune(trimmed)) > maxLen {
+		return label, fmt.Sprintf("%s melebihi batas maksimum %d karakter.", label, maxLen)
+	}
+	return "", ""
 }
 
 func sendVerificationEmail(c *gin.Context, user *models.User) {
@@ -450,8 +581,13 @@ func verifySignature(secret string, userID int64, hash string, expires int64, si
 	return hmac.Equal([]byte(expected), []byte(signature))
 }
 
-func sha1Hex(value string) string {
+func sha1LegacyHex(value string) string {
 	sum := sha1.Sum([]byte(value))
+	return hex.EncodeToString(sum[:])
+}
+
+func sha256Hex(value string) string {
+	sum := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(sum[:])
 }
 

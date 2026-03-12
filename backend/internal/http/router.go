@@ -1,6 +1,7 @@
 package http
 
 import (
+	_ "embed"
 	"net/http"
 	"strings"
 	"time"
@@ -23,6 +24,27 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+//go:embed docs/openapi.yaml
+var openAPISpec []byte
+
+const swaggerUIHTML = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>HRIS API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css" />
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = function() {
+      SwaggerUIBundle({ url: '/openapi.yaml', dom_id: '#swagger-ui' });
+    };
+  </script>
+</body>
+</html>`
+
 func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	if cfg.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
@@ -30,6 +52,8 @@ func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(middleware.SecurityHeaders(cfg))
+	r.Use(middleware.LimitRequestBody(cfg.MaxRequestBodyBytes))
 	r.Use(middleware.Gzip())
 
 	r.Use(cors.New(cors.Config{
@@ -58,6 +82,8 @@ func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	r.Use(middleware.EnsureCSRFToken())
 
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
+	r.GET("/openapi.yaml", func(c *gin.Context) { c.Data(http.StatusOK, "application/yaml; charset=utf-8", openAPISpec) })
+	r.GET("/docs", func(c *gin.Context) { c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(swaggerUIHTML)) })
 	r.GET("/verify-email", authhandlers.VerifyEmail)
 	r.GET("/verify-email/:id/:hash", authhandlers.VerifyEmail)
 
@@ -90,7 +116,7 @@ func allowedOrigins(cfg config.Config) []string {
 	seen := map[string]struct{}{}
 	add := func(origin string) {
 		origin = strings.TrimSpace(origin)
-		if origin == "" {
+		if origin == "" || origin == "*" {
 			return
 		}
 		seen[origin] = struct{}{}

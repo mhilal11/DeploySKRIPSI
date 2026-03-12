@@ -149,7 +149,10 @@ func DeleteProfile(c *gin.Context) {
 
 	session := sessions.Default(c)
 	session.Clear()
-	_ = session.Save()
+	if err := session.Save(); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menghapus sesi.")
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"redirect_to": "/"})
 }
