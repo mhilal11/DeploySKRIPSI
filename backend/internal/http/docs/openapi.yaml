@@ -5,10 +5,14 @@ info:
   description: Dokumentasi endpoint utama HRIS LDP.
 servers:
   - url: /api
+    description: API endpoints
+  - url: /
+    description: Public/root endpoints
 tags:
   - name: Auth
   - name: Public
   - name: Profile
+  - name: SuperAdmin
 paths:
   /csrf:
     get:
@@ -125,6 +129,37 @@ paths:
           description: Token/validasi gagal
         '429':
           description: Terlalu banyak request
+  /email/verification-notification:
+    post:
+      tags: [Auth]
+      summary: Kirim ulang email verifikasi
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Email verifikasi dikirim
+        '401':
+          description: Unauthenticated
+        '429':
+          description: Terlalu banyak request
+  /verify-email:
+    get:
+      tags: [Auth]
+      summary: Verifikasi email menggunakan token
+      parameters:
+        - in: query
+          name: token
+          required: true
+          schema:
+            type: string
+            maxLength: 255
+      responses:
+        '200':
+          description: Email terverifikasi
+        '400':
+          description: Request verifikasi tidak valid
+        '410':
+          description: Token verifikasi kedaluwarsa
   /public/landing:
     get:
       tags: [Public]
@@ -151,6 +186,152 @@ paths:
       responses:
         '200':
           description: Updated
+        '422':
+          description: Validasi gagal
+  /super-admin/kelola-pengaduan:
+    get:
+      tags: [SuperAdmin]
+      summary: Daftar pengaduan untuk super admin (dengan filter + pagination)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: priority
+          schema:
+            type: string
+        - in: query
+          name: category
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden
+  /super-admin/kelola-pengaduan/{id}:
+    patch:
+      tags: [SuperAdmin]
+      summary: Update status/prioritas pengaduan
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                priority:
+                  type: string
+                resolution_notes:
+                  type: string
+                  maxLength: 4000
+      responses:
+        '200':
+          description: Updated
+        '404':
+          description: Not found
+        '422':
+          description: Validasi gagal
+  /super-admin/kelola-surat:
+    get:
+      tags: [SuperAdmin]
+      summary: Daftar surat super admin (dengan filter + pagination)
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: category
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: OK
+    post:
+      tags: [SuperAdmin]
+      summary: Buat surat super admin
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [jenis_surat, perihal, kategori, prioritas, target_division]
+              properties:
+                jenis_surat:
+                  type: string
+                  maxLength: 80
+                perihal:
+                  type: string
+                  maxLength: 220
+                isi_surat:
+                  type: string
+                  maxLength: 8000
+                kategori:
+                  type: string
+                  maxLength: 80
+                prioritas:
+                  type: string
+                  maxLength: 24
+                penerima:
+                  type: string
+                  maxLength: 120
+                target_division:
+                  type: string
+                  maxLength: 120
+                lampiran:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Created
         '422':
           description: Validasi gagal
 components:
