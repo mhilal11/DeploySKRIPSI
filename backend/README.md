@@ -19,6 +19,10 @@ Salin template:
 - `STORAGE_PATH` : lokasi penyimpanan file (default `./storage`)
 - `STORAGE_ENCRYPTION_KEY` : key enkripsi at-rest file storage (minimal 32 karakter atau base64 key 32-byte)
 - `STORAGE_ENCRYPT_UPLOADS` : `true|false` untuk aktifkan enkripsi file upload (default otomatis `true` jika key tersedia)
+- `REDIS_URL` : URL Redis (opsional), contoh `redis://localhost:6379/0`
+- `REDIS_ADDR` : host:port Redis alternatif jika tidak pakai `REDIS_URL`
+- `REDIS_PASSWORD` : password Redis (opsional)
+- `REDIS_DB` : index database Redis (default `0`)
 - `DISABLE_BACKGROUND_WORKERS` : `true|false` untuk menonaktifkan worker background (berguna untuk test/integration environment)
 - `COOKIE_SECURE` : `true` jika pakai HTTPS
 - `GOOGLE_OAUTH_CLIENT_ID` : Client ID OAuth 2.0 dari Google Cloud Console (opsional, untuk Daftar via Google)
@@ -84,7 +88,7 @@ go run ./cmd/server
 - Worker dipanggil saat server berjalan dan akan retry dengan backoff jika proses gagal.
 
 ## Caching
-- Endpoint `GET /api/public/landing` menggunakan cache in-memory dengan TTL 30 detik untuk menurunkan beban query berulang.
+- Endpoint `GET /api/public/landing` menggunakan cache Redis (jika dikonfigurasi) dengan fallback cache in-memory TTL 30 detik.
 
 ## Hot Reload (Air)
 Install Air:
