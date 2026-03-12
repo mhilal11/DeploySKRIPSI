@@ -8,6 +8,7 @@
     X,
     ChevronDown,
 } from 'lucide-react';
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 
 import { Button } from '@/shared/components/ui/button';
@@ -121,9 +122,11 @@ export default function Navbar({ }: NavbarProps) {
                     {/* Logo/Brand - Left */}
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
-                            <img
+                            <Image
                                 src="/img/LogoLDP.png"
                                 alt="LDP Logo"
+                                width={40}
+                                height={40}
                                 className="h-10 w-10 object-contain"
                             />
                             <div className="hidden sm:block">
@@ -171,9 +174,12 @@ export default function Navbar({ }: NavbarProps) {
                                 >
                                     <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center overflow-hidden">
                                         {profilePhotoUrl ? (
-                                            <img
+                                            <Image
                                                 src={profilePhotoUrl}
                                                 alt="Foto profil"
+                                                width={32}
+                                                height={32}
+                                                unoptimized
                                                 className="h-full w-full object-cover"
                                             />
                                         ) : (

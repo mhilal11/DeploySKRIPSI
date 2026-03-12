@@ -5,6 +5,7 @@ import {
     Type,
     X,
 } from 'lucide-react';
+import Image from 'next/image';
 
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
@@ -119,9 +120,12 @@ export function TemplateEditorCard({
                         </div>
                         {logoPreview && (
                             <div className="relative">
-                                <img
+                                <Image
                                     src={logoPreview}
                                     alt="Logo Preview"
+                                    width={64}
+                                    height={64}
+                                    unoptimized
                                     className="h-16 w-16 rounded-lg border bg-white p-1 object-contain"
                                 />
                                 <button

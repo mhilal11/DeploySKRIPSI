@@ -6,6 +6,7 @@ import {
     Trash2,
     X,
 } from 'lucide-react';
+import Image from 'next/image';
 
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -72,9 +73,12 @@ export function TemplateListSection({
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
                         <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
                             {template.logoUrl && (
-                                <img
+                                <Image
                                     src={template.logoUrl}
                                     alt="Logo"
+                                    width={40}
+                                    height={40}
+                                    unoptimized
                                     className="h-8 w-8 shrink-0 rounded border bg-white p-0.5 object-contain sm:h-10 sm:w-10"
                                 />
                             )}

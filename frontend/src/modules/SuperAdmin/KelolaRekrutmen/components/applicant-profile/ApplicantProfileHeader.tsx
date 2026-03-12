@@ -1,4 +1,5 @@
 import { Calendar, CheckCircle, Mail, Phone, User } from 'lucide-react';
+import Image from 'next/image';
 
 import { Badge } from '@/shared/components/ui/badge';
 import { Card } from '@/shared/components/ui/card';
@@ -35,9 +36,12 @@ export function ApplicantProfileHeader({
           <div className="relative">
             <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center border-4 border-white shadow-xl overflow-hidden">
               {profilePhotoUrl ? (
-                <img
+                <Image
                   src={profilePhotoUrl}
                   alt={applicant.name}
+                  width={128}
+                  height={128}
+                  unoptimized
                   className="w-full h-full object-cover"
                 />
               ) : (
