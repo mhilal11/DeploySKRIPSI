@@ -4,7 +4,6 @@ import 'aos/dist/aos.css';
 
 import SplashScreen from '@/shared/components/SplashScreen';
 import { Head } from '@/shared/lib/inertia';
-import { PageProps } from '@/shared/types';
 
 import { CareersSection } from './CareersSection';
 import { ContactSection } from './ContactSection';
@@ -31,11 +30,11 @@ type CareerJob = {
   availableSlots?: number | null;
 };
 
-type LandingPageProps = PageProps<{
+type LandingPageProps = {
   canLogin: boolean;
   canRegister: boolean;
   jobs: CareerJob[];
-}>;
+};
 
 export default function LandingPage({
   canLogin,

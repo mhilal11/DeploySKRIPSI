@@ -1,3 +1,5 @@
+'use client';
+
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
@@ -41,18 +43,21 @@ function shouldShowLandingSplash(): boolean {
 }
 
 export default function SplashScreen() {
-  const [show, setShow] = useState<boolean>(() => shouldShowLandingSplash());
+  const [show, setShow] = useState(false);
   const [session, setSession] = useState<1 | 2>(1);
 
   const mainWords = ["Lintas", "Data", "Prima"];
 
   useEffect(() => {
-    if (!show) {
+    const shouldShow = shouldShowLandingSplash();
+    if (!shouldShow) {
+      setShow(false);
       return;
     }
     markLandingSplashShown();
     setSession(1);
-  }, [show]);
+    setShow(true);
+  }, []);
 
   useEffect(() => {
     if (!show) {
@@ -188,4 +193,3 @@ export default function SplashScreen() {
     </AnimatePresence>
   );
 }
-

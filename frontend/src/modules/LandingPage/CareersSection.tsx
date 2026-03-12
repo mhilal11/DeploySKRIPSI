@@ -204,7 +204,7 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                 >
                   {canApply && (
                     <Link
-                      href={route('login')}
+                      href='/login'
                       aria-label={`Lamar posisi ${title}`}
                       className="absolute inset-0 z-10"
                     />
@@ -324,3 +324,4 @@ export function CareersSection({ jobs }: CareersSectionProps) {
     </section>
   );
 }
+

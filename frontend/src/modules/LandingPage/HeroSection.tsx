@@ -4,6 +4,14 @@ import { useEffect, useRef } from 'react';
 
 import { Button } from '@/shared/components/ui/button';
 
+const ORBIT_POINTS = [
+  { x: 100, y: 0 },
+  { x: 50, y: 86.6025 },
+  { x: -50, y: 86.6025 },
+  { x: -100, y: 0 },
+  { x: -50, y: -86.6025 },
+  { x: 50, y: -86.6025 },
+];
 
 export function HeroSection() {
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -180,17 +188,13 @@ export function HeroSection() {
 
                 {/* Orbiting Nodes */}
                 <div className="relative w-full aspect-square">
-                  {[0, 60, 120, 180, 240, 300].map((angle, index) => {
-                    const radius = 100;
-                    const x = Math.cos((angle * Math.PI) / 180) * radius;
-                    const y = Math.sin((angle * Math.PI) / 180) * radius;
-
+                  {ORBIT_POINTS.map((point, index) => {
                     return (
                       <div
                         key={index}
                         className="absolute top-1/2 left-1/2 w-12 h-12 md:w-16 md:h-16 bg-white/15 backdrop-blur-lg rounded-full flex items-center justify-center shadow-[0_8px_32px_rgba(139,92,246,0.3)] animate-pulse border border-white/30"
                         style={{
-                          transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`,
+                          transform: `translate(calc(-50% + ${point.x}px), calc(-50% + ${point.y}px))`,
                           animationDelay: `${index * 0.2}s`,
                         }}
                       >
@@ -235,18 +239,14 @@ export function HeroSection() {
                       />
                     </linearGradient>
                   </defs>
-                  {[0, 60, 120, 180, 240, 300].map((angle, index) => {
-                    const radius = 100;
-                    const x = Math.cos((angle * Math.PI) / 180) * radius;
-                    const y = Math.sin((angle * Math.PI) / 180) * radius;
-
+                  {ORBIT_POINTS.map((point, index) => {
                     return (
                       <line
                         key={index}
                         x1="50%"
                         y1="50%"
-                        x2={`calc(50% + ${x}px)`}
-                        y2={`calc(50% + ${y}px)`}
+                        x2={`calc(50% + ${point.x}px)`}
+                        y2={`calc(50% + ${point.y}px)`}
                         stroke="url(#lineGradient)"
                         strokeWidth="2"
                         className="animate-pulse"

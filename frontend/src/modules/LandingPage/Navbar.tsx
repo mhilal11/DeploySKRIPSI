@@ -186,7 +186,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
                   variant="ghost"
                   className="text-white hover:text-white bg-white/10 hover:bg-white/15 border border-white/30 backdrop-blur-sm"
                 >
-                  <Link href={route('login')}>Masuk</Link>
+                  <Link href='/login'>Masuk</Link>
                 </Button>
               )}
               {canRegister && (
@@ -194,7 +194,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
                   asChild
                   className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border border-cyan-400/40 shadow-[0_6px_20px_rgba(34,211,238,0.3)]"
                 >
-                  <Link href={route('register')}>Daftar</Link>
+                  <Link href='/register'>Daftar</Link>
                 </Button>
               )}
             </div>
@@ -273,7 +273,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
                 variant="ghost"
                 className="w-full text-white hover:text-white hover:bg-white/10 backdrop-blur-sm border border-white/20"
               >
-                <Link href={route('login')}>Masuk</Link>
+                <Link href='/login'>Masuk</Link>
               </Button>
             )}
             {canRegister && (
@@ -281,7 +281,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
                 asChild
                 className="w-full bg-white/20 hover:bg-white/30 text-white shadow-[0_8px_32px_rgba(139,92,246,0.3)] border border-white/30 backdrop-blur-sm"
               >
-                <Link href={route('register')}>Daftar</Link>
+                <Link href='/register'>Daftar</Link>
               </Button>
             )}
           </div>
@@ -290,6 +290,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
     </>
   );
 }
+
 
 
 

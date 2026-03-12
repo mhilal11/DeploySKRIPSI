@@ -19,7 +19,7 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const landingDataCacheTTL = 30 * time.Second
+const landingDataCacheTTL = 5 * time.Second
 const landingDataRedisKey = "public:landing:v1"
 
 var landingDataCache = struct {
@@ -59,7 +59,26 @@ func LandingData(c *gin.Context) {
 		return
 	}
 
-	divisions := make([]map[string]any, 0, len(profiles))
+	divisionIDs := make([]int64, 0, len(profiles))
+	for _, profile := range profiles {
+		divisionIDs = append(divisionIDs, profile.ID)
+	}
+	activeJobsByDivisionID := map[int64][]map[string]any{}
+	activeJobs, activeJobsErr := dbrepo.ListActiveDivisionJobsByDivisionIDs(db, divisionIDs)
+	if activeJobsErr == nil {
+		for _, job := range activeJobs {
+			activeJobsByDivisionID[job.DivisionProfileID] = append(activeJobsByDivisionID[job.DivisionProfileID], map[string]any{
+				"id":                   job.ID,
+				"title":                job.JobTitle,
+				"description":          job.JobDescription,
+				"requirements":         handlers.DecodeJSONStringArray(job.JobRequirements),
+				"eligibility_criteria": handlers.DecodeJSONMap(job.JobEligibility),
+				"hiring_opened_at":     handlers.FormatDateISO(job.OpenedAt),
+			})
+		}
+	}
+
+	jobs := make([]map[string]any, 0)
 	for _, profile := range profiles {
 		currentStaff, _ := dbrepo.CountActiveDivisionUsers(db, profile.Name)
 		effectiveCapacity := profile.Capacity
@@ -71,43 +90,48 @@ func LandingData(c *gin.Context) {
 			availableSlots = 0
 		}
 
-		divisions = append(divisions, map[string]any{
-			"id":               profile.ID,
-			"name":             profile.Name,
-			"description":      profile.Description,
-			"manager_name":     profile.ManagerName,
-			"capacity":         effectiveCapacity,
-			"current_staff":    currentStaff,
-			"available_slots":  availableSlots,
-			"is_hiring":        profile.IsHiring && profile.JobTitle != nil,
-			"job_title":        profile.JobTitle,
-			"job_description":  profile.JobDescription,
-			"job_requirements": handlers.DecodeJSONStringArray(profile.JobRequirements),
-			"job_eligibility":  handlers.DecodeJSONMap(profile.JobEligibility),
-			"hiring_opened_at": handlers.FormatDateISO(profile.HiringOpenedAt),
-		})
-	}
+		activeDivisionJobs := activeJobsByDivisionID[profile.ID]
+		if len(activeDivisionJobs) > 0 {
+			for _, activeJob := range activeDivisionJobs {
+				jobs = append(jobs, map[string]any{
+					"id":                   activeJob["id"],
+					"division":             profile.Name,
+					"division_description": profile.Description,
+					"manager_name":         profile.ManagerName,
+					"capacity":             effectiveCapacity,
+					"current_staff":        currentStaff,
+					"availableSlots":       availableSlots,
+					"isHiring":             true,
+					"title":                activeJob["title"],
+					"description":          activeJob["description"],
+					"requirements":         activeJob["requirements"],
+					"eligibility_criteria": activeJob["eligibility_criteria"],
+					"hiring_opened_at":     activeJob["hiring_opened_at"],
+					"location":             "Divisi " + profile.Name,
+					"type":                 "Full-time",
+				})
+			}
+			continue
+		}
 
-	jobs := make([]map[string]any, 0)
-	for _, division := range divisions {
-		if hiring, ok := division["is_hiring"].(bool); ok && !hiring {
+		if !(profile.IsHiring && profile.JobTitle != nil) {
 			continue
 		}
 		jobs = append(jobs, map[string]any{
-			"id":                   division["id"],
-			"division":             division["name"],
-			"division_description": division["description"],
-			"manager_name":         division["manager_name"],
-			"capacity":             division["capacity"],
-			"current_staff":        division["current_staff"],
-			"availableSlots":       division["available_slots"],
-			"isHiring":             division["is_hiring"],
-			"title":                division["job_title"],
-			"description":          division["job_description"],
-			"requirements":         division["job_requirements"],
-			"eligibility_criteria": division["job_eligibility"],
-			"hiring_opened_at":     division["hiring_opened_at"],
-			"location":             "Divisi " + division["name"].(string),
+			"id":                   profile.ID,
+			"division":             profile.Name,
+			"division_description": profile.Description,
+			"manager_name":         profile.ManagerName,
+			"capacity":             effectiveCapacity,
+			"current_staff":        currentStaff,
+			"availableSlots":       availableSlots,
+			"isHiring":             true,
+			"title":                profile.JobTitle,
+			"description":          profile.JobDescription,
+			"requirements":         handlers.DecodeJSONStringArray(profile.JobRequirements),
+			"eligibility_criteria": handlers.DecodeJSONMap(profile.JobEligibility),
+			"hiring_opened_at":     handlers.FormatDateISO(profile.HiringOpenedAt),
+			"location":             "Divisi " + profile.Name,
 			"type":                 "Full-time",
 		})
 	}
