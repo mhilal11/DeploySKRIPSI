@@ -1,8 +1,4 @@
-﻿import { gsap } from 'gsap';
-import { ArrowRight, MapPin, Wifi, Zap, Globe } from 'lucide-react';
-import { useEffect, useRef } from 'react';
-
-import { Button } from '@/shared/components/ui/button';
+﻿import { Wifi, Zap, Globe } from 'lucide-react';
 
 const ORBIT_POINTS = [
   { x: 100, y: 0 },
@@ -14,80 +10,6 @@ const ORBIT_POINTS = [
 ];
 
 export function HeroSection() {
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const subtextRef = useRef<HTMLParagraphElement>(null);
-  const buttonsRef = useRef<HTMLDivElement>(null);
-  const statsRef = useRef<HTMLDivElement>(null);
-  const illustrationRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-    const buttonChildren = buttonsRef.current
-      ? Array.from(buttonsRef.current.children)
-      : [];
-    const statChildren = statsRef.current
-      ? Array.from(statsRef.current.children)
-      : [];
-
-    if (headingRef.current) {
-      tl.from(headingRef.current, {
-        opacity: 0,
-        y: 50,
-        duration: 1,
-      });
-    }
-
-    if (subtextRef.current) {
-      tl.from(
-        subtextRef.current,
-        {
-          opacity: 0,
-          y: 30,
-          duration: 0.8,
-        },
-        '-=0.5'
-      );
-    }
-
-    if (buttonChildren.length > 0) {
-      tl.from(
-        buttonChildren,
-        {
-          opacity: 0,
-          y: 20,
-          stagger: 0.2,
-          duration: 0.6,
-        },
-        '-=0.4'
-      );
-    }
-
-    if (statChildren.length > 0) {
-      tl.from(
-        statChildren,
-        {
-          opacity: 0,
-          y: 20,
-          stagger: 0.15,
-          duration: 0.6,
-        },
-        '-=0.3'
-      );
-    }
-
-    if (illustrationRef.current) {
-      tl.from(
-        illustrationRef.current,
-        {
-          opacity: 0,
-          scale: 0.8,
-          duration: 1,
-        },
-        '-=1'
-      );
-    }
-  }, []);
-
   return (
     <section
       id="home"
@@ -108,49 +30,23 @@ export function HeroSection() {
         <div className="grid lg:grid-cols-2 gap-8 md:gap-12 items-center">
           {/* Left Content */}
           <div className="space-y-6 md:space-y-8 text-center lg:text-left">
-            <h1
-              ref={headingRef}
-              className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]"
-            >
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
               Internet Cepat &amp; Terpercaya untuk{' '}
               <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-[0_2px_10px_rgba(34,211,238,0.3)]">
                 Semua Orang
               </span>
             </h1>
 
-            <p
-              ref={subtextRef}
-              className="text-lg sm:text-xl text-white/90 max-w-xl mx-auto lg:mx-0 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
-            >
+            <p className="text-lg sm:text-xl text-white/90 max-w-xl mx-auto lg:mx-0 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
               Menghubungkan Anda ke dunia dengan kecepatan kilat.
             </p>
 
-            <div
-              ref={buttonsRef}
-              className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center lg:justify-start"
-            >
-              {/* <Button
-                size="lg"
-                className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-[0_8px_32px_rgba(34,211,238,0.5)] border border-cyan-400/30 backdrop-blur-sm group w-full sm:w-auto rounded-2xl"
-              >
-                Mulai Sekarang
-                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-white/40 bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm group w-full sm:w-auto rounded-2xl shadow-[0_4px_16px_rgba(255,255,255,0.1)]"
-              >
-                <MapPin className="mr-2 w-5 h-5" />
-                Cek Jangkauan
-              </Button> */}
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 justify-center lg:justify-start">
+              {/* tombol CTA sementara disembunyikan */}
             </div>
 
             {/* Stats */}
-            <div
-              ref={statsRef}
-              className="grid grid-cols-3 gap-4 md:gap-6 pt-8"
-            >
+            <div className="grid grid-cols-3 gap-4 md:gap-6 pt-8">
               <div className="space-y-1 bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/10">
                 <div className="text-2xl md:text-3xl bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
                   1J+
@@ -177,7 +73,7 @@ export function HeroSection() {
           </div>
 
           {/* Right Content - Illustration */}
-          <div ref={illustrationRef} className="relative">
+          <div className="relative">
             <div className="relative bg-white/15 backdrop-blur-[30px] rounded-[28px] p-8 md:p-12 shadow-[0_8px_32px_rgba(139,92,246,0.4)] border border-white/30">
               {/* Network Illustration */}
               <div className="relative">
@@ -280,6 +176,3 @@ export function HeroSection() {
     </section>
   );
 }
-
-
-

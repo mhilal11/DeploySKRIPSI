@@ -65,5 +65,17 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Hide native password reveal controls to avoid duplicate eye icon */
+  input[type='password']::-ms-reveal,
+  input[type='password']::-ms-clear {
+    display: none;
+  }
+
+  input[type='password']::-webkit-credentials-auto-fill-button,
+  input[type='password']::-webkit-textfield-decoration-container {
+    visibility: hidden;
+    pointer-events: none;
+  }
 }
 

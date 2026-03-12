@@ -1,7 +1,8 @@
 import { MapPin, Clock, ArrowRight, Users, ListChecks } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect } from 'react';
 
-import { Link } from '@/shared/lib/inertia';
+import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
 
 import { ImageWithFallback } from './figma/ImageWithFallback';
 
@@ -108,6 +109,10 @@ export function CareersSection({ jobs }: CareersSectionProps) {
     });
   }, []);
 
+  const handleApplyNavigate = () => {
+    markLandingSplashSkipOnce();
+  };
+
   const availableJobs = jobs.filter((job) => {
     const hasSlots =
       typeof job.availableSlots === 'number' ? job.availableSlots > 0 : true;
@@ -204,7 +209,8 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                 >
                   {canApply && (
                     <Link
-                      href='/login'
+                      href="/login"
+                      onClick={handleApplyNavigate}
                       aria-label={`Lamar posisi ${title}`}
                       className="absolute inset-0 z-10"
                     />

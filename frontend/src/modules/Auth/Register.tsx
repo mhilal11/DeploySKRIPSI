@@ -1,5 +1,6 @@
 import { ArrowLeft, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { FormEventHandler, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -16,7 +17,7 @@ import {
 } from "@/shared/components/ui/alert-dialog";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
-import { Head, Link, useForm } from "@/shared/lib/inertia";
+import { Head, useForm } from "@/shared/lib/inertia";
 import { markLandingSplashSkipOnce } from "@/shared/lib/landing-splash";
 
 const logo = "/img/LogoLDP.png";
@@ -98,7 +99,7 @@ export default function Register({
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        post(route("register"), {
+        post("/register", {
             onSuccess: () => {
                 toast.success("Pendaftaran berhasil.", {
                     description: "Akun berhasil dibuat. Silakan lanjutkan proses login.",
@@ -139,6 +140,7 @@ export default function Register({
                     <div className="w-full max-w-md">
                         <Link
                             href="/"
+                            onClick={() => markLandingSplashSkipOnce()}
                             className="mb-6 inline-flex items-center gap-2 text-sm text-white/80 transition hover:text-white"
                         >
                             <ArrowLeft className="h-4 w-4" />
@@ -390,7 +392,7 @@ export default function Register({
                             <div className="mt-8 text-center text-sm text-white/80">
                                 Sudah punya akun?{" "}
                                 <Link
-                                    href={route("login")}
+                                    href="/login"
                                     className="font-semibold text-cyan-300 hover:text-cyan-200"
                                 >
                                     Masuk di sini
@@ -417,7 +419,7 @@ export default function Register({
                             <AlertDialogCancel>Tutup</AlertDialogCancel>
                             <AlertDialogAction
                                 onClick={() => {
-                                    window.location.href = route("login");
+                                    window.location.href = "/login";
                                 }}
                             >
                                 Ke Halaman Login

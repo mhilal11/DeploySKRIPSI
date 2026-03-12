@@ -1,11 +1,12 @@
 import { ArrowLeft, Mail } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { FormEventHandler, useEffect, useRef } from 'react';
 
 import InputError from '@/shared/components/InputError';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Head, Link, useForm } from '@/shared/lib/inertia';
+import { Head, useForm } from '@/shared/lib/inertia';
 
 const logo = '/img/LogoLDP.png';
 
@@ -48,7 +49,7 @@ export default function ForgotPassword({ status }: { status?: string }) {
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        post(route('password.email'));
+        post('/forgot-password');
     };
 
     return (
@@ -68,7 +69,7 @@ export default function ForgotPassword({ status }: { status?: string }) {
                 >
                     <div className="w-full max-w-md">
                         <Link
-                            href={route('login')}
+                            href="/login"
                             className="mb-6 inline-flex items-center gap-2 text-sm text-white/80 transition hover:text-white"
                         >
                             <ArrowLeft className="h-4 w-4" />

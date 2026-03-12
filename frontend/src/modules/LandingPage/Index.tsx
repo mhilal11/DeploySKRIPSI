@@ -1,6 +1,7 @@
 'use client';
 
 import 'aos/dist/aos.css';
+import { useEffect } from 'react';
 
 import SplashScreen from '@/shared/components/SplashScreen';
 import { Head } from '@/shared/lib/inertia';
@@ -41,6 +42,15 @@ export default function LandingPage({
   canRegister,
   jobs = [],
 }: LandingPageProps) {
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (!window.location.hash) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }
+  }, []);
+
   return (
     <>
       <Head title="Lintas Data Prima" />

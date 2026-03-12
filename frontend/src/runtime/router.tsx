@@ -26,6 +26,16 @@ const PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
 const PAGE_CACHE_MAX_ENTRIES = 150;
 const pageDataCache = new Map<string, CachedPagePayload>();
 const warmedApiCacheKeys = new Set<string>();
+const DISABLE_TRANSITION_FALLBACK_ROUTES = new Set([
+  'landing',
+  'login',
+  'register',
+  'password.request',
+  'password.reset',
+  'password.setup',
+  'password.confirm',
+  'verification.notice',
+]);
 
 function getCachedPageData(cacheKey: string | null): any | null {
   if (!cacheKey) {
@@ -94,7 +104,7 @@ function PageShell({
   const normalizedSearch = searchString ? `?${searchString}` : '';
   const routeKey = `${name}::${apiEndpoint ?? '__loader__'}::${normalizedSearch}`;
   const cacheKey = buildPageCacheKey(apiEndpoint ?? null, normalizedSearch);
-  const disableTransitionFallback = name === 'login' || name === 'register';
+  const disableTransitionFallback = DISABLE_TRANSITION_FALLBACK_ROUTES.has(name);
   const initialCachedProps = getCachedPageData(cacheKey);
   const [pageProps, setPageProps] = useState<any>(initialCachedProps);
   const [renderedPage, setRenderedPage] = useState<RenderedPageSnapshot | null>(

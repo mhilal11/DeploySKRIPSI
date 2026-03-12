@@ -60,7 +60,7 @@ export default function SetPassword({
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        post(route('password.store'), {
+        post('/reset-password', {
             onFinish: () => reset('password', 'password_confirmation'),
         });
     };

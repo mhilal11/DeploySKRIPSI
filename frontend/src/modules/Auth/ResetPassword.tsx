@@ -5,7 +5,7 @@ import { FormEventHandler, useEffect, useRef, useState } from 'react';
 import InputError from '@/shared/components/InputError';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Head, Link, useForm } from '@/shared/lib/inertia';
+import { Head, useForm } from '@/shared/lib/inertia';
 
 const logo = '/img/LogoLDP.png';
 
@@ -60,7 +60,7 @@ export default function ResetPassword({
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        post(route('password.store'), {
+        post('/reset-password', {
             onFinish: () => reset('password', 'password_confirmation'),
         });
     };

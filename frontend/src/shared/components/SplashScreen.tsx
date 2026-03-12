@@ -29,6 +29,16 @@ function shouldShowLandingSplash(): boolean {
   const navEntry = window.performance.getEntriesByType("navigation")[0] as
     | PerformanceNavigationTiming
     | undefined;
+  const navEntryPathname = navEntry?.name
+    ? new URL(navEntry.name, window.location.origin).pathname
+    : null;
+
+  // If the active document was not loaded at "/", this render is from a
+  // client-side route transition and should never replay splash.
+  if (navEntryPathname && navEntryPathname !== "/") {
+    return false;
+  }
+
   const navigationType = navEntry?.type ?? "navigate";
 
   if (navigationType === "reload") {
@@ -84,6 +94,7 @@ export default function SplashScreen() {
     <AnimatePresence>
       {show && (
         <motion.div
+          data-testid="landing-splash-overlay"
           className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center cursor-pointer"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}

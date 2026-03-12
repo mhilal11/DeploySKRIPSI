@@ -10,7 +10,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        post(route('verification.send'));
+        post('/email/verification-notification');
     };
 
     return (
@@ -38,7 +38,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
                     </PrimaryButton>
 
                     <Link
-                        href={route('logout')}
+                        href="/logout"
                         method="post"
                         as="button"
                         className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"

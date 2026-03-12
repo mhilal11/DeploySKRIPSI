@@ -1,10 +1,10 @@
-import { gsap } from 'gsap';
 import { Menu, X } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useRef, useState, MouseEvent } from 'react';
+import Link from 'next/link';
+import { MouseEvent, useState } from 'react';
 
 import { Button } from '@/shared/components/ui/button';
-import { Link } from '@/shared/lib/inertia';
+import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
 
 const logo = '/img/LogoLDP.png';
 
@@ -14,78 +14,16 @@ type NavbarProps = {
 };
 
 export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
-  const navRef = useRef<HTMLElement>(null);
-  const logoRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonsRef = useRef<HTMLDivElement>(null);
-  const sidebarRef = useRef<HTMLDivElement>(null);
-
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Beranda aktif saat pertama kali masuk
   const [activeItem, setActiveItem] = useState<string>('#home');
 
-  useEffect(() => {
-    if (logoRef.current && menuRef.current && buttonsRef.current) {
-      gsap.from(logoRef.current, {
-        opacity: 0,
-        x: -30,
-        duration: 0.8,
-        ease: 'power3.out',
-      });
-
-      gsap.from(menuRef.current, {
-        opacity: 0,
-        y: -20,
-        duration: 0.6,
-        ease: 'power3.out',
-      });
-
-      gsap.from(buttonsRef.current.children, {
-        opacity: 0,
-        y: -10,
-        duration: 0.5,
-        stagger: 0.1,
-        ease: 'power3.out',
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!sidebarRef.current) return;
-
-    if (isSidebarOpen) {
-      gsap.to(sidebarRef.current, {
-        x: 0,
-        duration: 0.4,
-        ease: 'power3.out',
-      });
-    } else {
-      gsap.to(sidebarRef.current, {
-        x: '100%',
-        duration: 0.4,
-        ease: 'power3.in',
-      });
-    }
-  }, [isSidebarOpen]);
-
-  const handleMenuHover = (e: MouseEvent<HTMLAnchorElement>) => {
-    gsap.to(e.currentTarget, {
-      scale: 1.05,
-      duration: 0.25,
-      ease: 'power2.out',
-    });
-  };
-
-  const handleMenuLeave = (e: MouseEvent<HTMLAnchorElement>) => {
-    gsap.to(e.currentTarget, {
-      scale: 1,
-      duration: 0.25,
-      ease: 'power2.out',
-    });
-  };
-
   const closeSidebar = () => setIsSidebarOpen(false);
+  const handleAuthNavigate = () => {
+    markLandingSplashSkipOnce();
+    setIsSidebarOpen(false);
+  };
 
   const menuItems = [
     { label: 'Beranda', href: '#home' },
@@ -127,13 +65,12 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
   return (
     <>
       <nav
-        ref={navRef}
         className="fixed top-0 left-0 right-0 z-50 bg-white/10 backdrop-blur-[40px] border-b border-white/20 shadow-[0_8px_32px_rgba(139,92,246,0.15)]"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex items-center h-16 md:h-20">
             {/* Logo kiri */}
-            <div ref={logoRef} className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Image
                 src={logo}
                 alt="Lintas Data Prima"
@@ -149,7 +86,6 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
 
             {/* Menu desktop (tengah) */}
             <div
-              ref={menuRef}
               className="hidden lg:flex items-center gap-6 absolute left-1/2 -translate-x-1/2"
             >
               {menuItems.map((item) => {
@@ -160,10 +96,8 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
                     key={item.label}
                     href={item.href}
                     onClick={(e) => handleMenuClick(e, item.href)}
-                    onMouseEnter={handleMenuHover}
-                    onMouseLeave={handleMenuLeave}
                     className={
-                      'inline-flex items-center justify-center rounded-full border px-4 py-1.5 text-sm md:text-base transition-all cursor-pointer ' +
+                      'inline-flex items-center justify-center rounded-full border px-4 py-1.5 text-sm md:text-base transition-all duration-200 cursor-pointer hover:scale-105 ' +
                       (isActive
                         ? 'border-white/70 bg-white/10 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.15)]'
                         : 'border-transparent text-white/85 hover:text-white hover:border-white/40 hover:bg-white/5')
@@ -176,17 +110,14 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
             </div>
 
             {/* Tombol kanan (desktop) */}
-            <div
-              ref={buttonsRef}
-              className="hidden md:flex items-center gap-3 ml-auto"
-            >
+            <div className="hidden md:flex items-center gap-3 ml-auto">
               {canLogin && (
                 <Button
                   asChild
                   variant="ghost"
                   className="text-white hover:text-white bg-white/10 hover:bg-white/15 border border-white/30 backdrop-blur-sm"
                 >
-                  <Link href='/login'>Masuk</Link>
+                  <Link href="/login" onClick={handleAuthNavigate}>Masuk</Link>
                 </Button>
               )}
               {canRegister && (
@@ -194,7 +125,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
                   asChild
                   className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border border-cyan-400/40 shadow-[0_6px_20px_rgba(34,211,238,0.3)]"
                 >
-                  <Link href='/register'>Daftar</Link>
+                  <Link href="/register" onClick={handleAuthNavigate}>Daftar</Link>
                 </Button>
               )}
             </div>
@@ -220,8 +151,9 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
 
       {/* Sidebar mobile */}
       <div
-        ref={sidebarRef}
-        className="fixed top-0 right-0 bottom-0 w-72 bg-white/10 backdrop-blur-[40px] shadow-[0_8px_32px_rgba(139,92,246,0.3)] z-50 lg:hidden transform translate-x-full border-l border-white/20"
+        className={`fixed top-0 right-0 bottom-0 w-72 bg-white/10 backdrop-blur-[40px] shadow-[0_8px_32px_rgba(139,92,246,0.3)] z-50 lg:hidden border-l border-white/20 transition-transform duration-300 ease-out ${
+          isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
       >
         <div className="flex flex-col h-full">
           {/* Header sidebar */}
@@ -273,7 +205,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
                 variant="ghost"
                 className="w-full text-white hover:text-white hover:bg-white/10 backdrop-blur-sm border border-white/20"
               >
-                <Link href='/login'>Masuk</Link>
+                <Link href="/login" onClick={handleAuthNavigate}>Masuk</Link>
               </Button>
             )}
             {canRegister && (
@@ -281,7 +213,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
                 asChild
                 className="w-full bg-white/20 hover:bg-white/30 text-white shadow-[0_8px_32px_rgba(139,92,246,0.3)] border border-white/30 backdrop-blur-sm"
               >
-                <Link href='/register'>Daftar</Link>
+                <Link href="/register" onClick={handleAuthNavigate}>Daftar</Link>
               </Button>
             )}
           </div>

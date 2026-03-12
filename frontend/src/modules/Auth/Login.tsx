@@ -1,5 +1,6 @@
 import { ArrowLeft, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { FormEventHandler, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -15,7 +16,7 @@ import {
 } from '@/shared/components/ui/alert-dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Head, Link, useForm } from '@/shared/lib/inertia';
+import { Head, useForm } from '@/shared/lib/inertia';
 import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
 
 
@@ -89,7 +90,7 @@ export default function Login({
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
-        post(route('login'), {
+        post('/login', {
             onSuccess: (responseData: any) => {
                 if (
                     typeof window !== 'undefined' &&
@@ -137,6 +138,7 @@ export default function Login({
                     <div className="w-full max-w-md">
                         <Link
                             href="/"
+                            onClick={() => markLandingSplashSkipOnce()}
                             className="mb-6 inline-flex items-center gap-2 text-sm text-white/80 transition hover:text-white"
                         >
                             <ArrowLeft className="h-4 w-4" />
@@ -221,7 +223,7 @@ export default function Login({
                                         </label>
                                         {canResetPassword && (
                                             <Link
-                                                href={route('password.request')}
+                                                href="/forgot-password"
                                                 className="text-sm text-cyan-400 hover:text-cyan-300"
                                             >
                                                 Lupa kata sandi?
@@ -290,7 +292,7 @@ export default function Login({
                             <div className="mt-8 text-center text-sm text-white/80">
                                 Belum punya akun?{' '}
                                 <Link
-                                    href={route('register')}
+                                    href="/register"
                                     className="font-semibold text-cyan-300 hover:text-cyan-200"
                                 >
                                     Daftar sekarang
