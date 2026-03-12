@@ -1,4 +1,3 @@
-﻿import { gsap } from 'gsap';
 import { ArrowLeft, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import Image from 'next/image';
 import { FormEventHandler, useEffect, useRef, useState } from 'react';
@@ -60,22 +59,31 @@ export default function Login({
     }, [inactiveMessage]);
 
     useEffect(() => {
-        if (containerRef.current) {
-            gsap.from(containerRef.current, {
-                opacity: 0,
-                duration: 0.4,
-            });
-        }
+        let mounted = true;
+        void import('gsap').then(({ gsap }) => {
+            if (!mounted) {
+                return;
+            }
+            if (containerRef.current) {
+                gsap.from(containerRef.current, {
+                    opacity: 0,
+                    duration: 0.4,
+                });
+            }
 
-        if (cardRef.current) {
-            gsap.from(cardRef.current, {
-                opacity: 0,
-                y: 30,
-                duration: 0.8,
-                delay: 0.15,
-                ease: 'power3.out',
-            });
-        }
+            if (cardRef.current) {
+                gsap.from(cardRef.current, {
+                    opacity: 0,
+                    y: 30,
+                    duration: 0.8,
+                    delay: 0.15,
+                    ease: 'power3.out',
+                });
+            }
+        });
+        return () => {
+            mounted = false;
+        };
     }, []);
 
     const submit: FormEventHandler = (e) => {
@@ -316,4 +324,5 @@ export default function Login({
         </>
     );
 }
+
 
