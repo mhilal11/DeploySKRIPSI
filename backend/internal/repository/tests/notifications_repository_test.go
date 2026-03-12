@@ -47,3 +47,24 @@ func TestListUnreadAuditLogs_ErrorWrapped(t *testing.T) {
 		t.Fatalf("expected contextual error, got %v", err)
 	}
 }
+
+func TestListUnifiedNotificationsPaged_ErrorWrapped(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	queryErr := errors.New("unified notification query fail")
+	mock.ExpectQuery("(?s)SELECT id, type, title, description, url, created_at\\s+FROM \\(").
+		WithArgs(int64(17), 5, 10).
+		WillReturnError(queryErr)
+
+	_, err := repository.ListUnifiedNotificationsPaged(db, 17, 5, 10)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !errors.Is(err, queryErr) {
+		t.Fatalf("expected wrapped query error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "list unified notifications paged") {
+		t.Fatalf("expected contextual error, got %v", err)
+	}
+}
