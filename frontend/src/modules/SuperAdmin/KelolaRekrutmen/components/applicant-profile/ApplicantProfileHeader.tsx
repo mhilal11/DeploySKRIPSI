@@ -32,8 +32,8 @@ export function ApplicantProfileHeader({
     <Card className="overflow-hidden border-0 shadow-lg">
       <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-blue-900 h-32"></div>
       <div className="px-6 pb-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-end gap-6 -mt-16 relative">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row items-start gap-6 relative">
+          <div className="relative -mt-16 shrink-0">
             <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center border-4 border-white shadow-xl overflow-hidden">
               {profilePhotoUrl ? (
                 <Image
@@ -53,7 +53,7 @@ export function ApplicantProfileHeader({
             </div>
           </div>
 
-          <div className="flex-1 mt-4 sm:mt-0">
+          <div className="flex-1 pt-2 sm:pt-6">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
               <div className="space-y-3">
                 <div>
