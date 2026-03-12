@@ -11,7 +11,34 @@ import (
 	dbrepo "hris-backend/internal/repository"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
+
+type recruitmentIndexRepository interface {
+	ListRecruitmentApplicationsPaged(limit, offset int) ([]models.Application, error)
+	CountRecruitmentApplications() (int, error)
+	ListApplicantProfilesByUserIDs(userIDs []int64) (map[int64]*models.ApplicantProfile, error)
+}
+
+type sqlRecruitmentIndexRepository struct {
+	db *sqlx.DB
+}
+
+func newRecruitmentIndexRepository(db *sqlx.DB) recruitmentIndexRepository {
+	return &sqlRecruitmentIndexRepository{db: db}
+}
+
+func (r *sqlRecruitmentIndexRepository) ListRecruitmentApplicationsPaged(limit, offset int) ([]models.Application, error) {
+	return dbrepo.ListRecruitmentApplicationsPaged(r.db, limit, offset)
+}
+
+func (r *sqlRecruitmentIndexRepository) CountRecruitmentApplications() (int, error) {
+	return dbrepo.CountRecruitmentApplications(r.db)
+}
+
+func (r *sqlRecruitmentIndexRepository) ListApplicantProfilesByUserIDs(userIDs []int64) (map[int64]*models.ApplicantProfile, error) {
+	return dbrepo.ListApplicantProfilesByUserIDs(r.db, userIDs)
+}
 
 func SuperAdminRecruitmentIndex(c *gin.Context) {
 	user := middleware.CurrentUser(c)
@@ -21,14 +48,15 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	repo := newRecruitmentIndexRepository(db)
 	pagination := handlers.ParsePagination(c, 20, 100)
 
-	apps, err := dbrepo.ListRecruitmentApplicationsPaged(db, pagination.Limit, pagination.Offset)
+	apps, err := repo.ListRecruitmentApplicationsPaged(pagination.Limit, pagination.Offset)
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat data recruitment")
 		return
 	}
-	totalApplications, _ := dbrepo.CountRecruitmentApplications(db)
+	totalApplications, _ := repo.CountRecruitmentApplications()
 	slaSettings := loadRecruitmentSLASettings(db)
 	now := time.Now()
 	slaOverview := map[string]any{
@@ -41,7 +69,7 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 	slaReminders := make([]map[string]any, 0)
 
 	profileByUser := map[int64]*models.ApplicantProfile{}
-	loadedProfiles, loadErr := dbrepo.ListApplicantProfilesByUserIDs(db, extractApplicationUserIDs(apps))
+	loadedProfiles, loadErr := repo.ListApplicantProfilesByUserIDs(extractApplicationUserIDs(apps))
 	if loadErr == nil {
 		profileByUser = loadedProfiles
 	}

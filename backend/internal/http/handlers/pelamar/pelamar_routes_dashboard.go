@@ -8,7 +8,29 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
+
+type pelamarDashboardRepository interface {
+	ListApplicationsByUserIDPaged(userID int64, limit, offset int) ([]models.Application, error)
+	CountApplicationsByUserID(userID int64) (int, error)
+}
+
+type sqlPelamarDashboardRepository struct {
+	db *sqlx.DB
+}
+
+func newPelamarDashboardRepository(db *sqlx.DB) pelamarDashboardRepository {
+	return &sqlPelamarDashboardRepository{db: db}
+}
+
+func (r *sqlPelamarDashboardRepository) ListApplicationsByUserIDPaged(userID int64, limit, offset int) ([]models.Application, error) {
+	return dbrepo.ListApplicationsByUserIDPaged(r.db, userID, limit, offset)
+}
+
+func (r *sqlPelamarDashboardRepository) CountApplicationsByUserID(userID int64) (int, error) {
+	return dbrepo.CountApplicationsByUserID(r.db, userID)
+}
 
 func RegisterPelamarRoutes(rg *gin.RouterGroup) {
 	rg.GET("/pelamar/dashboard", PelamarDashboard)
@@ -28,7 +50,10 @@ func PelamarDashboard(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	applications, _ := dbrepo.ListApplicationsByUserID(db, user.ID)
+	repo := newPelamarDashboardRepository(db)
+	pagination := handlers.ParsePagination(c, 20, 100)
+	applications, _ := repo.ListApplicationsByUserIDPaged(user.ID, pagination.Limit, pagination.Offset)
+	totalApplications, _ := repo.CountApplicationsByUserID(user.ID)
 
 	var latestApp *models.Application
 	if len(applications) > 0 {
@@ -166,8 +191,13 @@ func PelamarDashboard(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"applicationsStatus": applicationsStatus,
 		"applications":       applicationsData,
+		"pagination": handlers.BuildPaginationMeta(
+			pagination.Page,
+			pagination.Limit,
+			totalApplications,
+		),
 		"stats": gin.H{
-			"totalApplications": len(applications),
+			"totalApplications": totalApplications,
 			"latestStatus": func() any {
 				if latestApp != nil {
 					return latestApp.Status

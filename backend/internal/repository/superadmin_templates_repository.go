@@ -41,6 +41,33 @@ func ListLetterTemplates(db *sqlx.DB) ([]models.LetterTemplate, error) {
 	return rows, wrapRepoErr("list letter templates", err)
 }
 
+func CountLetterTemplates(db *sqlx.DB) (int, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+	var count int
+	err := db.Get(&count, "SELECT COUNT(*) FROM letter_templates")
+	return count, wrapRepoErr("count letter templates", err)
+}
+
+func ListLetterTemplatesPaged(db *sqlx.DB, limit, offset int) ([]models.LetterTemplate, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows := []models.LetterTemplate{}
+	err := db.Select(&rows, "SELECT * FROM letter_templates ORDER BY created_at DESC LIMIT ? OFFSET ?", limit, offset)
+	return rows, wrapRepoErr("list letter templates paged", err)
+}
+
 func CreateLetterTemplate(db *sqlx.DB, input LetterTemplateCreateInput) error {
 	if db == nil {
 		return errors.New("database tidak tersedia")

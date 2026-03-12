@@ -1,6 +1,7 @@
 package superadmin
 
 import (
+	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	dbrepo "hris-backend/internal/repository"
 
@@ -15,7 +16,64 @@ import (
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
+
+type templatesRepository interface {
+	ListLetterTemplatesPaged(limit, offset int) ([]models.LetterTemplate, error)
+	CountLetterTemplates() (int, error)
+	GetLetterTemplateIsActive(id int64) (bool, error)
+	DeactivateAllLetterTemplates() error
+	SetLetterTemplateActive(id int64, active bool) error
+	GetLetterTemplateByID(id int64) (*models.LetterTemplate, error)
+	CreateAndActivateLetterTemplate(input dbrepo.LetterTemplateCreateInput) error
+	UpdateLetterTemplate(input dbrepo.LetterTemplateUpdateInput) error
+	DeleteLetterTemplateByID(id int64) error
+}
+
+type sqlTemplatesRepository struct {
+	db *sqlx.DB
+}
+
+func newTemplatesRepository(db *sqlx.DB) templatesRepository {
+	return &sqlTemplatesRepository{db: db}
+}
+
+func (r *sqlTemplatesRepository) ListLetterTemplatesPaged(limit, offset int) ([]models.LetterTemplate, error) {
+	return dbrepo.ListLetterTemplatesPaged(r.db, limit, offset)
+}
+
+func (r *sqlTemplatesRepository) CountLetterTemplates() (int, error) {
+	return dbrepo.CountLetterTemplates(r.db)
+}
+
+func (r *sqlTemplatesRepository) GetLetterTemplateIsActive(id int64) (bool, error) {
+	return dbrepo.GetLetterTemplateIsActive(r.db, id)
+}
+
+func (r *sqlTemplatesRepository) DeactivateAllLetterTemplates() error {
+	return dbrepo.DeactivateAllLetterTemplates(r.db)
+}
+
+func (r *sqlTemplatesRepository) SetLetterTemplateActive(id int64, active bool) error {
+	return dbrepo.SetLetterTemplateActive(r.db, id, active)
+}
+
+func (r *sqlTemplatesRepository) GetLetterTemplateByID(id int64) (*models.LetterTemplate, error) {
+	return dbrepo.GetLetterTemplateByID(r.db, id)
+}
+
+func (r *sqlTemplatesRepository) CreateAndActivateLetterTemplate(input dbrepo.LetterTemplateCreateInput) error {
+	return dbrepo.CreateAndActivateLetterTemplate(r.db, input)
+}
+
+func (r *sqlTemplatesRepository) UpdateLetterTemplate(input dbrepo.LetterTemplateUpdateInput) error {
+	return dbrepo.UpdateLetterTemplate(r.db, input)
+}
+
+func (r *sqlTemplatesRepository) DeleteLetterTemplateByID(id int64) error {
+	return dbrepo.DeleteLetterTemplateByID(r.db, id)
+}
 
 func SuperAdminTemplatesList(c *gin.Context) {
 	user := middleware.CurrentUser(c)
@@ -25,25 +83,29 @@ func SuperAdminTemplatesList(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	templates, _ := dbrepo.ListLetterTemplates(db)
+	repo := newTemplatesRepository(db)
+	pagination := handlers.ParsePagination(c, 20, 100)
+	templates, _ := repo.ListLetterTemplatesPaged(pagination.Limit, pagination.Offset)
+	totalTemplates, _ := repo.CountLetterTemplates()
 
-	payload := make([]map[string]any, 0, len(templates))
+	payload := make([]dto.LetterTemplateListItem, 0, len(templates))
 	for _, t := range templates {
-		payload = append(payload, map[string]any{
-			"id":         t.ID,
-			"name":       t.Name,
-			"fileName":   t.FileName,
-			"headerText": t.HeaderText,
-			"footerText": t.FooterText,
-			"logoUrl":    handlers.AttachmentURL(c, t.LogoPath),
-			"isActive":   t.IsActive,
-			"createdBy":  handlers.LookupUserName(db, derefInt64(t.CreatedBy)),
-			"createdAt":  handlers.FormatDateTime(t.CreatedAt),
+		payload = append(payload, dto.LetterTemplateListItem{
+			ID:         t.ID,
+			Name:       t.Name,
+			FileName:   t.FileName,
+			HeaderText: t.HeaderText,
+			FooterText: t.FooterText,
+			LogoURL:    handlers.AttachmentURL(c, t.LogoPath),
+			IsActive:   t.IsActive,
+			CreatedBy:  handlers.LookupUserName(db, derefInt64(t.CreatedBy)),
+			CreatedAt:  handlers.FormatDateTime(t.CreatedAt),
 		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"templates":            payload,
+		"pagination":           handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalTemplates),
 		"sidebarNotifications": handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
@@ -97,16 +159,20 @@ func SuperAdminTemplatesIndex(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	templates, _ := dbrepo.ListLetterTemplates(db)
-	payload := make([]map[string]any, 0, len(templates))
+	repo := newTemplatesRepository(db)
+	pagination := handlers.ParsePagination(c, 20, 100)
+	templates, _ := repo.ListLetterTemplatesPaged(pagination.Limit, pagination.Offset)
+	totalTemplates, _ := repo.CountLetterTemplates()
+	payload := make([]dto.LetterTemplateListItem, 0, len(templates))
 	for _, t := range templates {
-		payload = append(payload, map[string]any{
-			"id":        t.ID,
-			"name":      t.Name,
-			"fileName":  t.FileName,
-			"isActive":  t.IsActive,
-			"createdBy": handlers.LookupUserName(db, derefInt64(t.CreatedBy)),
-			"createdAt": handlers.FormatDateTime(t.CreatedAt),
+		payload = append(payload, dto.LetterTemplateListItem{
+			ID:        t.ID,
+			Name:      t.Name,
+			FileName:  t.FileName,
+			LogoURL:   handlers.AttachmentURL(c, t.LogoPath),
+			IsActive:  t.IsActive,
+			CreatedBy: handlers.LookupUserName(db, derefInt64(t.CreatedBy)),
+			CreatedAt: handlers.FormatDateTime(t.CreatedAt),
 		})
 	}
 
@@ -129,6 +195,7 @@ func SuperAdminTemplatesIndex(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"templates":            payload,
+		"pagination":           handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalTemplates),
 		"placeholders":         placeholders,
 		"sidebarNotifications": handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
 	})
@@ -172,8 +239,9 @@ func SuperAdminTemplatesStore(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	repo := newTemplatesRepository(db)
 	now := time.Now()
-	_ = dbrepo.CreateAndActivateLetterTemplate(db, dbrepo.LetterTemplateCreateInput{
+	_ = repo.CreateAndActivateLetterTemplate(dbrepo.LetterTemplateCreateInput{
 		Name:       name,
 		FilePath:   templatePath,
 		FileName:   meta.OriginalName,
@@ -200,13 +268,14 @@ func SuperAdminTemplatesToggle(c *gin.Context) {
 		return
 	}
 	db := middleware.GetDB(c)
+	repo := newTemplatesRepository(db)
 
-	active, _ := dbrepo.GetLetterTemplateIsActive(db, id)
+	active, _ := repo.GetLetterTemplateIsActive(id)
 
 	if !active {
-		_ = dbrepo.DeactivateAllLetterTemplates(db)
+		_ = repo.DeactivateAllLetterTemplates()
 	}
-	_ = dbrepo.SetLetterTemplateActive(db, id, !active)
+	_ = repo.SetLetterTemplateActive(id, !active)
 
 	c.JSON(http.StatusOK, gin.H{"status": "Template diperbarui."})
 }
@@ -224,7 +293,8 @@ func SuperAdminTemplatesDownload(c *gin.Context) {
 		return
 	}
 	db := middleware.GetDB(c)
-	template, err := dbrepo.GetLetterTemplateByID(db, id)
+	repo := newTemplatesRepository(db)
+	template, err := repo.GetLetterTemplateByID(id)
 	if err != nil || template == nil {
 		handlers.JSONError(c, http.StatusNotFound, "Template tidak ditemukan")
 		return
@@ -289,7 +359,8 @@ func SuperAdminTemplatesUpdate(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
-	template, err := dbrepo.GetLetterTemplateByID(db, id)
+	repo := newTemplatesRepository(db)
+	template, err := repo.GetLetterTemplateByID(id)
 	if err != nil || template == nil {
 		handlers.JSONError(c, http.StatusNotFound, "Template tidak ditemukan")
 		return
@@ -321,7 +392,7 @@ func SuperAdminTemplatesUpdate(c *gin.Context) {
 		}
 	}
 
-	_ = dbrepo.UpdateLetterTemplate(db, dbrepo.LetterTemplateUpdateInput{
+	_ = repo.UpdateLetterTemplate(dbrepo.LetterTemplateUpdateInput{
 		ID:         id,
 		Name:       name,
 		FilePath:   filePath,
@@ -359,9 +430,10 @@ func SuperAdminTemplatesDelete(c *gin.Context) {
 		return
 	}
 	db := middleware.GetDB(c)
+	repo := newTemplatesRepository(db)
 
-	template, _ := dbrepo.GetLetterTemplateByID(db, id)
-	_ = dbrepo.DeleteLetterTemplateByID(db, id)
+	template, _ := repo.GetLetterTemplateByID(id)
+	_ = repo.DeleteLetterTemplateByID(id)
 
 	cfg := middleware.GetConfig(c)
 	if template != nil && template.FilePath != "" {
