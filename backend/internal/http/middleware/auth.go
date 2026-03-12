@@ -2,6 +2,10 @@ package middleware
 
 import (
 	"database/sql"
+	"encoding/json"
+	"net/http"
+	"strconv"
+	"strings"
 
 	"hris-backend/internal/models"
 
@@ -18,16 +22,10 @@ func LoadCurrentUser() gin.HandlerFunc {
 			return
 		}
 
-		userID, ok := userIDRaw.(int64)
+		userID, ok := parseSessionUserID(userIDRaw)
 		if !ok {
-			if idFloat, ok := userIDRaw.(float64); ok {
-				userID = int64(idFloat)
-			} else if idInt, ok := userIDRaw.(int); ok {
-				userID = int64(idInt)
-			} else {
-				c.Next()
-				return
-			}
+			c.Next()
+			return
 		}
 
 		db := GetDB(c)
@@ -41,7 +39,10 @@ func LoadCurrentUser() gin.HandlerFunc {
 		if err != nil {
 			if err == sql.ErrNoRows {
 				session.Delete("user_id")
-				_ = session.Save()
+				if saveErr := session.Save(); saveErr != nil {
+					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Gagal menyinkronkan sesi pengguna"})
+					return
+				}
 			}
 			c.Next()
 			return
@@ -49,6 +50,30 @@ func LoadCurrentUser() gin.HandlerFunc {
 
 		c.Set(ctxUserKey, &user)
 		c.Next()
+	}
+}
+
+func parseSessionUserID(raw any) (int64, bool) {
+	switch v := raw.(type) {
+	case int64:
+		return v, v > 0
+	case int:
+		id := int64(v)
+		return id, id > 0
+	case int32:
+		id := int64(v)
+		return id, id > 0
+	case float64:
+		id := int64(v)
+		return id, id > 0
+	case json.Number:
+		id, err := v.Int64()
+		return id, err == nil && id > 0
+	case string:
+		id, err := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		return id, err == nil && id > 0
+	default:
+		return 0, false
 	}
 }
 

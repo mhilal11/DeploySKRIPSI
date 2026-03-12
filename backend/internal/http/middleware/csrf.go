@@ -18,7 +18,10 @@ func EnsureCSRFToken() gin.HandlerFunc {
 			if err == nil {
 				token = newToken
 				session.Set("csrf_token", token)
-				_ = session.Save()
+				if saveErr := session.Save(); saveErr != nil {
+					c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"message": "Gagal menyimpan token CSRF"})
+					return
+				}
 			}
 		}
 

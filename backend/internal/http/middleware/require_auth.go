@@ -18,7 +18,11 @@ func RequireAuth() gin.HandlerFunc {
 		if user.Status == "Inactive" {
 			session := sessions.Default(c)
 			session.Clear()
-			_ = session.Save()
+			if err := session.Save(); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"message": "Gagal menghapus sesi"})
+				c.Abort()
+				return
+			}
 			c.JSON(http.StatusForbidden, gin.H{"message": "Account inactive"})
 			c.Abort()
 			return

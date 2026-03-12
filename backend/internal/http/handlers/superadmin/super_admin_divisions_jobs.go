@@ -74,11 +74,17 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 	if strings.TrimSpace(req.JobDescription) == "" {
 		validationErrors["job_description"] = "Deskripsi pekerjaan wajib diisi."
 	}
+	handlers.ValidateFieldLength(validationErrors, "job_title", "Judul pekerjaan", req.JobTitle, 180)
+	handlers.ValidateFieldLength(validationErrors, "job_description", "Deskripsi pekerjaan", req.JobDescription, 6000)
 
 	cleaned := []string{}
 	for _, reqStr := range req.JobRequirements {
 		reqStr = strings.TrimSpace(reqStr)
 		if reqStr != "" {
+			if len([]rune(reqStr)) > 400 {
+				validationErrors["job_requirements"] = "Setiap persyaratan maksimal 400 karakter."
+				continue
+			}
 			cleaned = append(cleaned, reqStr)
 		}
 	}

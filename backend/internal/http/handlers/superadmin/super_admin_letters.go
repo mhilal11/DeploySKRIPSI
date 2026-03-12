@@ -131,6 +131,18 @@ func SuperAdminLettersStore(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"jenis_surat": "Data surat tidak lengkap."})
 		return
 	}
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "jenis_surat", "Jenis surat", jenis, 80)
+	handlers.ValidateFieldLength(validationErrors, "perihal", "Perihal", perihal, 220)
+	handlers.ValidateFieldLength(validationErrors, "isi_surat", "Isi surat", isiSurat, 8000)
+	handlers.ValidateFieldLength(validationErrors, "kategori", "Kategori", kategori, 80)
+	handlers.ValidateFieldLength(validationErrors, "prioritas", "Prioritas", prioritas, 24)
+	handlers.ValidateFieldLength(validationErrors, "penerima", "Penerima", penerima, 120)
+	handlers.ValidateFieldLength(validationErrors, "target_division", "Divisi tujuan", targetDivision, 120)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
+	}
 
 	departemenID := handlers.EnsureDepartemen(db, user.Division)
 
@@ -360,7 +372,12 @@ func SuperAdminLettersExportWord(c *gin.Context) {
 	}
 
 	filePath, fileName := generateDispositionDocument(c, db, surat)
-	absPath := filepath.Join(middleware.GetConfig(c).StoragePath, filePath)
+	normalizedPath := handlers.NormalizeAttachmentPath(filePath)
+	absPath, ok := resolveStorageFilePath(middleware.GetConfig(c).StoragePath, normalizedPath)
+	if !ok {
+		handlers.JSONError(c, http.StatusUnprocessableEntity, "Path dokumen disposisi tidak valid.")
+		return
+	}
 	c.FileAttachment(absPath, fileName)
 }
 
@@ -375,9 +392,11 @@ func generateDispositionDocument(c *gin.Context, db *sqlx.DB, surat *models.Sura
 	template, err := dbrepo.GetActiveLetterTemplate(db)
 	var tempFile string
 	if err == nil && template != nil && template.FilePath != "" {
-		templatePath := filepath.Join(middleware.GetConfig(c).StoragePath, template.FilePath)
-		if _, err := os.Stat(templatePath); err == nil {
-			tempFile, _ = services.ReplaceDocxPlaceholders(templatePath, placeholders)
+		templatePath := handlers.NormalizeAttachmentPath(template.FilePath)
+		if resolvedTemplatePath, ok := resolveStorageFilePath(middleware.GetConfig(c).StoragePath, templatePath); ok {
+			if _, err := os.Stat(resolvedTemplatePath); err == nil {
+				tempFile, _ = services.ReplaceDocxPlaceholders(resolvedTemplatePath, placeholders)
+			}
 		}
 	}
 

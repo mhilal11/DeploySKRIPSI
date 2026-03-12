@@ -263,6 +263,15 @@ func StaffComplaintsStore(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"category": "Kategori wajib diisi.", "subject": "Subjek wajib diisi.", "description": "Deskripsi wajib diisi."})
 		return
 	}
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "category", "Kategori", category, 80)
+	handlers.ValidateFieldLength(validationErrors, "subject", "Subjek", subject, 160)
+	handlers.ValidateFieldLength(validationErrors, "description", "Deskripsi", description, 4000)
+	handlers.ValidateFieldLength(validationErrors, "priority", "Prioritas", priority, 24)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
+	}
 
 	if priority == "" {
 		priority = models.ComplaintPriorityMedium
@@ -392,6 +401,14 @@ func StaffResignationStore(c *gin.Context) {
 
 	if effectiveDate == "" || reason == "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"effective_date": "Tanggal efektif wajib diisi.", "reason": "Alasan wajib diisi."})
+		return
+	}
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "effective_date", "Tanggal efektif", effectiveDate, 30)
+	handlers.ValidateFieldLength(validationErrors, "reason", "Alasan", reason, 3000)
+	handlers.ValidateFieldLength(validationErrors, "suggestion", "Saran", suggestion, 3000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
 		return
 	}
 
