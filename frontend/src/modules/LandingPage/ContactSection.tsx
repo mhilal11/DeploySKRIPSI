@@ -1,5 +1,6 @@
 ﻿import AOS from 'aos';
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
+import Image from 'next/image';
 import { useEffect } from 'react';
 
 import { Button } from '@/shared/components/ui/button';
@@ -48,7 +49,7 @@ export function ContactSection() {
           {/* Company Info */}
           <div data-aos="fade-up" data-aos-delay="0">
             <div className="flex items-center gap-2 mb-6">
-              <img src={logo} alt="Lintas Data Prima" className="w-10 h-10" />
+              <Image src={logo} alt="Lintas Data Prima" width={40} height={40} className="w-10 h-10" />
               <span className="text-xl text-white">Lintas Data Prima</span>
             </div>
             <p className="text-white/80 mb-6">

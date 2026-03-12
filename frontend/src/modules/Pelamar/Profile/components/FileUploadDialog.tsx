@@ -1,4 +1,5 @@
-﻿import { Upload, FileText, ImageIcon, X, Check, CloudUpload } from 'lucide-react';
+import { Upload, FileText, ImageIcon, X, Check, CloudUpload } from 'lucide-react';
+import Image from 'next/image';
 import { useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 
@@ -170,9 +171,12 @@ export default function FileUploadDialog({
                                 {/* Thumbnail */}
                                 <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border border-slate-100 bg-slate-50">
                                     {previewUrl && !isPdf ? (
-                                        <img
+                                        <Image
                                             src={previewUrl}
                                             alt="Preview"
+                                            width={80}
+                                            height={80}
+                                            unoptimized
                                             className="h-full w-full object-cover"
                                         />
                                     ) : (
@@ -279,6 +283,7 @@ export default function FileUploadDialog({
         </Dialog>
     );
 }
+
 
 
 

@@ -1,5 +1,6 @@
 ﻿import { gsap } from "gsap";
 import { ArrowLeft, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+import Image from "next/image";
 import { FormEventHandler, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -142,9 +143,11 @@ export default function Register({
                         >
                             <div className="mb-8 text-center">
                                 <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-white/10">
-                                    <img
+                                    <Image
                                         src={logo}
                                         alt="Lintas Data Prima"
+                                        width={48}
+                                        height={48}
                                         className="h-12 w-12 object-contain"
                                     />
                                 </div>

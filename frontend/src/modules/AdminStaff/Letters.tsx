@@ -247,14 +247,12 @@ export default function AdminStaffLetters() {
       return;
     }
 
-    const ziggyHasReplyRoute =
-      typeof window !== 'undefined' &&
-      typeof window.route === 'function' &&
-      window?.Ziggy?.routes?.['admin-staff.letters.reply'];
-
-    const replyEndpoint = ziggyHasReplyRoute
-      ? route('admin-staff.letters.reply', selectedLetter.id)
-      : `/admin-staff/kelola-surat/${selectedLetter.id}/reply`;
+    let replyEndpoint = `/admin-staff/kelola-surat/${selectedLetter.id}/reply`;
+    try {
+      replyEndpoint = route('admin-staff.letters.reply', selectedLetter.id);
+    } catch {
+      // fallback kept for environments where this route is not registered in Ziggy
+    }
 
     replyForm.post(replyEndpoint, {
       preserveScroll: true,

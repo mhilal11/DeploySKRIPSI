@@ -1,4 +1,5 @@
-﻿import { Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
+import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -410,9 +411,12 @@ export default function ComplaintComposerDialog({
                                         </div>
                                         {form.data.attachment.type.startsWith('image/') && (
                                             <div className="overflow-hidden rounded-lg border border-slate-100">
-                                                <img
+                                                <Image
                                                     src={URL.createObjectURL(form.data.attachment)}
                                                     alt="Preview lampiran"
+                                                    width={512}
+                                                    height={192}
+                                                    unoptimized
                                                     className="max-h-48 w-full object-cover"
                                                     onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
                                                 />
@@ -453,6 +457,7 @@ export default function ComplaintComposerDialog({
         </Dialog>
     );
 }
+
 
 
 

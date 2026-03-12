@@ -1,4 +1,5 @@
-﻿import { Camera, User as UserIcon } from 'lucide-react';
+import { Camera, User as UserIcon } from 'lucide-react';
+import Image from 'next/image';
 
 import { Badge } from '@/shared/components/ui/badge';
 import { Card } from '@/shared/components/ui/card';
@@ -38,9 +39,12 @@ export default function ProfileHeader({
             >
                 <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full border-4 border-blue-900 bg-slate-100 shadow-md">
                     {photoPreview ? (
-                        <img
+                        <Image
                             src={photoPreview}
                             alt="Foto profil"
+                            width={avatarSize}
+                            height={avatarSize}
+                            unoptimized
                             className="h-full w-full object-cover"
                         />
                     ) : (
@@ -115,5 +119,6 @@ export default function ProfileHeader({
         </Card>
     );
 }
+
 
 
