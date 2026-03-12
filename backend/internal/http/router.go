@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"hris-backend/internal/config"
+	basehandlers "hris-backend/internal/http/handlers"
 	adminhandlers "hris-backend/internal/http/handlers/admin"
 	authhandlers "hris-backend/internal/http/handlers/auth"
 	dashboardhandlers "hris-backend/internal/http/handlers/dashboard"
@@ -107,7 +108,11 @@ func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 		}
 	}
 
-	r.Static("/storage", cfg.StoragePath)
+	if !cfg.DisableBackgroundWorker {
+		superadminhandlers.StartRecruitmentAIScreeningWorker(db, cfg)
+	}
+
+	r.GET("/storage/*filepath", basehandlers.ServeStorageFile)
 
 	return r
 }
