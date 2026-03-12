@@ -2,7 +2,6 @@ package auth
 
 import (
 	"crypto/hmac"
-	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -62,6 +61,10 @@ type authRepository interface {
 	SavePasswordResetToken(email, token string, now time.Time) error
 	GetPasswordResetTokenByEmail(email string) (*dbrepo.PasswordResetTokenRecord, error)
 	DeletePasswordResetTokenByEmail(email string) error
+	SaveEmailVerificationToken(userID int64, tokenHash string, expiresAt, now time.Time) error
+	GetEmailVerificationTokenByHash(tokenHash string) (*dbrepo.EmailVerificationTokenRecord, error)
+	DeleteEmailVerificationTokenByUserID(userID int64) error
+	DeleteEmailVerificationTokenByHash(tokenHash string) error
 	UpdateUserPasswordByEmail(email, passwordHash string) error
 	GetUserByID(userID int64) (*models.User, error)
 	MarkUserEmailVerified(userID int64, now time.Time) error
@@ -101,6 +104,22 @@ func (r *sqlAuthRepository) GetPasswordResetTokenByEmail(email string) (*dbrepo.
 
 func (r *sqlAuthRepository) DeletePasswordResetTokenByEmail(email string) error {
 	return dbrepo.DeletePasswordResetTokenByEmail(r.db, email)
+}
+
+func (r *sqlAuthRepository) SaveEmailVerificationToken(userID int64, tokenHash string, expiresAt, now time.Time) error {
+	return dbrepo.SaveEmailVerificationToken(r.db, userID, tokenHash, expiresAt, now)
+}
+
+func (r *sqlAuthRepository) GetEmailVerificationTokenByHash(tokenHash string) (*dbrepo.EmailVerificationTokenRecord, error) {
+	return dbrepo.GetEmailVerificationTokenByHash(r.db, tokenHash)
+}
+
+func (r *sqlAuthRepository) DeleteEmailVerificationTokenByUserID(userID int64) error {
+	return dbrepo.DeleteEmailVerificationTokenByUserID(r.db, userID)
+}
+
+func (r *sqlAuthRepository) DeleteEmailVerificationTokenByHash(tokenHash string) error {
+	return dbrepo.DeleteEmailVerificationTokenByHash(r.db, tokenHash)
 }
 
 func (r *sqlAuthRepository) UpdateUserPasswordByEmail(email, passwordHash string) error {
@@ -448,6 +467,50 @@ func VerificationNotification(c *gin.Context) {
 }
 
 func VerifyEmail(c *gin.Context) {
+	token := strings.TrimSpace(c.Query("token"))
+
+	db := middleware.GetDB(c)
+	repo := newAuthRepository(db)
+	if token != "" {
+		if field, msg := validateAuthFieldLengths(token, maxTokenLength, "Token"); field != "" {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"token": msg})
+			return
+		}
+
+		tokenHash := sha256Hex(token)
+		record, err := repo.GetEmailVerificationTokenByHash(tokenHash)
+		if err != nil || record == nil {
+			handlers.JSONError(c, http.StatusBadRequest, "Invalid verification request")
+			return
+		}
+		now := time.Now()
+		if now.After(record.ExpiresAt) {
+			_ = repo.DeleteEmailVerificationTokenByHash(tokenHash)
+			handlers.JSONError(c, http.StatusGone, "Link verifikasi sudah kedaluwarsa.")
+			return
+		}
+
+		user, err := repo.GetUserByID(record.UserID)
+		if err != nil || user == nil {
+			handlers.JSONError(c, http.StatusNotFound, "User tidak ditemukan")
+			return
+		}
+
+		if user.EmailVerifiedAt == nil {
+			_ = repo.MarkUserEmailVerified(user.ID, now)
+		}
+		_ = repo.DeleteEmailVerificationTokenByUserID(user.ID)
+
+		redirectURL := "/dashboard"
+		if wantsJSON(c) {
+			c.JSON(http.StatusOK, gin.H{"status": "verified", "redirect_to": redirectURL})
+			return
+		}
+		c.Redirect(http.StatusFound, middleware.GetConfig(c).FrontendURL+redirectURL)
+		return
+	}
+
+	// Legacy signed-link fallback for already-sent links.
 	id := c.Param("id")
 	hash := c.Param("hash")
 	if id == "" {
@@ -476,8 +539,6 @@ func VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	db := middleware.GetDB(c)
-	repo := newAuthRepository(db)
 	user, err := repo.GetUserByID(userID)
 	if err != nil || user == nil {
 		handlers.JSONError(c, http.StatusNotFound, "User tidak ditemukan")
@@ -485,8 +546,7 @@ func VerifyEmail(c *gin.Context) {
 	}
 
 	expectedHash := sha256Hex(user.Email)
-	legacyHash := sha1LegacyHex(user.Email)
-	if hash != expectedHash && hash != legacyHash {
+	if hash != expectedHash {
 		handlers.JSONError(c, http.StatusBadRequest, "Invalid verification request")
 		return
 	}
@@ -527,11 +587,20 @@ func dashboardPathFor(user models.User) string {
 
 func buildVerificationLink(c *gin.Context, user *models.User) (string, error) {
 	cfg := middleware.GetConfig(c)
-	expires := time.Now().Add(60 * time.Minute).Unix()
-	hash := sha256Hex(user.Email)
-	signature := signVerification(cfg.CSRFSecret, user.ID, hash, expires)
-	path := "/verify-email/" + strconv.FormatInt(user.ID, 10) + "/" + hash
-	link := cfg.BaseURL + path + "?expires=" + strconv.FormatInt(expires, 10) + "&signature=" + signature
+	db := middleware.GetDB(c)
+	repo := newAuthRepository(db)
+
+	token, err := utils.RandomToken(32)
+	if err != nil || strings.TrimSpace(token) == "" {
+		return "", fmt.Errorf("gagal membuat token verifikasi")
+	}
+
+	now := time.Now()
+	expiresAt := now.Add(60 * time.Minute)
+	if err := repo.SaveEmailVerificationToken(user.ID, sha256Hex(token), expiresAt, now); err != nil {
+		return "", err
+	}
+	link := cfg.BaseURL + "/verify-email?token=" + url.QueryEscape(token)
 	return link, nil
 }
 
@@ -579,11 +648,6 @@ func signVerification(secret string, userID int64, hash string, expires int64) s
 func verifySignature(secret string, userID int64, hash string, expires int64, signature string) bool {
 	expected := signVerification(secret, userID, hash, expires)
 	return hmac.Equal([]byte(expected), []byte(signature))
-}
-
-func sha1LegacyHex(value string) string {
-	sum := sha1.Sum([]byte(value))
-	return hex.EncodeToString(sum[:])
 }
 
 func sha256Hex(value string) string {
