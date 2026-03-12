@@ -16,6 +16,42 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+type complaintsRepository interface {
+	ListComplaintsByFiltersPaged(filters dbrepo.ComplaintListFilters, limit, offset int) ([]models.Complaint, error)
+	CountComplaintsByFilters(filters dbrepo.ComplaintListFilters) (int, error)
+	GetComplaintByID(id int64) (*models.Complaint, error)
+	UpdateComplaint(input dbrepo.ComplaintUpdateInput) error
+	GetUserByID(userID int64) (*models.User, error)
+}
+
+type sqlComplaintsRepository struct {
+	db *sqlx.DB
+}
+
+func newComplaintsRepository(db *sqlx.DB) complaintsRepository {
+	return &sqlComplaintsRepository{db: db}
+}
+
+func (r *sqlComplaintsRepository) ListComplaintsByFiltersPaged(filters dbrepo.ComplaintListFilters, limit, offset int) ([]models.Complaint, error) {
+	return dbrepo.ListComplaintsByFiltersPaged(r.db, filters, limit, offset)
+}
+
+func (r *sqlComplaintsRepository) CountComplaintsByFilters(filters dbrepo.ComplaintListFilters) (int, error) {
+	return dbrepo.CountComplaintsByFilters(r.db, filters)
+}
+
+func (r *sqlComplaintsRepository) GetComplaintByID(id int64) (*models.Complaint, error) {
+	return dbrepo.GetComplaintByID(r.db, id)
+}
+
+func (r *sqlComplaintsRepository) UpdateComplaint(input dbrepo.ComplaintUpdateInput) error {
+	return dbrepo.UpdateComplaint(r.db, input)
+}
+
+func (r *sqlComplaintsRepository) GetUserByID(userID int64) (*models.User, error) {
+	return dbrepo.GetUserByID(r.db, userID)
+}
+
 func SuperAdminComplaintsIndex(c *gin.Context) {
 	user := middleware.CurrentUser(c)
 	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
@@ -24,6 +60,7 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	repo := newComplaintsRepository(db)
 
 	filters := map[string]string{
 		"search":   strings.TrimSpace(c.Query("search")),
@@ -31,13 +68,16 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		"priority": strings.TrimSpace(c.Query("priority")),
 		"category": strings.TrimSpace(c.Query("category")),
 	}
+	pagination := handlers.ParsePagination(c, 20, 100)
 
-	complaints, _ := dbrepo.ListComplaintsByFilters(db, dbrepo.ComplaintListFilters{
+	filterConfig := dbrepo.ComplaintListFilters{
 		Search:   filters["search"],
 		Status:   normalizeComplaintStatus(filters["status"]),
 		Priority: normalizeComplaintPriority(filters["priority"]),
 		Category: filters["category"],
-	})
+	}
+	complaints, _ := repo.ListComplaintsByFiltersPaged(filterConfig, pagination.Limit, pagination.Offset)
+	totalComplaints, _ := repo.CountComplaintsByFilters(filterConfig)
 
 	data := make([]map[string]any, 0, len(complaints))
 	categoryOptions := map[string]bool{}
@@ -58,7 +98,7 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		reporterEmail := ""
 		if !complaint.IsAnonymous {
 			reporterName = handlers.LookupUserName(db, complaint.UserID)
-			reporterEmail = lookupUserEmail(db, complaint.UserID)
+			reporterEmail = lookupUserEmail(repo, complaint.UserID)
 		}
 		var handlerName any = nil
 		if complaint.HandledByID != nil {
@@ -96,11 +136,20 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 	}
 
 	stats := map[string]int{
-		"total":       len(complaints),
-		"new":         countComplaintsByStatus(complaints, models.ComplaintStatusNew),
-		"in_progress": countComplaintsByStatus(complaints, models.ComplaintStatusInProgress),
-		"resolved":    countComplaintsByStatus(complaints, models.ComplaintStatusResolved),
+		"total":       totalComplaints,
+		"new":         0,
+		"in_progress": 0,
+		"resolved":    0,
 	}
+	newFilter := filterConfig
+	newFilter.Status = models.ComplaintStatusNew
+	stats["new"], _ = repo.CountComplaintsByFilters(newFilter)
+	inProgressFilter := filterConfig
+	inProgressFilter.Status = models.ComplaintStatusInProgress
+	stats["in_progress"], _ = repo.CountComplaintsByFilters(inProgressFilter)
+	resolvedFilter := filterConfig
+	resolvedFilter.Status = models.ComplaintStatusResolved
+	stats["resolved"], _ = repo.CountComplaintsByFilters(resolvedFilter)
 
 	categories := []string{}
 	for k := range categoryOptions {
@@ -124,6 +173,7 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 			"data":  data,
 			"links": []any{},
 		},
+		"pagination":           handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalComplaints),
 		"statusOptions":        statusOptions,
 		"priorityOptions":      priorityOptions,
 		"categoryOptions":      categories,
@@ -151,15 +201,22 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 	status := normalizeComplaintStatus(payload.Status)
 	priority := normalizeComplaintPriority(payload.Priority)
 	resolution := strings.TrimSpace(payload.ResolutionNotes)
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "resolution_notes", "Catatan penyelesaian", resolution, 4000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
+	}
 
 	db := middleware.GetDB(c)
+	repo := newComplaintsRepository(db)
 	complaintID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil || complaintID <= 0 {
 		handlers.JSONError(c, http.StatusBadRequest, "ID pengaduan tidak valid")
 		return
 	}
 
-	existing, err := dbrepo.GetComplaintByID(db, complaintID)
+	existing, err := repo.GetComplaintByID(complaintID)
 	if err != nil || existing == nil {
 		handlers.JSONError(c, http.StatusNotFound, "Pengaduan tidak ditemukan")
 		return
@@ -184,7 +241,7 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 		resolvedAt = &now
 	}
 
-	_ = dbrepo.UpdateComplaint(db, dbrepo.ComplaintUpdateInput{
+	_ = repo.UpdateComplaint(dbrepo.ComplaintUpdateInput{
 		ID:              complaintID,
 		Status:          status,
 		Priority:        priority,
@@ -194,16 +251,6 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{"status": "Pengaduan berhasil diperbarui."})
-}
-
-func countComplaintsByStatus(list []models.Complaint, status string) int {
-	count := 0
-	for _, complaint := range list {
-		if normalizeComplaintStatus(complaint.Status) == status {
-			count++
-		}
-	}
-	return count
 }
 
 func normalizeComplaintStatus(raw string) string {
@@ -250,8 +297,8 @@ func complaintPriorityLabel(priority string) string {
 	return "-"
 }
 
-func lookupUserEmail(db *sqlx.DB, userID int64) string {
-	user, err := dbrepo.GetUserByID(db, userID)
+func lookupUserEmail(repo complaintsRepository, userID int64) string {
+	user, err := repo.GetUserByID(userID)
 	if err != nil || user == nil {
 		return ""
 	}

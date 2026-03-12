@@ -14,8 +14,8 @@ func TestListSuratByFilters_ErrorWrapped(t *testing.T) {
 	defer cleanup()
 
 	queryErr := errors.New("list fail")
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM surat WHERE (nomor_surat LIKE ? OR perihal LIKE ? OR penerima LIKE ?) AND kategori = ? ORDER BY tanggal_surat DESC, surat_id DESC")).
-		WithArgs("%memo%", "%memo%", "%memo%", "Internal").
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM surat WHERE (nomor_surat LIKE ? OR perihal LIKE ? OR penerima LIKE ?) AND kategori = ? ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ? OFFSET ?")).
+		WithArgs("%memo%", "%memo%", "%memo%", "Internal", 200, 0).
 		WillReturnError(queryErr)
 
 	_, err := repository.ListSuratByFilters(db, repository.SuratListFilters{

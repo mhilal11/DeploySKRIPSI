@@ -36,7 +36,7 @@ func SuperAdminAccountsStore(c *gin.Context) {
 	passwordConfirmation := strings.TrimSpace(c.PostForm("password_confirmation"))
 
 	db := middleware.GetDB(c)
-	fieldErrors, err := validateAccountInput(c, db, role, division, name, email, status, password, passwordConfirmation)
+	fieldErrors, err := validateAccountInput(c, db, role, division, name, email, status, registeredAt, inactiveAt, password, passwordConfirmation)
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memvalidasi data akun")
 		return
@@ -139,7 +139,7 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 	password := strings.TrimSpace(c.PostForm("password"))
 
 	db := middleware.GetDB(c)
-	fieldErrors, err := validateAccountInput(c, db, role, division, name, email, status, "_skip_password_", "_skip_password_")
+	fieldErrors, err := validateAccountInput(c, db, role, division, name, email, status, registeredAt, inactiveAt, "_skip_password_", "_skip_password_")
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memvalidasi data akun")
 		return
@@ -407,6 +407,8 @@ func validateAccountInput(
 	name string,
 	email string,
 	status string,
+	registeredAt string,
+	inactiveAt string,
 	password string,
 	passwordConfirmation string,
 ) (handlers.FieldErrors, error) {
@@ -423,6 +425,13 @@ func validateAccountInput(
 	if status == "" {
 		fieldErrors["status"] = "Status wajib dipilih."
 	}
+	handlers.ValidateFieldLength(fieldErrors, "name", "Nama", name, 120)
+	handlers.ValidateFieldLength(fieldErrors, "email", "Email", email, 254)
+	handlers.ValidateFieldLength(fieldErrors, "role", "Role", role, 40)
+	handlers.ValidateFieldLength(fieldErrors, "division", "Divisi", division, 120)
+	handlers.ValidateFieldLength(fieldErrors, "status", "Status", status, 24)
+	handlers.ValidateFieldLength(fieldErrors, "registered_at", "Tanggal registrasi", registeredAt, 30)
+	handlers.ValidateFieldLength(fieldErrors, "inactive_at", "Tanggal nonaktif", inactiveAt, 30)
 
 	checkPassword := password != "_skip_password_" || passwordConfirmation != "_skip_password_"
 	if checkPassword {
@@ -435,6 +444,8 @@ func validateAccountInput(
 		if password != "" && passwordConfirmation != "" && password != passwordConfirmation {
 			fieldErrors["password_confirmation"] = "Konfirmasi password tidak sama."
 		}
+		handlers.ValidateFieldLength(fieldErrors, "password", "Password", password, 128)
+		handlers.ValidateFieldLength(fieldErrors, "password_confirmation", "Konfirmasi password", passwordConfirmation, 128)
 	}
 
 	if role == models.RoleAdmin || role == models.RoleStaff {
@@ -448,15 +459,21 @@ func validateAccountInput(
 	}
 
 	if role == models.RoleStaff {
-		if strings.TrimSpace(c.PostForm("religion")) == "" {
+		religion := strings.TrimSpace(c.PostForm("religion"))
+		gender := strings.TrimSpace(c.PostForm("gender"))
+		educationLevel := strings.TrimSpace(c.PostForm("education_level"))
+		if religion == "" {
 			fieldErrors["religion"] = "Agama wajib dipilih."
 		}
-		if strings.TrimSpace(c.PostForm("gender")) == "" {
+		if gender == "" {
 			fieldErrors["gender"] = "Jenis kelamin wajib dipilih."
 		}
-		if strings.TrimSpace(c.PostForm("education_level")) == "" {
+		if educationLevel == "" {
 			fieldErrors["education_level"] = "Tingkat pendidikan wajib dipilih."
 		}
+		handlers.ValidateFieldLength(fieldErrors, "religion", "Agama", religion, 50)
+		handlers.ValidateFieldLength(fieldErrors, "gender", "Jenis kelamin", gender, 20)
+		handlers.ValidateFieldLength(fieldErrors, "education_level", "Tingkat pendidikan", educationLevel, 80)
 	}
 
 	return fieldErrors, nil

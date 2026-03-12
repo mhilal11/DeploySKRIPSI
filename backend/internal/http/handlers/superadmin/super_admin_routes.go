@@ -7,6 +7,8 @@ import (
 )
 
 func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
+	pelamarhandlers.RegisterRecruitmentAIScreeningTrigger(TriggerAutomaticRecruitmentAIScreening)
+
 	rg.GET("/super-admin/dashboard", SuperAdminDashboard)
 	rg.GET("/super-admin/admin-hr/dashboard", SuperAdminAdminHrDashboard)
 	rg.GET("/super-admin/notifications", SuperAdminNotifications)

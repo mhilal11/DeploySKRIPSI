@@ -32,11 +32,15 @@ func SuperAdminLettersIndex(c *gin.Context) {
 
 	search := strings.TrimSpace(c.Query("search"))
 	category := strings.TrimSpace(c.Query("category"))
+	pagination := handlers.ParsePagination(c, 20, 100)
 
-	letters, _ := dbrepo.ListSuratByFilters(db, dbrepo.SuratListFilters{
+	filterConfig := dbrepo.SuratListFilters{
 		Search:   search,
 		Category: category,
-	})
+	}
+	letters, _ := dbrepo.ListSuratByFiltersPaged(db, filterConfig, pagination.Limit, pagination.Offset)
+	totalLetters, _ := dbrepo.CountSuratByFilters(db, filterConfig)
+	letterStats, _ := dbrepo.CountSuratStatsByFilters(db, filterConfig)
 
 	archive := []models.Surat{}
 	activeLetters := []models.Surat{}
@@ -67,17 +71,18 @@ func SuperAdminLettersIndex(c *gin.Context) {
 	}
 
 	stats := map[string]int{
-		"inbox":    len(inbox),
-		"outbox":   len(outbox),
-		"pending":  len(pendingDisposition),
-		"archived": len(archive),
+		"inbox":    letterStats.Inbox,
+		"outbox":   letterStats.Outbox,
+		"pending":  letterStats.Pending,
+		"archived": letterStats.Archived,
 	}
 
 	divisionCode := services.DivisionCodeFromName(handlers.FirstString(user.Division, ""))
 	nextNumber, _ := services.GenerateNomorSurat(db, divisionCode, time.Now())
 
 	c.JSON(http.StatusOK, gin.H{
-		"stats": stats,
+		"stats":      stats,
+		"pagination": handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalLetters),
 		"filters": gin.H{
 			"search": search,
 			"category": func() string {
@@ -213,6 +218,12 @@ func SuperAdminLettersDisposition(c *gin.Context) {
 		return
 	}
 	note := c.PostForm("disposition_note")
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "disposition_note", "Catatan disposisi", note, 3000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
+	}
 	db := middleware.GetDB(c)
 
 	surat, err := dbrepo.GetSuratByID(db, id)
@@ -243,6 +254,12 @@ func SuperAdminLettersBulkDisposition(c *gin.Context) {
 		ids = c.PostFormArray("letter_ids")
 	}
 	note := c.PostForm("disposition_note")
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "disposition_note", "Catatan disposisi", note, 3000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
+	}
 
 	db := middleware.GetDB(c)
 	idValues := parseInt64IDs(ids)
@@ -265,6 +282,12 @@ func SuperAdminLettersRejectDisposition(c *gin.Context) {
 	note := c.PostForm("disposition_note")
 	if note == "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"disposition_note": "Catatan disposisi wajib diisi."})
+		return
+	}
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "disposition_note", "Catatan disposisi", note, 3000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
 		return
 	}
 
@@ -297,6 +320,12 @@ func SuperAdminLettersFinalDisposition(c *gin.Context) {
 		ids = c.PostFormArray("letter_ids")
 	}
 	note := c.PostForm("disposition_note")
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "disposition_note", "Catatan disposisi", note, 3000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
+	}
 
 	db := middleware.GetDB(c)
 	for _, id := range ids {
@@ -378,7 +407,13 @@ func SuperAdminLettersExportWord(c *gin.Context) {
 		handlers.JSONError(c, http.StatusUnprocessableEntity, "Path dokumen disposisi tidak valid.")
 		return
 	}
-	c.FileAttachment(absPath, fileName)
+	content, _, readErr := services.ReadFileMaybeDecrypted(absPath, middleware.GetConfig(c).StorageEncryptionKey)
+	if readErr != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal membaca dokumen disposisi.")
+		return
+	}
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", content)
 }
 
 func SuperAdminLettersExportFinal(c *gin.Context) {
@@ -395,7 +430,11 @@ func generateDispositionDocument(c *gin.Context, db *sqlx.DB, surat *models.Sura
 		templatePath := handlers.NormalizeAttachmentPath(template.FilePath)
 		if resolvedTemplatePath, ok := resolveStorageFilePath(middleware.GetConfig(c).StoragePath, templatePath); ok {
 			if _, err := os.Stat(resolvedTemplatePath); err == nil {
-				tempFile, _ = services.ReplaceDocxPlaceholders(resolvedTemplatePath, placeholders)
+				readPath, cleanup, prepErr := services.PrepareFileForRead(resolvedTemplatePath, middleware.GetConfig(c).StorageEncryptionKey)
+				if prepErr == nil {
+					defer cleanup()
+					tempFile, _ = services.ReplaceDocxPlaceholders(readPath, placeholders)
+				}
 			}
 		}
 	}
@@ -415,6 +454,10 @@ func generateDispositionDocument(c *gin.Context, db *sqlx.DB, surat *models.Sura
 	_ = os.MkdirAll(storagePath, 0o755)
 	destPath := filepath.Join(storagePath, fileName)
 	_ = copyFile(tempFile, destPath)
+	cfg := middleware.GetConfig(c)
+	if cfg.StorageEncryptUploads && cfg.StorageEncryptionKey != "" {
+		_ = services.EncryptFileInPlace(destPath, cfg.StorageEncryptionKey)
+	}
 
 	relPath := filepath.ToSlash(filepath.Join("disposition_documents", fileName))
 	return relPath, fileName

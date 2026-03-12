@@ -6,7 +6,6 @@ import (
 
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -147,6 +146,16 @@ func SuperAdminTemplatesStore(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"name": "Nama wajib diisi."})
 		return
 	}
+	validationErrors := handlers.FieldErrors{}
+	headerText := c.PostForm("header_text")
+	footerText := c.PostForm("footer_text")
+	handlers.ValidateFieldLength(validationErrors, "name", "Nama template", name, 120)
+	handlers.ValidateFieldLength(validationErrors, "header_text", "Header template", headerText, 4000)
+	handlers.ValidateFieldLength(validationErrors, "footer_text", "Footer template", footerText, 4000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
+	}
 
 	templatePath, meta, err := handlers.SaveUploadedFile(c, "template_file", "letter-templates")
 	if err != nil {
@@ -161,9 +170,6 @@ func SuperAdminTemplatesStore(c *gin.Context) {
 			logoPath = &path
 		}
 	}
-
-	headerText := c.PostForm("header_text")
-	footerText := c.PostForm("footer_text")
 
 	db := middleware.GetDB(c)
 	now := time.Now()
@@ -224,11 +230,18 @@ func SuperAdminTemplatesDownload(c *gin.Context) {
 		return
 	}
 
-	templatePath := filepath.Join(middleware.GetConfig(c).StoragePath, template.FilePath)
-	if _, err := os.Stat(templatePath); err != nil {
+	normalizedTemplatePath := handlers.NormalizeAttachmentPath(template.FilePath)
+	templatePath, ok := resolveStorageFilePath(middleware.GetConfig(c).StoragePath, normalizedTemplatePath)
+	if !ok {
 		handlers.JSONError(c, http.StatusNotFound, "File template tidak ditemukan")
 		return
 	}
+	readTemplatePath, cleanupReadTemplate, prepErr := services.PrepareFileForRead(templatePath, middleware.GetConfig(c).StorageEncryptionKey)
+	if prepErr != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal membaca file template")
+		return
+	}
+	defer cleanupReadTemplate()
 
 	replacements := map[string]string{
 		"{{header}}": handlers.FirstString(template.HeaderText, ""),
@@ -239,7 +252,7 @@ func SuperAdminTemplatesDownload(c *gin.Context) {
 		replacements[strings.ReplaceAll(strings.ReplaceAll(k, "{{", "${"), "}}", "}")] = v
 	}
 
-	tempFile, err := services.ReplaceDocxPlaceholders(templatePath, replacements)
+	tempFile, err := services.ReplaceDocxPlaceholders(readTemplatePath, replacements)
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memproses template")
 		return
@@ -266,6 +279,14 @@ func SuperAdminTemplatesUpdate(c *gin.Context) {
 	headerText := c.PostForm("header_text")
 	footerText := c.PostForm("footer_text")
 	removeLogo := c.PostForm("remove_logo") == "true"
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "name", "Nama template", name, 120)
+	handlers.ValidateFieldLength(validationErrors, "header_text", "Header template", headerText, 4000)
+	handlers.ValidateFieldLength(validationErrors, "footer_text", "Footer template", footerText, 4000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
+	}
 
 	db := middleware.GetDB(c)
 	template, err := dbrepo.GetLetterTemplateByID(db, id)
@@ -363,6 +384,13 @@ func deleteStoredPath(basePath string, relPath string) {
 	if strings.TrimSpace(relPath) == "" {
 		return
 	}
-	abs := filepath.Join(basePath, relPath)
+	normalized := handlers.NormalizeAttachmentPath(relPath)
+	if normalized == "" {
+		return
+	}
+	abs, ok := resolveStorageFilePath(basePath, normalized)
+	if !ok {
+		return
+	}
 	_ = os.Remove(abs)
 }

@@ -2,11 +2,13 @@ package superadmin
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"hris-backend/internal/config"
@@ -21,6 +23,7 @@ import (
 )
 
 const recruitmentAIScreeningPromptVersion = "cv-screening-v2"
+const recruitmentAIScreeningQueueName = "recruitment_ai_screening"
 
 var (
 	errAIScreeningConfigIncomplete    = errors.New("konfigurasi groq belum lengkap")
@@ -31,6 +34,7 @@ var (
 	errAIScreeningCVUnreadable        = errors.New("cv tidak dapat diproses")
 	errAIScreeningProviderFailed      = errors.New("screening ai gagal")
 	errAIScreeningPersistFailed       = errors.New("hasil screening ai gagal disimpan")
+	recruitmentAIWorkerStartOnce      sync.Once
 )
 
 type recruitmentAIScreeningRunOutput struct {
@@ -40,23 +44,17 @@ type recruitmentAIScreeningRunOutput struct {
 	Result      services.CVScreeningResult
 }
 
-func init() {
-	handlers.TriggerRecruitmentAIScreening = TriggerAutomaticRecruitmentAIScreening
+func StartRecruitmentAIScreeningWorker(db *sqlx.DB, cfg config.Config) {
+	startRecruitmentAIWorker(db, cfg)
 }
 
 func TriggerAutomaticRecruitmentAIScreening(db *sqlx.DB, cfg config.Config, applicationID, actorUserID int64) {
 	if db == nil || applicationID <= 0 {
 		return
 	}
-	go func() {
-		timeoutSec := cfg.GroqRequestTimeoutSec
-		if timeoutSec <= 0 {
-			timeoutSec = 60
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec+15)*time.Second)
-		defer cancel()
-		_, _ = runRecruitmentAIScreeningForApplication(ctx, db, cfg, applicationID, actorUserID)
-	}()
+
+	enqueueRecruitmentAIScreeningJob(db, applicationID, actorUserID, 0)
+	startRecruitmentAIWorker(db, cfg)
 }
 
 func SuperAdminRecruitmentGetAIScreening(c *gin.Context) {
@@ -195,7 +193,7 @@ func runRecruitmentAIScreeningForApplication(
 		return nil, errAIScreeningCVFileNotFound
 	}
 
-	cvText, err := services.ExtractCVText(absCVPath)
+	cvText, err := services.ExtractCVTextWithKey(absCVPath, cfg.StorageEncryptionKey)
 	if err != nil {
 		_ = insertRecruitmentAIScreeningFailure(db, app.ID, actorUserID, normalizedCVPath, client.Models(), err.Error(), nil)
 		return nil, fmt.Errorf("%w: %v", errAIScreeningCVUnreadable, err)
@@ -259,6 +257,87 @@ func runRecruitmentAIScreeningForApplication(
 		ModelUsed:   modelUsed,
 		Result:      result,
 	}, nil
+}
+
+type recruitmentAIScreeningJobPayload struct {
+	ApplicationID int64 `json:"application_id"`
+	ActorUserID   int64 `json:"actor_user_id"`
+}
+
+func startRecruitmentAIWorker(db *sqlx.DB, cfg config.Config) {
+	recruitmentAIWorkerStartOnce.Do(func() {
+		go runRecruitmentAIWorkerLoop(db, cfg)
+	})
+}
+
+func runRecruitmentAIWorkerLoop(db *sqlx.DB, cfg config.Config) {
+	if db == nil {
+		return
+	}
+
+	for {
+		job, err := dbrepo.ReserveNextJob(db, recruitmentAIScreeningQueueName, 2*time.Minute)
+		if err != nil {
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		if job == nil {
+			time.Sleep(1200 * time.Millisecond)
+			continue
+		}
+
+		var payload recruitmentAIScreeningJobPayload
+		if err := json.Unmarshal([]byte(job.Payload), &payload); err != nil {
+			_ = dbrepo.MoveJobToFailed(db, *job, "payload tidak valid: "+err.Error())
+			_ = dbrepo.DeleteJobByID(db, job.ID)
+			continue
+		}
+		if payload.ApplicationID <= 0 {
+			_ = dbrepo.MoveJobToFailed(db, *job, "application_id tidak valid")
+			_ = dbrepo.DeleteJobByID(db, job.ID)
+			continue
+		}
+
+		timeoutSec := cfg.GroqRequestTimeoutSec
+		if timeoutSec <= 0 {
+			timeoutSec = 60
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec+20)*time.Second)
+		_, runErr := runRecruitmentAIScreeningForApplication(ctx, db, cfg, payload.ApplicationID, payload.ActorUserID)
+		cancel()
+
+		if runErr == nil {
+			_ = dbrepo.DeleteJobByID(db, job.ID)
+			continue
+		}
+
+		if job.Attempts >= 5 {
+			_ = dbrepo.MoveJobToFailed(db, *job, runErr.Error())
+			_ = dbrepo.DeleteJobByID(db, job.ID)
+			continue
+		}
+
+		retryDelay := time.Duration(1<<uint(job.Attempts)) * time.Second
+		if retryDelay > 5*time.Minute {
+			retryDelay = 5 * time.Minute
+		}
+		_ = dbrepo.ReleaseJob(db, job.ID, retryDelay)
+	}
+}
+
+func enqueueRecruitmentAIScreeningJob(db *sqlx.DB, applicationID, actorUserID int64, delay time.Duration) {
+	if db == nil || applicationID <= 0 {
+		return
+	}
+	payload := recruitmentAIScreeningJobPayload{
+		ApplicationID: applicationID,
+		ActorUserID:   actorUserID,
+	}
+	rawPayload, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	_, _ = dbrepo.EnqueueJob(db, recruitmentAIScreeningQueueName, string(rawPayload), time.Now().Add(delay))
 }
 
 func loadApplicantProfileByUserID(db *sqlx.DB, userID *int64) *models.ApplicantProfile {

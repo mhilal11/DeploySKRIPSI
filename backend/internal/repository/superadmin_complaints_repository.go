@@ -82,6 +82,85 @@ func ListComplaintsByFilters(db *sqlx.DB, filters ComplaintListFilters) ([]model
 	return rows, wrapRepoErr("list complaints by filters", err)
 }
 
+func CountComplaintsByFilters(db *sqlx.DB, filters ComplaintListFilters) (int, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+	baseQuery, args := buildComplaintsFilterQuery(filters)
+	query := "SELECT COUNT(*) FROM complaints" + baseQuery
+	var count int
+	if err := db.Get(&count, query, args...); err != nil {
+		return 0, wrapRepoErr("count complaints by filters", err)
+	}
+	return count, nil
+}
+
+func ListComplaintsByFiltersPaged(db *sqlx.DB, filters ComplaintListFilters, limit, offset int) ([]models.Complaint, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	baseQuery, args := buildComplaintsFilterQuery(filters)
+	query := "SELECT * FROM complaints" + baseQuery + " ORDER BY submitted_at DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows := []models.Complaint{}
+	err := db.Select(&rows, query, args...)
+	return rows, wrapRepoErr("list complaints by filters paged", err)
+}
+
+func buildComplaintsFilterQuery(filters ComplaintListFilters) (string, []any) {
+	clauses := []string{}
+	args := []any{}
+
+	if strings.TrimSpace(filters.Search) != "" {
+		like := "%" + strings.TrimSpace(filters.Search) + "%"
+		clauses = append(clauses, "(complaint_code LIKE ? OR subject LIKE ? OR description LIKE ?)")
+		args = append(args, like, like, like)
+	}
+
+	status := strings.ToLower(strings.TrimSpace(filters.Status))
+	if status != "" && status != "all" {
+		switch status {
+		case "new":
+			clauses = append(clauses, "LOWER(status) IN ('new','baru','open')")
+		case "in_progress":
+			clauses = append(clauses, "LOWER(status) IN ('in_progress','onprogress','inprogress','processing','proses','diproses')")
+		case "resolved":
+			clauses = append(clauses, "LOWER(status) IN ('resolved','selesai','closed','done')")
+		case "archived":
+			clauses = append(clauses, "LOWER(status) IN ('archived','diarsipkan','archive')")
+		}
+	}
+
+	priority := strings.ToLower(strings.TrimSpace(filters.Priority))
+	if priority != "" && priority != "all" {
+		switch priority {
+		case "high":
+			clauses = append(clauses, "LOWER(priority) IN ('high','tinggi')")
+		case "medium":
+			clauses = append(clauses, "LOWER(priority) IN ('medium','sedang','normal')")
+		case "low":
+			clauses = append(clauses, "LOWER(priority) IN ('low','rendah')")
+		}
+	}
+
+	if strings.TrimSpace(filters.Category) != "" && !strings.EqualFold(strings.TrimSpace(filters.Category), "all") {
+		clauses = append(clauses, "category = ?")
+		args = append(args, strings.TrimSpace(filters.Category))
+	}
+
+	if len(clauses) == 0 {
+		return "", args
+	}
+	return " WHERE " + strings.Join(clauses, " AND "), args
+}
+
 func GetComplaintByID(db *sqlx.DB, id int64) (*models.Complaint, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")

@@ -2,6 +2,7 @@ package superadmin
 
 import (
 	"fmt"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
 	dbrepo "hris-backend/internal/repository"
+	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -150,9 +152,19 @@ func SuperAdminRecruitmentViewCV(c *gin.Context) {
 		return
 	}
 
+	content, _, readErr := services.ReadFileMaybeDecrypted(absPath, middleware.GetConfig(c).StorageEncryptionKey)
+	if readErr != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal membaca file CV")
+		return
+	}
+
 	filename := filepath.Base(filepath.FromSlash(normalized))
 	c.Header("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", filename))
-	c.File(absPath)
+	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(filename)))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	c.Data(http.StatusOK, contentType, content)
 }
 
 func SuperAdminRecruitmentUpdateStatus(c *gin.Context) {
@@ -184,6 +196,13 @@ func SuperAdminRecruitmentUpdateStatus(c *gin.Context) {
 
 	if status == "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"status": "Status wajib diisi."})
+		return
+	}
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "status", "Status", status, 30)
+	handlers.ValidateFieldLength(validationErrors, "rejection_reason", "Alasan penolakan", rejection, 3000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
 		return
 	}
 
@@ -264,6 +283,12 @@ func SuperAdminRecruitmentReject(c *gin.Context) {
 	}
 	if rejection == "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"rejection_reason": "Alasan penolakan wajib diisi."})
+		return
+	}
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "rejection_reason", "Alasan penolakan", rejection, 3000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
 		return
 	}
 
@@ -370,6 +395,18 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 
 	if date == "" || timeStart == "" || timeEnd == "" || mode == "" || interviewer == "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"date": "Tanggal, waktu, mode, interviewer wajib diisi."})
+		return
+	}
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "date", "Tanggal interview", date, 20)
+	handlers.ValidateFieldLength(validationErrors, "time", "Waktu mulai", timeStart, 10)
+	handlers.ValidateFieldLength(validationErrors, "end_time", "Waktu selesai", timeEnd, 10)
+	handlers.ValidateFieldLength(validationErrors, "mode", "Mode interview", mode, 20)
+	handlers.ValidateFieldLength(validationErrors, "interviewer", "Interviewer", interviewer, 120)
+	handlers.ValidateFieldLength(validationErrors, "meeting_link", "Link meeting", meetingLink, 500)
+	handlers.ValidateFieldLength(validationErrors, "notes", "Catatan interview", notes, 3000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
 		return
 	}
 

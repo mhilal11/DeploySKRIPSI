@@ -41,13 +41,73 @@ type SuperAdminLetterCreateInput struct {
 	StatusPersetujuan string
 }
 
+type SuratListStats struct {
+	Inbox    int `db:"inbox_count"`
+	Outbox   int `db:"outbox_count"`
+	Pending  int `db:"pending_count"`
+	Archived int `db:"archived_count"`
+}
+
 func ListSuratByFilters(db *sqlx.DB, filters SuratListFilters) ([]models.Surat, error) {
+	return ListSuratByFiltersPaged(db, filters, 500, 0)
+}
+
+func CountSuratByFilters(db *sqlx.DB, filters SuratListFilters) (int, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+	baseQuery, args := buildSuratFilterQuery(filters)
+	var total int
+	if err := db.Get(&total, "SELECT COUNT(*) FROM surat"+baseQuery, args...); err != nil {
+		return 0, wrapRepoErr("count surat by filters", err)
+	}
+	return total, nil
+}
+
+func ListSuratByFiltersPaged(db *sqlx.DB, filters SuratListFilters, limit, offset int) ([]models.Surat, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
 	}
-	query := "SELECT * FROM surat"
-	clauses := []string{}
-	args := []any{}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	baseQuery, args := buildSuratFilterQuery(filters)
+	query := "SELECT * FROM surat" + baseQuery + " ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+	rows := []models.Surat{}
+	err := db.Select(&rows, query, args...)
+	return rows, wrapRepoErr("list surat by filters paged", err)
+}
+
+func CountSuratStatsByFilters(db *sqlx.DB, filters SuratListFilters) (SuratListStats, error) {
+	if db == nil {
+		return SuratListStats{}, errors.New("database tidak tersedia")
+	}
+	baseQuery, args := buildSuratFilterQuery(filters)
+	query := `
+		SELECT
+			COALESCE(SUM(CASE WHEN status_persetujuan = 'Diarsipkan' THEN 1 ELSE 0 END), 0) AS archived_count,
+			COALESCE(SUM(CASE WHEN status_persetujuan <> 'Diarsipkan' AND current_recipient = 'hr' THEN 1 ELSE 0 END), 0) AS inbox_count,
+			COALESCE(SUM(CASE WHEN status_persetujuan <> 'Diarsipkan' AND current_recipient = 'division' THEN 1 ELSE 0 END), 0) AS outbox_count,
+			COALESCE(SUM(CASE WHEN status_persetujuan <> 'Diarsipkan' AND current_recipient = 'hr' AND status_persetujuan IN ('Menunggu HR', 'Diajukan', 'Diproses') THEN 1 ELSE 0 END), 0) AS pending_count
+		FROM surat` + baseQuery
+	var stats SuratListStats
+	if err := db.Get(&stats, query, args...); err != nil {
+		return SuratListStats{}, wrapRepoErr("count surat stats by filters", err)
+	}
+	return stats, nil
+}
+
+func buildSuratFilterQuery(filters SuratListFilters) (string, []any) {
+	clauses := make([]string, 0, 2)
+	args := make([]any, 0, 4)
 	if strings.TrimSpace(filters.Search) != "" {
 		like := "%" + strings.TrimSpace(filters.Search) + "%"
 		clauses = append(clauses, "(nomor_surat LIKE ? OR perihal LIKE ? OR penerima LIKE ?)")
@@ -57,13 +117,10 @@ func ListSuratByFilters(db *sqlx.DB, filters SuratListFilters) ([]models.Surat, 
 		clauses = append(clauses, "kategori = ?")
 		args = append(args, strings.TrimSpace(filters.Category))
 	}
-	if len(clauses) > 0 {
-		query += " WHERE " + strings.Join(clauses, " AND ")
+	if len(clauses) == 0 {
+		return "", args
 	}
-	query += " ORDER BY tanggal_surat DESC, surat_id DESC"
-	rows := []models.Surat{}
-	err := db.Select(&rows, query, args...)
-	return rows, wrapRepoErr("list surat by filters", err)
+	return " WHERE " + strings.Join(clauses, " AND "), args
 }
 
 func InsertSuperAdminLetter(db *sqlx.DB, input SuperAdminLetterCreateInput) error {
