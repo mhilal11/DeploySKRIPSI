@@ -122,3 +122,55 @@ func TestCreatePelamarUserWithProfile_ProfileInsertFailRollback(t *testing.T) {
 		t.Fatalf("unmet expectations: %v", err)
 	}
 }
+
+func TestSaveEmailVerificationToken_Success(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	now := time.Date(2026, 3, 11, 10, 0, 0, 0, time.UTC)
+	expiresAt := now.Add(60 * time.Minute)
+
+	mock.ExpectBegin()
+	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM email_verification_tokens WHERE user_id = ?")).
+		WithArgs(int64(99)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta("INSERT INTO email_verification_tokens (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)")).
+		WithArgs(int64(99), "abc123", expiresAt, now).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
+
+	err := repository.SaveEmailVerificationToken(db, 99, "abc123", expiresAt, now)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestGetEmailVerificationTokenByHash_Success(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	now := time.Date(2026, 3, 11, 10, 0, 0, 0, time.UTC)
+	expiresAt := now.Add(60 * time.Minute)
+	rows := sqlmock.NewRows([]string{"user_id", "token_hash", "expires_at", "created_at"}).
+		AddRow(int64(7), "hash123", expiresAt, now)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT user_id, token_hash, expires_at, created_at FROM email_verification_tokens WHERE token_hash = ? LIMIT 1")).
+		WithArgs("hash123").
+		WillReturnRows(rows)
+
+	record, err := repository.GetEmailVerificationTokenByHash(db, "hash123")
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if record == nil {
+		t.Fatalf("expected record, got nil")
+	}
+	if record.UserID != 7 {
+		t.Fatalf("expected user_id 7, got %d", record.UserID)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}

@@ -15,6 +15,13 @@ type PasswordResetTokenRecord struct {
 	CreatedAt time.Time `db:"created_at"`
 }
 
+type EmailVerificationTokenRecord struct {
+	UserID    int64     `db:"user_id"`
+	TokenHash string    `db:"token_hash"`
+	ExpiresAt time.Time `db:"expires_at"`
+	CreatedAt time.Time `db:"created_at"`
+}
+
 func GetUserByEmail(db *sqlx.DB, email string) (*models.User, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
@@ -110,6 +117,78 @@ func GetPasswordResetTokenByEmail(db *sqlx.DB, email string) (*PasswordResetToke
 		return nil, wrapRepoErr("get password reset token", err)
 	}
 	return &record, nil
+}
+
+func SaveEmailVerificationToken(db *sqlx.DB, userID int64, tokenHash string, expiresAt, now time.Time) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	if userID <= 0 {
+		return errors.New("user id tidak valid")
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	if expiresAt.IsZero() {
+		expiresAt = now.Add(60 * time.Minute)
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return wrapRepoErr("begin email verification token tx", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("DELETE FROM email_verification_tokens WHERE user_id = ?", userID); err != nil {
+		return wrapRepoErr("delete email verification token by user id", err)
+	}
+	if _, err := tx.Exec(
+		"INSERT INTO email_verification_tokens (user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?)",
+		userID,
+		tokenHash,
+		expiresAt,
+		now,
+	); err != nil {
+		return wrapRepoErr("insert email verification token", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return wrapRepoErr("commit email verification token tx", err)
+	}
+	return nil
+}
+
+func GetEmailVerificationTokenByHash(db *sqlx.DB, tokenHash string) (*EmailVerificationTokenRecord, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	var record EmailVerificationTokenRecord
+	if err := db.Get(
+		&record,
+		"SELECT user_id, token_hash, expires_at, created_at FROM email_verification_tokens WHERE token_hash = ? LIMIT 1",
+		tokenHash,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapRepoErr("get email verification token", err)
+	}
+	return &record, nil
+}
+
+func DeleteEmailVerificationTokenByUserID(db *sqlx.DB, userID int64) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	_, err := db.Exec("DELETE FROM email_verification_tokens WHERE user_id = ?", userID)
+	return wrapRepoErr("delete email verification token by user id", err)
+}
+
+func DeleteEmailVerificationTokenByHash(db *sqlx.DB, tokenHash string) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	_, err := db.Exec("DELETE FROM email_verification_tokens WHERE token_hash = ?", tokenHash)
+	return wrapRepoErr("delete email verification token by hash", err)
 }
 
 func DeletePasswordResetTokenByEmail(db *sqlx.DB, email string) error {

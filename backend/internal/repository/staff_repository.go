@@ -112,6 +112,21 @@ func ListComplaintsByUserID(db *sqlx.DB, userID int64, limit int) ([]models.Comp
 	return rows, wrapRepoErr("list complaints by user id", err)
 }
 
+func ListComplaintsByUserIDPaged(db *sqlx.DB, userID int64, limit, offset int) ([]models.Complaint, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows := []models.Complaint{}
+	err := db.Select(&rows, "SELECT * FROM complaints WHERE user_id = ? ORDER BY submitted_at DESC, id DESC LIMIT ? OFFSET ?", userID, limit, offset)
+	return rows, wrapRepoErr("list complaints by user id paged", err)
+}
+
 func ListStaffTerminationsByUserID(db *sqlx.DB, userID int64) ([]models.StaffTermination, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
