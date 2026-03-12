@@ -181,7 +181,7 @@ func UpdateComplaint(db *sqlx.DB, input ComplaintUpdateInput) error {
 	}
 	var resolvedAt any
 	if input.ResolvedAt != nil {
-		resolvedAt = *input.ResolvedAt
+		resolvedAt = input.ResolvedAt.UTC()
 	}
 	_, err := db.Exec(`UPDATE complaints SET status = ?, priority = ?, resolution_notes = ?, handled_by_id = ?, resolved_at = ? WHERE id = ?`,
 		input.Status, input.Priority, input.ResolutionNotes, input.HandledByID, resolvedAt, input.ID)

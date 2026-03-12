@@ -181,7 +181,7 @@ func InsertStaffComplaint(db *sqlx.DB, input StaffComplaintCreateInput) error {
 		return errors.New("database tidak tersedia")
 	}
 	if input.SubmittedAt.IsZero() {
-		input.SubmittedAt = time.Now()
+		input.SubmittedAt = time.Now().UTC()
 	}
 	if input.CreatedAt.IsZero() {
 		input.CreatedAt = input.SubmittedAt
@@ -224,7 +224,7 @@ func InsertStaffTermination(db *sqlx.DB, input StaffTerminationCreateInput) erro
 		input.ChecklistJSON = "{}"
 	}
 	if input.RequestDate.IsZero() {
-		input.RequestDate = time.Now()
+		input.RequestDate = time.Now().UTC()
 	}
 	if input.CreatedAt.IsZero() {
 		input.CreatedAt = input.RequestDate

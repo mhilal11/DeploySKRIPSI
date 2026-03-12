@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -15,6 +16,7 @@ type Config struct {
 	Address                 string
 	BaseURL                 string
 	FrontendURL             string
+	AppTimezone             string
 	EducationReferencePath  string
 	GroqAPIKey              string
 	GroqBaseURL             string
@@ -73,6 +75,7 @@ func Load() Config {
 		Address:                 getenv("APP_ADDR", ":8080"),
 		BaseURL:                 baseURL,
 		FrontendURL:             frontendURL,
+		AppTimezone:             strings.TrimSpace(getenv("APP_TIMEZONE", "Asia/Jakarta")),
 		EducationReferencePath:  getenv("EDUCATION_REFERENCE_PATH", "./data/education_reference_id.json"),
 		GroqAPIKey:              strings.TrimSpace(getenv("GROQ_API_KEY", "")),
 		GroqBaseURL:             strings.TrimSpace(getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")),
@@ -146,6 +149,12 @@ func (c Config) ValidateForServer() error {
 	}
 	if c.MaxRequestBodyBytes <= 0 {
 		return fmt.Errorf("MAX_REQUEST_BODY_MB harus lebih dari 0")
+	}
+	if strings.TrimSpace(c.AppTimezone) == "" {
+		return fmt.Errorf("APP_TIMEZONE tidak boleh kosong")
+	}
+	if _, err := time.LoadLocation(c.AppTimezone); err != nil {
+		return fmt.Errorf("APP_TIMEZONE tidak valid: %w", err)
 	}
 	if c.StorageEncryptionKey != "" {
 		if len(c.StorageEncryptionKey) < 32 {

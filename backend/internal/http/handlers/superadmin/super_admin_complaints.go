@@ -237,7 +237,7 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 
 	var resolvedAt *time.Time
 	if status == models.ComplaintStatusResolved {
-		now := time.Now()
+		now := time.Now().UTC()
 		resolvedAt = &now
 	}
 

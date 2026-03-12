@@ -2,46 +2,92 @@ package handlers
 
 import (
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	dbrepo "hris-backend/internal/repository"
 )
 
+var (
+	displayLocationMu sync.RWMutex
+	displayLocation   = defaultDisplayLocation()
+)
+
+func defaultDisplayLocation() *time.Location {
+	loc, err := time.LoadLocation("Asia/Jakarta")
+	if err != nil {
+		return time.UTC
+	}
+	return loc
+}
+
+func SetDisplayLocation(timezone string) error {
+	name := strings.TrimSpace(timezone)
+	if name == "" {
+		name = "Asia/Jakarta"
+	}
+	loc, err := time.LoadLocation(name)
+	if err != nil {
+		return err
+	}
+	displayLocationMu.Lock()
+	displayLocation = loc
+	displayLocationMu.Unlock()
+	return nil
+}
+
+func currentDisplayLocation() *time.Location {
+	displayLocationMu.RLock()
+	loc := displayLocation
+	displayLocationMu.RUnlock()
+	return loc
+}
+
+func toDisplayTime(t *time.Time) time.Time {
+	return t.In(currentDisplayLocation())
+}
+
 func FormatDate(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return "-"
 	}
-	return t.Format("02 Jan 2006")
+	local := toDisplayTime(t)
+	return local.Format("02 Jan 2006")
 }
 
 func FormatDateISO(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return ""
 	}
-	return t.Format("2006-01-02")
+	local := toDisplayTime(t)
+	return local.Format("2006-01-02")
 }
 
 func FormatDateTime(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return "-"
 	}
-	return t.Format("02 Jan 2006 15:04")
+	local := toDisplayTime(t)
+	return local.Format("02 Jan 2006 15:04")
 }
 
 func FormatTimeHM(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return "-"
 	}
-	return t.Format("15:04")
+	local := toDisplayTime(t)
+	return local.Format("15:04")
 }
 
 func DiffForHumans(t *time.Time) string {
 	if t == nil || t.IsZero() {
 		return "-"
 	}
-	now := time.Now()
-	diff := now.Sub(*t)
+	target := toDisplayTime(t)
+	now := time.Now().In(currentDisplayLocation())
+	diff := now.Sub(target)
 	after := false
 	if diff < 0 {
 		after = true

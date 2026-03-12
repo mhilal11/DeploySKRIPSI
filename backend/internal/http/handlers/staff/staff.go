@@ -370,7 +370,7 @@ func StaffComplaintsStore(c *gin.Context) {
 		}
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	if err := repo.InsertStaffComplaint(dbrepo.StaffComplaintCreateInput{
 		ComplaintCode:  code,
 		UserID:         user.ID,
@@ -500,7 +500,7 @@ func StaffResignationStore(c *gin.Context) {
 		return
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 	if err := repo.InsertStaffTermination(dbrepo.StaffTerminationCreateInput{
 		Reference:     reference,
 		UserID:        user.ID,

@@ -50,6 +50,7 @@ func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	if cfg.Env == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
+	_ = basehandlers.SetDisplayLocation(cfg.AppTimezone)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
