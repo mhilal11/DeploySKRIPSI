@@ -273,6 +273,34 @@ func ListActiveDivisionJobs(db *sqlx.DB) ([]models.DivisionJob, error) {
 	return rows, nil
 }
 
+func ListActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) ([]models.DivisionJob, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if len(divisionIDs) == 0 {
+		return []models.DivisionJob{}, nil
+	}
+
+	query, args, err := sqlx.In(
+		"SELECT * FROM division_jobs WHERE is_active = 1 AND division_profile_id IN (?) ORDER BY opened_at DESC, id DESC",
+		divisionIDs,
+	)
+	if err != nil {
+		return nil, wrapRepoErr("list active division jobs by division ids build query", err)
+	}
+
+	query = db.Rebind(query)
+	rows := []models.DivisionJob{}
+	err = db.Select(&rows, query, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "doesn't exist") {
+			return []models.DivisionJob{}, nil
+		}
+		return nil, wrapRepoErr("list active division jobs by division ids", err)
+	}
+	return rows, nil
+}
+
 func GetPrimaryActiveDivisionJob(db *sqlx.DB, divisionID int64) (*models.DivisionJob, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")

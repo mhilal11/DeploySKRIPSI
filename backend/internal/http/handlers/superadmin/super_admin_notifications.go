@@ -1,18 +1,59 @@
 package superadmin
 
 import (
+	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
-	"strconv"
-	"time"
 
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
+
+type notificationsRepository interface {
+	ListUnifiedNotificationsPaged(userID int64, limit, offset int) ([]dbrepo.NotificationRow, error)
+	CountPendingHRLetters() (int, error)
+	CountPendingRecruitmentApplications() (int, error)
+	CountPendingStaffTerminations() (int, error)
+	CountNewComplaints() (int, error)
+	CountUnreadRecentAuditLogs(userID int64) (int, error)
+}
+
+type sqlNotificationsRepository struct {
+	db *sqlx.DB
+}
+
+func newNotificationsRepository(db *sqlx.DB) notificationsRepository {
+	return &sqlNotificationsRepository{db: db}
+}
+
+func (r *sqlNotificationsRepository) ListUnifiedNotificationsPaged(userID int64, limit, offset int) ([]dbrepo.NotificationRow, error) {
+	return dbrepo.ListUnifiedNotificationsPaged(r.db, userID, limit, offset)
+}
+
+func (r *sqlNotificationsRepository) CountPendingHRLetters() (int, error) {
+	return dbrepo.CountPendingHRLetters(r.db)
+}
+
+func (r *sqlNotificationsRepository) CountPendingRecruitmentApplications() (int, error) {
+	return dbrepo.CountPendingRecruitmentApplications(r.db)
+}
+
+func (r *sqlNotificationsRepository) CountPendingStaffTerminations() (int, error) {
+	return dbrepo.CountPendingStaffTerminations(r.db)
+}
+
+func (r *sqlNotificationsRepository) CountNewComplaints() (int, error) {
+	return dbrepo.CountNewComplaints(r.db)
+}
+
+func (r *sqlNotificationsRepository) CountUnreadRecentAuditLogs(userID int64) (int, error) {
+	return dbrepo.CountUnreadRecentAuditLogs(r.db, userID)
+}
 
 func SuperAdminNotifications(c *gin.Context) {
 	user := middleware.CurrentUser(c)
@@ -22,14 +63,9 @@ func SuperAdminNotifications(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	repo := newNotificationsRepository(db)
+	pagination := handlers.ParsePagination(c, 5, 50)
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	if page < 1 {
-		page = 1
-	}
-	perPage := 5
-
-	notifications := []map[string]any{}
 	sidebarNotifications := map[string]int{
 		"super-admin.letters.index":    0,
 		"super-admin.recruitment":      0,
@@ -38,129 +74,40 @@ func SuperAdminNotifications(c *gin.Context) {
 		"super-admin.audit-log":        0,
 	}
 
-	letters := []models.Surat{}
-	letters, _ = dbrepo.ListPendingHRLetters(db)
-	sidebarNotifications["super-admin.letters.index"] = len(letters)
-	for _, letter := range letters {
-		notifications = append(notifications, map[string]any{
-			"id":          "letter-" + strconv.FormatInt(letter.SuratID, 10),
-			"type":        "letter",
-			"title":       "Surat Perlu Ditindaklanjuti",
-			"description": "Surat " + letter.NomorSurat + " - " + letter.Perihal,
-			"timestamp":   handlers.DiffForHumans(letter.CreatedAt),
-			"url":         "/super-admin/kelola-surat",
-			"created_at":  letter.CreatedAt,
-		})
-	}
+	sidebarNotifications["super-admin.letters.index"], _ = repo.CountPendingHRLetters()
+	sidebarNotifications["super-admin.recruitment"], _ = repo.CountPendingRecruitmentApplications()
+	sidebarNotifications["super-admin.staff.index"], _ = repo.CountPendingStaffTerminations()
+	sidebarNotifications["super-admin.complaints.index"], _ = repo.CountNewComplaints()
+	sidebarNotifications["super-admin.audit-log"], _ = repo.CountUnreadRecentAuditLogs(user.ID)
 
-	applications := []models.Application{}
-	applications, _ = dbrepo.ListPendingRecruitmentApplications(db)
-	sidebarNotifications["super-admin.recruitment"] = len(applications)
-	for _, app := range applications {
-		notifications = append(notifications, map[string]any{
-			"id":          "application-" + strconv.FormatInt(app.ID, 10),
-			"type":        "application",
-			"title":       "Aplikasi Pelamar Baru",
-			"description": app.FullName + " melamar posisi " + app.Position,
-			"timestamp":   handlers.DiffForHumans(app.CreatedAt),
-			"url":         "/super-admin/recruitment",
-			"created_at":  app.CreatedAt,
-		})
+	total := 0
+	for _, count := range sidebarNotifications {
+		total += count
 	}
-
-	terminations := []models.StaffTermination{}
-	terminations, _ = dbrepo.ListPendingStaffTerminations(db)
-	sidebarNotifications["super-admin.staff.index"] = len(terminations)
-	for _, term := range terminations {
-		notifications = append(notifications, map[string]any{
-			"id":          "termination-" + strconv.FormatInt(term.ID, 10),
-			"type":        "termination",
-			"title":       "Pengajuan Offboarding",
-			"description": "Pengajuan offboarding " + term.EmployeeName,
-			"timestamp":   handlers.DiffForHumans(term.RequestDate),
-			"url":         "/super-admin/kelola-staff",
-			"created_at":  term.RequestDate,
-		})
-	}
-
-	complaints := []models.Complaint{}
-	complaints, _ = dbrepo.ListNewComplaints(db)
-	sidebarNotifications["super-admin.complaints.index"] = len(complaints)
-	for _, complaint := range complaints {
-		notifications = append(notifications, map[string]any{
-			"id":          "complaint-" + strconv.FormatInt(complaint.ID, 10),
-			"type":        "complaint",
-			"title":       "Pengaduan Baru",
-			"description": complaint.Subject,
-			"timestamp":   handlers.DiffForHumans(complaint.CreatedAt),
-			"url":         "/super-admin/kelola-pengaduan",
-			"created_at":  complaint.CreatedAt,
-		})
-	}
-
-	auditLogs := []models.AuditLog{}
-	auditLogs, _ = dbrepo.ListUnreadAuditLogs(db, user.ID)
-	sidebarNotifications["super-admin.audit-log"] = len(auditLogs)
-	for _, audit := range auditLogs {
-		description := "Aktivitas audit baru tercatat."
-		if audit.Description != nil && *audit.Description != "" {
-			description = *audit.Description
-		}
-		title := "Aktivitas Audit Baru"
-		if audit.Action != "" {
-			title = "Audit: " + audit.Action
-		}
-		notifications = append(notifications, map[string]any{
-			"id":          "audit-" + strconv.FormatInt(audit.ID, 10),
-			"type":        "audit",
-			"title":       title,
-			"description": description,
-			"timestamp":   handlers.DiffForHumans(audit.CreatedAt),
-			"url":         "/super-admin/audit-log",
-			"created_at":  audit.CreatedAt,
-		})
-	}
-
-	// sort by created_at desc
-	for i := 0; i < len(notifications); i++ {
-		for j := i + 1; j < len(notifications); j++ {
-			t1, _ := notifications[i]["created_at"].(*time.Time)
-			t2, _ := notifications[j]["created_at"].(*time.Time)
-			if t2 != nil && t1 != nil && t2.After(*t1) {
-				notifications[i], notifications[j] = notifications[j], notifications[i]
-			}
-		}
-	}
-
-	total := len(notifications)
-	lastPage := (total + perPage - 1) / perPage
-	if lastPage == 0 {
+	lastPage := (total + pagination.Limit - 1) / pagination.Limit
+	if lastPage <= 0 {
 		lastPage = 1
 	}
-	if page > lastPage {
-		page = lastPage
+
+	rows, _ := repo.ListUnifiedNotificationsPaged(user.ID, pagination.Limit, pagination.Offset)
+	items := make([]dto.NotificationItem, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, dto.NotificationItem{
+			ID:          row.ID,
+			Type:        row.Type,
+			Title:       row.Title,
+			Description: row.Description,
+			Timestamp:   handlers.DiffForHumans(row.CreatedAt),
+			URL:         row.URL,
+		})
 	}
 
-	start := (page - 1) * perPage
-	end := start + perPage
-	if start > total {
-		start = total
-	}
-	if end > total {
-		end = total
-	}
-
-	paginated := notifications[start:end]
-	for i := range paginated {
-		delete(paginated[i], "created_at")
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"data":                 paginated,
-		"current_page":         page,
-		"last_page":            lastPage,
-		"total":                total,
-		"per_page":             perPage,
-		"sidebarNotifications": sidebarNotifications,
+	c.JSON(http.StatusOK, dto.NotificationListResponse{
+		Data:                 items,
+		CurrentPage:          pagination.Page,
+		LastPage:             lastPage,
+		Total:                total,
+		PerPage:              pagination.Limit,
+		SidebarNotifications: sidebarNotifications,
 	})
 }

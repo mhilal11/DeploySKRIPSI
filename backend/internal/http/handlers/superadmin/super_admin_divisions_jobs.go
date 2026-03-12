@@ -303,7 +303,7 @@ func loadActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) map[i
 		idSet[divisionID] = struct{}{}
 	}
 
-	rows, err := dbrepo.ListActiveDivisionJobs(db)
+	rows, err := dbrepo.ListActiveDivisionJobsByDivisionIDs(db, divisionIDs)
 	if err != nil {
 		return result
 	}
