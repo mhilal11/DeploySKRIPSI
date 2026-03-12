@@ -11,6 +11,7 @@ Salin template:
 - `APP_ADDR` : alamat bind server, contoh `:8080`
 - `APP_URL` : base URL backend, contoh `http://localhost:8080`
 - `FRONTEND_URL` : origin frontend yang diizinkan CORS. Bisa lebih dari satu origin dipisah koma, contoh `http://localhost:5173,http://127.0.0.1:5173`
+- `APP_TIMEZONE` : timezone tampilan tanggal/jam di API response (default `Asia/Jakarta`)
 - `EDUCATION_REFERENCE_PATH` : path file snapshot referensi universitas/prodi (default `./data/education_reference_id.json`)
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
 - `SESSION_SECRET` : rahasia session cookie
@@ -31,6 +32,7 @@ Salin template:
 
 Catatan:
 - Koneksi database backend dijalankan dengan timezone `UTC` (`loc=UTC`) untuk mencegah mismatch tanggal lintas timezone server.
+- Timestamp disimpan dalam UTC, lalu dikonversi ke `APP_TIMEZONE` saat diformat ke response API.
 - Verifikasi email menggunakan random token yang disimpan di tabel `email_verification_tokens` dengan masa berlaku 60 menit.
 
 ### SMTP (opsional)
