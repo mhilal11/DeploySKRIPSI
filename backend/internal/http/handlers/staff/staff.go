@@ -126,24 +126,19 @@ func StaffComplaintsIndex(c *gin.Context) {
 		return
 	}
 	db := middleware.GetDB(c)
-
-	complaints, _ := dbrepo.ListComplaintsByUserID(db, user.ID, 0)
+	pagination := handlers.ParsePagination(c, 20, 100)
+	complaints, _ := dbrepo.ListComplaintsByUserIDPaged(db, user.ID, pagination.Limit, pagination.Offset)
+	totalComplaints, _ := dbrepo.CountComplaintsByUserID(db, user.ID)
 
 	stats := map[string]int{
-		"new":        0,
-		"inProgress": 0,
-		"resolved":   0,
+		"new":          0,
+		"inProgress":   0,
+		"resolved":     0,
+		"totalRecords": totalComplaints,
 	}
-	for _, complaint := range complaints {
-		switch complaint.Status {
-		case models.ComplaintStatusNew:
-			stats["new"]++
-		case models.ComplaintStatusInProgress:
-			stats["inProgress"]++
-		case models.ComplaintStatusResolved:
-			stats["resolved"]++
-		}
-	}
+	stats["new"], _ = dbrepo.CountComplaintsByUserIDAndStatuses(db, user.ID, models.ComplaintStatusNew)
+	stats["inProgress"], _ = dbrepo.CountComplaintsByUserIDAndStatuses(db, user.ID, models.ComplaintStatusInProgress)
+	stats["resolved"], _ = dbrepo.CountComplaintsByUserIDAndStatuses(db, user.ID, models.ComplaintStatusResolved)
 
 	if user.Division != nil {
 		regulationsCount, _ := dbrepo.CountDivisionIncomingRegulations(db, *user.Division, nil)
@@ -235,6 +230,7 @@ func StaffComplaintsIndex(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"stats":      stats,
 		"complaints": complaintPayload,
+		"pagination": handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalComplaints),
 		"filters": gin.H{
 			"categories": categories,
 			"statuses":   statusOptions,

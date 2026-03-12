@@ -140,8 +140,8 @@ func PelamarApplicationsStore(c *gin.Context) {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal mengirim lamaran")
 		return
 	}
-	if applicationID > 0 && handlers.TriggerRecruitmentAIScreening != nil {
-		handlers.TriggerRecruitmentAIScreening(db, middleware.GetConfig(c), applicationID, user.ID)
+	if applicationID > 0 {
+		triggerRecruitmentAIScreening(db, middleware.GetConfig(c), applicationID, user.ID)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Lamaran Anda berhasil dikirim."})

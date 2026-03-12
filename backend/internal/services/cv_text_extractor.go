@@ -17,16 +17,26 @@ import (
 const maxExtractedCVTextChars = 30000
 
 func ExtractCVText(filePath string) (string, error) {
-	ext := strings.ToLower(strings.TrimSpace(filepath.Ext(filePath)))
+	return ExtractCVTextWithKey(filePath, "")
+}
+
+func ExtractCVTextWithKey(filePath, rawKey string) (string, error) {
+	readPath, cleanup, err := PrepareFileForRead(filePath, rawKey)
+	if err != nil {
+		return "", err
+	}
+	defer cleanup()
+
+	ext := strings.ToLower(strings.TrimSpace(filepath.Ext(readPath)))
 	switch ext {
 	case ".pdf":
-		return extractTextFromPDF(filePath)
+		return extractTextFromPDF(readPath)
 	case ".docx":
-		return extractTextFromDOCX(filePath)
+		return extractTextFromDOCX(readPath)
 	case ".txt", ".md", ".rtf":
-		return extractTextFromPlainFile(filePath)
+		return extractTextFromPlainFile(readPath)
 	default:
-		return extractTextFromPlainFile(filePath)
+		return extractTextFromPlainFile(readPath)
 	}
 }
 

@@ -5,6 +5,8 @@ import (
 	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
+	"sync"
+	"time"
 
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/services"
@@ -12,11 +14,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const landingDataCacheTTL = 30 * time.Second
+
+var landingDataCache = struct {
+	mu        sync.RWMutex
+	expiresAt time.Time
+	payload   gin.H
+}{}
+
 func RegisterPublicRoutes(rg *gin.RouterGroup) {
 	rg.GET("/public/landing", LandingData)
 }
 
 func LandingData(c *gin.Context) {
+	if payload, ok := getLandingDataCache(); ok {
+		c.JSON(http.StatusOK, payload)
+		return
+	}
+
 	db := middleware.GetDB(c)
 
 	profiles, err := services.EnsureDivisionProfiles(db)
@@ -78,9 +93,30 @@ func LandingData(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	payload := gin.H{
 		"canLogin":    true,
 		"canRegister": true,
 		"jobs":        jobs,
-	})
+	}
+	setLandingDataCache(payload)
+	c.JSON(http.StatusOK, payload)
+}
+
+func getLandingDataCache() (gin.H, bool) {
+	landingDataCache.mu.RLock()
+	defer landingDataCache.mu.RUnlock()
+	if landingDataCache.payload == nil {
+		return nil, false
+	}
+	if time.Now().After(landingDataCache.expiresAt) {
+		return nil, false
+	}
+	return landingDataCache.payload, true
+}
+
+func setLandingDataCache(payload gin.H) {
+	landingDataCache.mu.Lock()
+	landingDataCache.payload = payload
+	landingDataCache.expiresAt = time.Now().Add(landingDataCacheTTL)
+	landingDataCache.mu.Unlock()
 }

@@ -7,6 +7,7 @@ import (
 
 	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/models"
+	"hris-backend/internal/services"
 )
 
 func evaluateRecruitmentScore(
@@ -50,189 +51,66 @@ func evaluateRecruitmentScoreWithAI(
 	certificationCount := countCertifications(certifications)
 	profileCompleteness := computeApplicantProfileCompleteness(profile, app, educations, experiences)
 
-	educationScore, educationDetail, educationPass := scoreEducationCriterion(highestEducation, requiredEducation)
-	educationScore, educationDetail = adjustEducationScoreByProgramStudy(
-		educationScore,
-		educationDetail,
-		educationPass,
-		highestStudyProgram,
-		requiredProgramStudies,
-	)
-	experienceScore, experienceDetail, experiencePass := scoreExperienceCriterion(experienceYears, requiredExperienceYears)
-	certificationScore, certificationDetail := scoreCertificationCriterion(certificationCount)
-	completenessScore, completenessDetail := scoreCompletenessCriterion(profileCompleteness)
-
-	weightEducation := scoringConfig.WeightEducation
-	weightExperience := scoringConfig.WeightExperience
-	weightCertifications := scoringConfig.WeightCerts
-	weightProfile := scoringConfig.WeightCompleteness
-	weightAI := scoringConfig.WeightAIScreening
-	hasAIScore := aiMatchScore != nil
-	if !hasAIScore {
-		weightAI = 0
-	}
-	totalWeight := weightEducation + weightExperience + weightCertifications + weightProfile + weightAI
-	if totalWeight <= 0 {
-		weightEducation = defaultWeightEducation
-		weightExperience = defaultWeightExperience
-		weightCertifications = defaultWeightCerts
-		weightProfile = defaultWeightCompleteness
-		if hasAIScore {
-			weightAI = defaultWeightAIScreening
-		} else {
-			weightAI = 0
-		}
-		totalWeight = weightEducation + weightExperience + weightCertifications + weightProfile + weightAI
-		if totalWeight <= 0 {
-			totalWeight = 1
-		}
-	}
-	weightEducation /= totalWeight
-	weightExperience /= totalWeight
-	weightCertifications /= totalWeight
-	weightProfile /= totalWeight
-	weightAI /= totalWeight
-
-	breakdown := []recruitmentScoreBreakdown{
-		componentScore("education", "Pendidikan", weightEducation, educationScore, educationDetail),
-		componentScore("experience", "Pengalaman", weightExperience, experienceScore, experienceDetail),
-		componentScore("certification", "Sertifikasi", weightCertifications, certificationScore, certificationDetail),
-		componentScore("profile", "Kelengkapan Profil", weightProfile, completenessScore, completenessDetail),
-	}
-	if hasAIScore {
-		breakdown = append(breakdown, componentScore(
-			"ai_screening",
-			"AI CV Screening",
-			weightAI,
-			clamp(*aiMatchScore, 0, 100),
-			fmt.Sprintf("Skor kecocokan AI terhadap lowongan: %.1f/100.", clamp(*aiMatchScore, 0, 100)),
-		))
-	}
-
-	highlights := []string{}
-	risks := []string{}
-	eligible := true
-	hardFailureCount := 0
-
-	if requiredEducation != "" {
-		if educationPass {
-			highlights = append(highlights, fmt.Sprintf("Pendidikan memenuhi syarat minimal %s.", requiredEducation))
-		} else {
-			eligible = false
-			hardFailureCount++
-			risks = append(risks, fmt.Sprintf("Pendidikan belum memenuhi syarat minimal %s.", requiredEducation))
-		}
-	} else if highestEducation != "" {
-		highlights = append(highlights, fmt.Sprintf("Pendidikan tertinggi terdeteksi: %s.", highestEducation))
-	}
-
-	if requiredExperienceYears > 0 {
-		if experiencePass {
-			highlights = append(highlights, fmt.Sprintf("Pengalaman kerja memenuhi minimal %d tahun.", requiredExperienceYears))
-		} else {
-			eligible = false
-			hardFailureCount++
-			risks = append(risks, fmt.Sprintf("Pengalaman kerja belum memenuhi minimal %d tahun.", requiredExperienceYears))
-		}
-	} else if experienceYears > 0 {
-		highlights = append(highlights, fmt.Sprintf("Total pengalaman kerja terhitung %.1f tahun.", experienceYears))
-	}
-
-	if certificationCount > 0 {
-		highlights = append(highlights, fmt.Sprintf("%d sertifikasi terdeteksi.", certificationCount))
-	}
-
-	if profileCompleteness < 70 {
-		risks = append(risks, "Kelengkapan profil masih rendah; data kandidat bisa belum merepresentasikan kompetensi penuh.")
-	}
-	if hasAIScore {
-		normalizedAIScore := clamp(*aiMatchScore, 0, 100)
-		switch {
-		case normalizedAIScore >= 85:
-			highlights = append(highlights, fmt.Sprintf("AI CV screening menunjukkan kecocokan sangat tinggi (%.1f/100).", normalizedAIScore))
-		case normalizedAIScore >= 70:
-			highlights = append(highlights, fmt.Sprintf("AI CV screening menunjukkan kecocokan baik (%.1f/100).", normalizedAIScore))
-		case normalizedAIScore < 55:
-			risks = append(risks, fmt.Sprintf("AI CV screening menunjukkan kecocokan rendah (%.1f/100).", normalizedAIScore))
+	var candidateAge *int
+	candidateGender := ""
+	if profile != nil {
+		candidateAge = handlers.CalculateAge(profile.DateOfBirth)
+		if profile.Gender != nil {
+			candidateGender = strings.TrimSpace(*profile.Gender)
 		}
 	}
 
-	if strings.TrimSpace(requiredGender) != "" && !strings.EqualFold(requiredGender, "none") && !strings.EqualFold(requiredGender, "any") {
-		if profile == nil || profile.Gender == nil || strings.TrimSpace(*profile.Gender) == "" {
-			eligible = false
-			hardFailureCount++
-			risks = append(risks, fmt.Sprintf("Kriteria jenis kelamin %q tidak bisa diverifikasi karena data belum lengkap.", requiredGender))
-		} else if !strings.EqualFold(strings.TrimSpace(*profile.Gender), requiredGender) {
-			eligible = false
-			hardFailureCount++
-			risks = append(risks, fmt.Sprintf("Jenis kelamin tidak sesuai kriteria lowongan (%s).", requiredGender))
-		} else {
-			highlights = append(highlights, "Jenis kelamin sesuai dengan kriteria lowongan.")
-		}
-	}
+	engineResult := services.EvaluateRecruitmentScoring(services.RecruitmentScoringInput{
+		Config: services.RecruitmentScoringConfig{
+			Method:                 scoringConfig.Method,
+			WeightEducation:        scoringConfig.WeightEducation,
+			WeightExperience:       scoringConfig.WeightExperience,
+			WeightCertifications:   scoringConfig.WeightCerts,
+			WeightCompleteness:     scoringConfig.WeightCompleteness,
+			WeightAIScreening:      scoringConfig.WeightAIScreening,
+			PriorityThreshold:      scoringConfig.PriorityThreshold,
+			RecommendedThreshold:   scoringConfig.RecommendedThreshold,
+			ConsiderThreshold:      scoringConfig.ConsiderThreshold,
+			PenaltyPerFailure:      scoringConfig.PenaltyPerFailure,
+			ExtraPenaltyAfterFails: scoringConfig.ExtraPenaltyAfterFails,
+			ExtraPenalty:           scoringConfig.ExtraPenalty,
+		},
+		HighestEducation:        highestEducation,
+		HighestStudyProgram:     highestStudyProgram,
+		ExperienceYears:         experienceYears,
+		CertificationCount:      certificationCount,
+		ProfileCompleteness:     profileCompleteness,
+		CandidateGender:         candidateGender,
+		CandidateAge:            candidateAge,
+		RequiredEducation:       requiredEducation,
+		RequiredProgramStudies:  requiredProgramStudies,
+		RequiredExperienceYears: requiredExperienceYears,
+		RequiredGender:          requiredGender,
+		MinAge:                  minAge,
+		MaxAge:                  maxAge,
+		AIMatchScore:            aiMatchScore,
+	})
 
-	if minAge > 0 || maxAge > 0 {
-		var age *int
-		if profile != nil {
-			age = handlers.CalculateAge(profile.DateOfBirth)
-		}
-		if age == nil {
-			eligible = false
-			hardFailureCount++
-			risks = append(risks, "Usia tidak bisa diverifikasi karena tanggal lahir belum lengkap.")
-		} else {
-			if minAge > 0 && *age < minAge {
-				eligible = false
-				hardFailureCount++
-				risks = append(risks, fmt.Sprintf("Usia kandidat (%d) di bawah batas minimum %d tahun.", *age, minAge))
-			}
-			if maxAge > 0 && *age > maxAge {
-				eligible = false
-				hardFailureCount++
-				risks = append(risks, fmt.Sprintf("Usia kandidat (%d) di atas batas maksimum %d tahun.", *age, maxAge))
-			}
-			if (minAge == 0 || *age >= minAge) && (maxAge == 0 || *age <= maxAge) {
-				highlights = append(highlights, fmt.Sprintf("Usia kandidat berada dalam rentang kriteria (%d tahun).", *age))
-			}
-		}
-	}
-
-	total := 0.0
-	for _, component := range breakdown {
-		total += component.Contribution
-	}
-
-	if hardFailureCount > 0 {
-		penalty := float64(hardFailureCount) * scoringConfig.PenaltyPerFailure
-		if hardFailureCount >= scoringConfig.ExtraPenaltyAfterFails {
-			penalty += scoringConfig.ExtraPenalty
-		}
-		total -= penalty
-		if total < 0 {
-			total = 0
-		}
-		risks = append(risks, fmt.Sprintf("Skor dikenakan penalti %.1f karena %d kriteria wajib tidak terpenuhi.", penalty, hardFailureCount))
-	}
-
-	total = roundTo(total, 2)
-	for i := range breakdown {
-		breakdown[i].Weight = roundTo(breakdown[i].Weight*100, 1)
-		breakdown[i].Score = roundTo(breakdown[i].Score, 1)
-		breakdown[i].Contribution = roundTo(breakdown[i].Contribution, 2)
-	}
-	method := scoringConfig.Method
-	if hasAIScore {
-		method += " + AI CV Screening"
+	breakdown := make([]recruitmentScoreBreakdown, 0, len(engineResult.Breakdown))
+	for _, component := range engineResult.Breakdown {
+		breakdown = append(breakdown, recruitmentScoreBreakdown{
+			Key:          component.Key,
+			Label:        component.Label,
+			Weight:       component.Weight,
+			Score:        component.Score,
+			Contribution: component.Contribution,
+			Detail:       component.Detail,
+		})
 	}
 
 	return recruitmentScoreResult{
-		Method:         method,
-		Total:          total,
-		Eligible:       eligible,
-		Recommendation: scoreRecommendation(total, eligible, scoringConfig),
+		Method:         engineResult.Method,
+		Total:          engineResult.Total,
+		Eligible:       engineResult.Eligible,
+		Recommendation: engineResult.Recommendation,
 		Breakdown:      breakdown,
-		Highlights:     uniqueStrings(highlights),
-		Risks:          uniqueStrings(risks),
+		Highlights:     engineResult.Highlights,
+		Risks:          engineResult.Risks,
 	}
 }
 
