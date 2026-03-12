@@ -11,7 +11,7 @@ import (
 )
 
 func Connect(cfg config.Config) (*sqlx.DB, error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&charset=utf8mb4&loc=Local",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&charset=utf8mb4&loc=UTC",
 		cfg.DBUser,
 		cfg.DBPassword,
 		cfg.DBHost,

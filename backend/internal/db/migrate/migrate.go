@@ -26,7 +26,7 @@ type StatusRow struct {
 }
 
 func EnsureDatabase(cfg config.Config) error {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=true&loc=Local",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/?charset=utf8mb4&parseTime=true&loc=UTC",
 		cfg.DBUser,
 		cfg.DBPassword,
 		cfg.DBHost,
@@ -44,7 +44,7 @@ func EnsureDatabase(cfg config.Config) error {
 }
 
 func OpenMigrationDB(cfg config.Config) (*sqlx.DB, error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&charset=utf8mb4&loc=Local&multiStatements=true",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&charset=utf8mb4&loc=UTC&multiStatements=true",
 		cfg.DBUser,
 		cfg.DBPassword,
 		cfg.DBHost,

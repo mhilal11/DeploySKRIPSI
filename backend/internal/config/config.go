@@ -32,6 +32,9 @@ type Config struct {
 	CSRFSecret              string
 	CSRFSecretFromEnv       bool
 	StoragePath             string
+	StorageEncryptionKey    string
+	StorageEncryptUploads   bool
+	DisableBackgroundWorker bool
 	CookieSecure            bool
 	MaxRequestBodyBytes     int64
 	SMTPHost                string
@@ -83,6 +86,9 @@ func Load() Config {
 		CSRFSecret:              csrfSecret,
 		CSRFSecretFromEnv:       csrfSecretFromEnv,
 		StoragePath:             storagePath,
+		StorageEncryptionKey:    strings.TrimSpace(getenv("STORAGE_ENCRYPTION_KEY", "")),
+		StorageEncryptUploads:   getenvBool("STORAGE_ENCRYPT_UPLOADS", strings.TrimSpace(getenv("STORAGE_ENCRYPTION_KEY", "")) != ""),
+		DisableBackgroundWorker: getenvBool("DISABLE_BACKGROUND_WORKERS", false),
 		CookieSecure:            getenvBool("COOKIE_SECURE", false),
 		MaxRequestBodyBytes:     int64(getenvInt("MAX_REQUEST_BODY_MB", 25)) * 1024 * 1024,
 		SMTPHost:                getenv("SMTP_HOST", ""),
@@ -132,6 +138,11 @@ func (c Config) ValidateForServer() error {
 	}
 	if c.MaxRequestBodyBytes <= 0 {
 		return fmt.Errorf("MAX_REQUEST_BODY_MB harus lebih dari 0")
+	}
+	if c.StorageEncryptionKey != "" {
+		if len(c.StorageEncryptionKey) < 32 {
+			return fmt.Errorf("STORAGE_ENCRYPTION_KEY minimal 32 karakter (atau base64 32-byte key)")
+		}
 	}
 	return nil
 }
