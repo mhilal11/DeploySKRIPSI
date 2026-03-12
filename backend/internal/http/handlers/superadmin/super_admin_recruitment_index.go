@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
@@ -59,14 +60,14 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 	totalApplications, _ := repo.CountRecruitmentApplications()
 	slaSettings := loadRecruitmentSLASettings(db)
 	now := time.Now()
-	slaOverview := map[string]any{
-		"active_applications": 0,
-		"on_track_count":      0,
-		"warning_count":       0,
-		"overdue_count":       0,
-		"compliance_rate":     100.0,
+	slaOverview := dto.RecruitmentSLAOverview{
+		ActiveApplications: 0,
+		OnTrackCount:       0,
+		WarningCount:       0,
+		OverdueCount:       0,
+		ComplianceRate:     100.0,
 	}
-	slaReminders := make([]map[string]any, 0)
+	slaReminders := make([]dto.RecruitmentSLAReminder, 0)
 
 	profileByUser := map[int64]*models.ApplicantProfile{}
 	loadedProfiles, loadErr := repo.ListApplicantProfilesByUserIDs(extractApplicationUserIDs(apps))
@@ -74,9 +75,9 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 		profileByUser = loadedProfiles
 	}
 
-	applications := make([]map[string]any, 0, len(apps))
-	interviews := make([]map[string]any, 0)
-	onboarding := make([]map[string]any, 0)
+	applications := make([]dto.RecruitmentApplication, 0, len(apps))
+	interviews := make([]dto.RecruitmentInterview, 0)
+	onboarding := make([]dto.RecruitmentOnboarding, 0)
 	scoreByApplicationID := buildRecruitmentScoreIndex(db, apps, profileByUser)
 	applicationIDs := make([]int64, 0, len(apps))
 	for _, app := range apps {
@@ -127,7 +128,7 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 		educationSummary := summarizeEducation(educations)
 		experienceSummary := summarizeExperience(experiences)
 		recruitmentScore, hasRecruitmentScore := scoreByApplicationID[app.ID]
-		var slaIndicator map[string]any
+		var slaIndicator *dto.RecruitmentSLAIndicator
 		if isRecruitmentSLAStage(app.Status) {
 			startAt := applicationStageStartedAt(app)
 			if startAt != nil {
@@ -150,95 +151,101 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 					slaState = "warning"
 				}
 
-				slaIndicator = map[string]any{
-					"stage":          app.Status,
-					"target_days":    targetDays,
-					"days_in_stage":  daysInStage,
-					"due_date":       dueAt.Format("2006-01-02"),
-					"remaining_days": remainingDays,
-					"overdue_days":   overdueDays,
-					"state":          slaState,
-					"is_overdue":     slaState == "overdue",
+				slaIndicator = &dto.RecruitmentSLAIndicator{
+					Stage:         app.Status,
+					TargetDays:    targetDays,
+					DaysInStage:   daysInStage,
+					DueDate:       dueAt.Format("2006-01-02"),
+					RemainingDays: remainingDays,
+					OverdueDays:   overdueDays,
+					State:         slaState,
+					IsOverdue:     slaState == "overdue",
 				}
 
-				slaOverview["active_applications"] = slaOverview["active_applications"].(int) + 1
+				slaOverview.ActiveApplications++
 				switch slaState {
 				case "overdue":
-					slaOverview["overdue_count"] = slaOverview["overdue_count"].(int) + 1
+					slaOverview.OverdueCount++
 				case "warning":
-					slaOverview["warning_count"] = slaOverview["warning_count"].(int) + 1
+					slaOverview.WarningCount++
 				default:
-					slaOverview["on_track_count"] = slaOverview["on_track_count"].(int) + 1
+					slaOverview.OnTrackCount++
 				}
 
 				if slaState == "overdue" || slaState == "warning" {
-					slaReminders = append(slaReminders, map[string]any{
-						"application_id": app.ID,
-						"name":           profileFullName,
-						"position":       app.Position,
-						"division":       app.Division,
-						"stage":          app.Status,
-						"days_in_stage":  daysInStage,
-						"target_days":    targetDays,
-						"due_date":       dueAt.Format("2006-01-02"),
-						"remaining_days": remainingDays,
-						"overdue_days":   overdueDays,
-						"state":          slaState,
+					slaReminders = append(slaReminders, dto.RecruitmentSLAReminder{
+						ApplicationID: app.ID,
+						Name:          profileFullName,
+						Position:      app.Position,
+						Division:      app.Division,
+						Stage:         app.Status,
+						DaysInStage:   daysInStage,
+						TargetDays:    targetDays,
+						DueDate:       dueAt.Format("2006-01-02"),
+						RemainingDays: remainingDays,
+						OverdueDays:   overdueDays,
+						State:         slaState,
 					})
 				}
 			}
 		}
 
-		applications = append(applications, map[string]any{
-			"id":                     app.ID,
-			"name":                   profileFullName,
-			"division":               app.Division,
-			"position":               app.Position,
-			"education":              chooseString(educationSummary, app.Education),
-			"experience":             chooseString(experienceSummary, app.Experience),
-			"profile_name":           profileFullName,
-			"profile_email":          profileEmail,
-			"profile_phone":          profilePhone,
-			"profile_address":        profileAddress,
-			"profile_city":           profileCity,
-			"profile_province":       profileProvince,
-			"profile_gender":         profileGender,
-			"profile_religion":       profileReligion,
-			"profile_date_of_birth":  handlers.FormatDateISO(profileDOB),
-			"educations":             educations,
-			"experiences":            experiences,
-			"certifications":         certifications,
-			"interview_date":         handlers.FormatDateISO(app.InterviewDate),
-			"interview_time":         interviewTime,
-			"interview_mode":         app.InterviewMode,
-			"interviewer_name":       app.InterviewerName,
-			"meeting_link":           app.MeetingLink,
-			"interview_notes":        app.InterviewNotes,
-			"interview_end_time":     interviewEndTime,
-			"has_interview_schedule": hasInterview,
-			"status":                 app.Status,
-			"date":                   handlers.FormatDate(app.SubmittedAt),
-			"submitted_date":         handlers.FormatDateISO(app.SubmittedAt),
-			"email":                  app.Email,
-			"phone":                  app.Phone,
-			"skills":                 app.Skills,
-			"cv_file":                app.CvFile,
-			"cv_url":                 superAdminRecruitmentCVURL(c, app.ID, app.CvFile),
-			"profile_photo_url": func() any {
-				if profile != nil {
-					return handlers.AttachmentURL(c, profile.ProfilePhotoPath)
+		var profilePhoneValue *string
+		if profilePhone != nil {
+			profilePhoneValue = profilePhone
+		} else {
+			profilePhoneValue = app.Phone
+		}
+		var recruitmentScoreValue any
+		if hasRecruitmentScore {
+			recruitmentScoreValue = recruitmentScore
+		}
+
+		applications = append(applications, dto.RecruitmentApplication{
+			ID:                   app.ID,
+			Name:                 profileFullName,
+			Division:             app.Division,
+			Position:             app.Position,
+			Education:            chooseString(educationSummary, app.Education),
+			Experience:           chooseString(experienceSummary, app.Experience),
+			ProfileName:          profileFullName,
+			ProfileEmail:         profileEmail,
+			ProfilePhone:         profilePhoneValue,
+			ProfileAddress:       profileAddress,
+			ProfileCity:          profileCity,
+			ProfileProvince:      profileProvince,
+			ProfileGender:        profileGender,
+			ProfileReligion:      profileReligion,
+			ProfileDateOfBirth:   handlers.FormatDateISO(profileDOB),
+			Educations:           educations,
+			Experiences:          experiences,
+			Certifications:       certifications,
+			InterviewDate:        handlers.FormatDateISO(app.InterviewDate),
+			InterviewTime:        interviewTime,
+			InterviewMode:        app.InterviewMode,
+			InterviewerName:      app.InterviewerName,
+			MeetingLink:          app.MeetingLink,
+			InterviewNotes:       app.InterviewNotes,
+			InterviewEndTime:     interviewEndTime,
+			HasInterviewSchedule: hasInterview,
+			Status:               app.Status,
+			Date:                 handlers.FormatDate(app.SubmittedAt),
+			SubmittedDate:        handlers.FormatDateISO(app.SubmittedAt),
+			Email:                app.Email,
+			Phone:                app.Phone,
+			Skills:               app.Skills,
+			CVFile:               app.CvFile,
+			CVURL:                superAdminRecruitmentCVURL(c, app.ID, app.CvFile),
+			ProfilePhotoURL: func() *string {
+				if profile == nil {
+					return nil
 				}
-				return nil
+				return handlers.AttachmentURL(c, profile.ProfilePhotoPath)
 			}(),
-			"rejection_reason": app.RejectionReason,
-			"recruitment_score": func() any {
-				if hasRecruitmentScore {
-					return recruitmentScore
-				}
-				return nil
-			}(),
-			"ai_screening": aiScreeningByApplicationID[app.ID],
-			"sla":          slaIndicator,
+			RejectionReason:  app.RejectionReason,
+			RecruitmentScore: recruitmentScoreValue,
+			AIScreening:      aiScreeningByApplicationID[app.ID],
+			SLA:              slaIndicator,
 		})
 
 		if hasInterview {
@@ -250,18 +257,18 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 					endTime = &endStr
 				}
 			}
-			interviews = append(interviews, map[string]any{
-				"application_id": app.ID,
-				"candidate":      app.FullName,
-				"position":       app.Position,
-				"date":           handlers.FormatDate(app.InterviewDate),
-				"date_value":     handlers.FormatDateISO(app.InterviewDate),
-				"time":           handlers.FirstString(interviewTime, "-"),
-				"end_time":       endTime,
-				"mode":           handlers.FirstString(app.InterviewMode, "-"),
-				"interviewer":    handlers.FirstString(app.InterviewerName, "-"),
-				"meeting_link":   app.MeetingLink,
-				"status":         app.Status,
+			interviews = append(interviews, dto.RecruitmentInterview{
+				ApplicationID: app.ID,
+				Candidate:     app.FullName,
+				Position:      app.Position,
+				Date:          handlers.FormatDate(app.InterviewDate),
+				DateValue:     handlers.FormatDateISO(app.InterviewDate),
+				Time:          handlers.FirstString(interviewTime, "-"),
+				EndTime:       endTime,
+				Mode:          handlers.FirstString(app.InterviewMode, "-"),
+				Interviewer:   handlers.FirstString(app.InterviewerName, "-"),
+				MeetingLink:   app.MeetingLink,
+				Status:        app.Status,
 			})
 		}
 
@@ -272,63 +279,57 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 			trainingDone := checklist.TrainingOrientation
 			allComplete := contractDone && inventoryDone && trainingDone
 
-			onboarding = append(onboarding, map[string]any{
-				"application_id": app.ID,
-				"name":           app.FullName,
-				"position":       app.Position,
-				"startedAt":      handlers.FormatDate(app.SubmittedAt),
-				"status": func() string {
+			onboarding = append(onboarding, dto.RecruitmentOnboarding{
+				ApplicationID: app.ID,
+				Name:          app.FullName,
+				Position:      app.Position,
+				StartedAt:     handlers.FormatDate(app.SubmittedAt),
+				Status: func() string {
 					if allComplete {
 						return "Selesai"
 					}
 					return "In Progress"
 				}(),
-				"is_staff": isUserStaff(db, app.UserID),
-				"steps": []map[string]any{
-					{"label": "Kontrak ditandatangani", "complete": contractDone},
-					{"label": "Serah terima inventaris", "complete": inventoryDone, "pending": !inventoryDone && contractDone},
-					{"label": "Training & orientasi", "complete": trainingDone, "pending": !trainingDone && inventoryDone},
+				IsStaff: isUserStaff(db, app.UserID),
+				Steps: []dto.RecruitmentOnboardingStep{
+					{Label: "Kontrak ditandatangani", Complete: contractDone},
+					{Label: "Serah terima inventaris", Complete: inventoryDone, Pending: !inventoryDone && contractDone},
+					{Label: "Training & orientasi", Complete: trainingDone, Pending: !trainingDone && inventoryDone},
 				},
 			})
 		}
 	}
 
-	activeSLA := slaOverview["active_applications"].(int)
+	activeSLA := slaOverview.ActiveApplications
 	if activeSLA > 0 {
-		overdue := slaOverview["overdue_count"].(int)
-		slaOverview["compliance_rate"] = float64(activeSLA-overdue) / float64(activeSLA) * 100
+		overdue := slaOverview.OverdueCount
+		slaOverview.ComplianceRate = float64(activeSLA-overdue) / float64(activeSLA) * 100
 	}
 	sort.SliceStable(slaReminders, func(i, j int) bool {
 		left := slaReminders[i]
 		right := slaReminders[j]
-		leftState, _ := left["state"].(string)
-		rightState, _ := right["state"].(string)
-		if leftState != rightState {
-			return leftState == "overdue"
+		if left.State != right.State {
+			return left.State == "overdue"
 		}
-		leftOverdue, _ := left["overdue_days"].(int)
-		rightOverdue, _ := right["overdue_days"].(int)
-		if leftOverdue != rightOverdue {
-			return leftOverdue > rightOverdue
+		if left.OverdueDays != right.OverdueDays {
+			return left.OverdueDays > right.OverdueDays
 		}
-		leftRemain, _ := left["remaining_days"].(int)
-		rightRemain, _ := right["remaining_days"].(int)
-		return leftRemain < rightRemain
+		return left.RemainingDays < right.RemainingDays
 	})
 	if len(slaReminders) > 12 {
 		slaReminders = slaReminders[:12]
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"applications":         applications,
-		"pagination":           handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalApplications),
-		"statusOptions":        models.ApplicationStatuses,
-		"interviews":           interviews,
-		"onboarding":           onboarding,
-		"slaSettings":          slaSettings,
-		"slaOverview":          slaOverview,
-		"slaReminders":         slaReminders,
-		"scoringAudits":        scoringAudits,
-		"sidebarNotifications": handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
+	c.JSON(http.StatusOK, dto.RecruitmentIndexResponse{
+		Applications:         applications,
+		Pagination:           handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalApplications),
+		StatusOptions:        models.ApplicationStatuses,
+		Interviews:           interviews,
+		Onboarding:           onboarding,
+		SLASettings:          slaSettings,
+		SLAOverview:          slaOverview,
+		SLAReminders:         slaReminders,
+		ScoringAudits:        scoringAudits,
+		SidebarNotifications: handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
