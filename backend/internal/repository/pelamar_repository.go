@@ -47,6 +47,39 @@ func ListApplicationsByUserID(db *sqlx.DB, userID int64) ([]models.Application, 
 	return applications, wrapRepoErr("list applications by user id", err)
 }
 
+func CountApplicationsByUserID(db *sqlx.DB, userID int64) (int, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+	var count int
+	err := db.Get(&count, "SELECT COUNT(*) FROM applications WHERE user_id = ?", userID)
+	return count, wrapRepoErr("count applications by user id", err)
+}
+
+func ListApplicationsByUserIDPaged(db *sqlx.DB, userID int64, limit, offset int) ([]models.Application, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	applications := []models.Application{}
+	err := db.Select(
+		&applications,
+		"SELECT * FROM applications WHERE user_id = ? ORDER BY submitted_at DESC LIMIT ? OFFSET ?",
+		userID,
+		limit,
+		offset,
+	)
+	return applications, wrapRepoErr("list applications by user id paged", err)
+}
+
 func CountActiveApplicationsByUserID(db *sqlx.DB, userID int64) (int, error) {
 	if db == nil {
 		return 0, errors.New("database tidak tersedia")

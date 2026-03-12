@@ -1,20 +1,26 @@
 package public
 
 import (
+	"context"
+	"encoding/json"
 	"hris-backend/internal/http/handlers"
 	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
+	"hris-backend/internal/config"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 const landingDataCacheTTL = 30 * time.Second
+const landingDataRedisKey = "public:landing:v1"
 
 var landingDataCache = struct {
 	mu        sync.RWMutex
@@ -22,11 +28,24 @@ var landingDataCache = struct {
 	payload   gin.H
 }{}
 
+var landingDataRedisClient = struct {
+	mu     sync.Mutex
+	client *redis.Client
+	ready  bool
+}{}
+
 func RegisterPublicRoutes(rg *gin.RouterGroup) {
 	rg.GET("/public/landing", LandingData)
 }
 
 func LandingData(c *gin.Context) {
+	cfg := middleware.GetConfig(c)
+	if payload, ok := getLandingDataRedis(c.Request.Context(), cfg); ok {
+		setLandingDataCache(payload)
+		c.JSON(http.StatusOK, payload)
+		return
+	}
+
 	if payload, ok := getLandingDataCache(); ok {
 		c.JSON(http.StatusOK, payload)
 		return
@@ -99,6 +118,7 @@ func LandingData(c *gin.Context) {
 		"jobs":        jobs,
 	}
 	setLandingDataCache(payload)
+	setLandingDataRedis(c.Request.Context(), cfg, payload)
 	c.JSON(http.StatusOK, payload)
 }
 
@@ -119,4 +139,61 @@ func setLandingDataCache(payload gin.H) {
 	landingDataCache.payload = payload
 	landingDataCache.expiresAt = time.Now().Add(landingDataCacheTTL)
 	landingDataCache.mu.Unlock()
+}
+
+func getLandingDataRedis(ctx context.Context, cfg config.Config) (gin.H, bool) {
+	client := getLandingDataRedisClient(cfg)
+	if client == nil {
+		return nil, false
+	}
+
+	raw, err := client.Get(ctx, landingDataRedisKey).Bytes()
+	if err != nil {
+		return nil, false
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, false
+	}
+	return gin.H(payload), true
+}
+
+func setLandingDataRedis(ctx context.Context, cfg config.Config, payload gin.H) {
+	client := getLandingDataRedisClient(cfg)
+	if client == nil || payload == nil {
+		return
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	_ = client.Set(ctx, landingDataRedisKey, raw, landingDataCacheTTL).Err()
+}
+
+func getLandingDataRedisClient(cfg config.Config) *redis.Client {
+	landingDataRedisClient.mu.Lock()
+	defer landingDataRedisClient.mu.Unlock()
+
+	if landingDataRedisClient.ready {
+		return landingDataRedisClient.client
+	}
+
+	var client *redis.Client
+	if strings.TrimSpace(cfg.RedisURL) != "" {
+		opts, err := redis.ParseURL(cfg.RedisURL)
+		if err == nil {
+			client = redis.NewClient(opts)
+		}
+	} else if strings.TrimSpace(cfg.RedisAddr) != "" {
+		client = redis.NewClient(&redis.Options{
+			Addr:     cfg.RedisAddr,
+			Password: cfg.RedisPassword,
+			DB:       cfg.RedisDB,
+		})
+	}
+
+	landingDataRedisClient.client = client
+	landingDataRedisClient.ready = true
+	return landingDataRedisClient.client
 }

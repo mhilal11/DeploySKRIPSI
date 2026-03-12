@@ -1,6 +1,7 @@
 package superadmin
 
 import (
+	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	dbrepo "hris-backend/internal/repository"
 
@@ -18,6 +19,52 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+type staffListRepository interface {
+	ListActiveStaffTerminationsPaged(limit, offset int) ([]models.StaffTermination, error)
+	ListArchivedStaffTerminationsPaged(limit, offset int) ([]models.StaffTermination, error)
+	CountActiveStaffTerminations() (int, error)
+	CountArchivedStaffTerminations() (int, error)
+	CountStaffTerminationsByStatus(status string) (int, error)
+	ListEligibleActiveStaffRows() ([]dbrepo.StaffPickerRow, error)
+	GetUserRegisteredAtByID(userID int64) (*time.Time, error)
+}
+
+type sqlStaffListRepository struct {
+	db *sqlx.DB
+}
+
+func newStaffListRepository(db *sqlx.DB) staffListRepository {
+	return &sqlStaffListRepository{db: db}
+}
+
+func (r *sqlStaffListRepository) ListActiveStaffTerminationsPaged(limit, offset int) ([]models.StaffTermination, error) {
+	return dbrepo.ListActiveStaffTerminationsPaged(r.db, limit, offset)
+}
+
+func (r *sqlStaffListRepository) ListArchivedStaffTerminationsPaged(limit, offset int) ([]models.StaffTermination, error) {
+	return dbrepo.ListArchivedStaffTerminationsPaged(r.db, limit, offset)
+}
+
+func (r *sqlStaffListRepository) CountActiveStaffTerminations() (int, error) {
+	return dbrepo.CountActiveStaffTerminations(r.db)
+}
+
+func (r *sqlStaffListRepository) CountArchivedStaffTerminations() (int, error) {
+	return dbrepo.CountArchivedStaffTerminations(r.db)
+}
+
+func (r *sqlStaffListRepository) CountStaffTerminationsByStatus(status string) (int, error) {
+	return dbrepo.CountStaffTerminationsByStatus(r.db, status)
+}
+
+func (r *sqlStaffListRepository) ListEligibleActiveStaffRows() ([]dbrepo.StaffPickerRow, error) {
+	return dbrepo.ListEligibleActiveStaffRows(r.db)
+}
+
+func (r *sqlStaffListRepository) GetUserRegisteredAtByID(userID int64) (*time.Time, error) {
+	return dbrepo.GetUserRegisteredAtByID(r.db, userID)
+}
+
 func SuperAdminStaffIndex(c *gin.Context) {
 	user := middleware.CurrentUser(c)
 	if user == nil || !(user.Role == models.RoleSuperAdmin || user.Role == models.RoleAdmin) {
@@ -26,27 +73,24 @@ func SuperAdminStaffIndex(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	repo := newStaffListRepository(db)
+	pagination := handlers.ParsePagination(c, 20, 100)
 
-	terminations, _ := dbrepo.ListStaffTerminationsByEffectiveDateDesc(db)
-
-	active := []models.StaffTermination{}
-	archive := []models.StaffTermination{}
-	for _, t := range terminations {
-		if t.Status == "Selesai" {
-			archive = append(archive, t)
-		} else {
-			active = append(active, t)
-		}
-	}
+	active, _ := repo.ListActiveStaffTerminationsPaged(pagination.Limit, pagination.Offset)
+	archive, _ := repo.ListArchivedStaffTerminationsPaged(pagination.Limit, pagination.Offset)
+	totalActive, _ := repo.CountActiveStaffTerminations()
+	totalArchive, _ := repo.CountArchivedStaffTerminations()
+	newRequestsCount, _ := repo.CountStaffTerminationsByStatus("Diajukan")
+	inProcessCount, _ := repo.CountStaffTerminationsByStatus("Proses")
 
 	stats := map[string]int{
-		"newRequests":        countByStatus(terminations, "Diajukan"),
-		"inProcess":          countByStatus(terminations, "Proses"),
+		"newRequests":        newRequestsCount,
+		"inProcess":          inProcessCount,
 		"completedThisMonth": countTerminationsThisMonth(db),
-		"archived":           len(terminations),
+		"archived":           totalArchive,
 	}
 
-	staffRows, _ := dbrepo.ListEligibleActiveStaffRows(db)
+	staffRows, _ := repo.ListEligibleActiveStaffRows()
 	staffOptions := make([]map[string]any, 0, len(staffRows))
 	for _, row := range staffRows {
 		staffOptions = append(staffOptions, map[string]any{
@@ -64,7 +108,7 @@ func SuperAdminStaffIndex(c *gin.Context) {
 		}
 		joinDate := "-"
 		if t.UserID != nil {
-			if registeredAt, err := dbrepo.GetUserRegisteredAtByID(db, *t.UserID); err == nil && registeredAt != nil {
+			if registeredAt, err := repo.GetUserRegisteredAtByID(*t.UserID); err == nil && registeredAt != nil {
 				joinDate = registeredAt.Format("02 Jan 2006")
 			}
 		}
@@ -96,6 +140,10 @@ func SuperAdminStaffIndex(c *gin.Context) {
 		"terminations": gin.H{
 			"active":  transformTerminations(active),
 			"archive": transformTerminations(archive),
+		},
+		"pagination": gin.H{
+			"active":  handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalActive),
+			"archive": handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalArchive),
 		},
 		"inactiveEmployees":    inactiveEmployees,
 		"staffOptions":         staffOptions,
@@ -259,25 +307,25 @@ func SuperAdminStaffDelete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "Offboarding berhasil dibatalkan."})
 }
 
-func transformTerminations(list []models.StaffTermination) []map[string]any {
-	out := []map[string]any{}
+func transformTerminations(list []models.StaffTermination) []dto.StaffTermination {
+	out := []dto.StaffTermination{}
 	for _, t := range list {
-		out = append(out, map[string]any{
-			"id":            t.ID,
-			"reference":     t.Reference,
-			"employeeName":  t.EmployeeName,
-			"employeeCode":  t.EmployeeCode,
-			"division":      t.Division,
-			"position":      t.Position,
-			"type":          t.Type,
-			"reason":        t.Reason,
-			"suggestion":    t.Suggestion,
-			"notes":         t.Notes,
-			"checklist":     t.Checklist,
-			"status":        t.Status,
-			"progress":      t.Progress,
-			"requestDate":   handlers.FormatDate(t.RequestDate),
-			"effectiveDate": handlers.FormatDate(t.EffectiveDate),
+		out = append(out, dto.StaffTermination{
+			ID:            t.ID,
+			Reference:     t.Reference,
+			EmployeeName:  t.EmployeeName,
+			EmployeeCode:  t.EmployeeCode,
+			Division:      t.Division,
+			Position:      t.Position,
+			Type:          t.Type,
+			Reason:        t.Reason,
+			Suggestion:    t.Suggestion,
+			Notes:         t.Notes,
+			Checklist:     t.Checklist,
+			Status:        t.Status,
+			Progress:      t.Progress,
+			RequestDate:   handlers.FormatDate(t.RequestDate),
+			EffectiveDate: handlers.FormatDate(t.EffectiveDate),
 		})
 	}
 	return out

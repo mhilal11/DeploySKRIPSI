@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/models"
 	dbrepo "hris-backend/internal/repository"
@@ -21,16 +22,16 @@ func countPending(letters []models.Surat) int {
 	return count
 }
 
-func recentRecruitments(db *sqlx.DB) []map[string]any {
+func recentRecruitments(db *sqlx.DB) []dto.RecruitmentSummary {
 	apps, _ := dbrepo.ListAppliedOrScreeningApplications(db, 10)
-	out := make([]map[string]any, 0, len(apps))
+	out := make([]dto.RecruitmentSummary, 0, len(apps))
 	for _, app := range apps {
-		out = append(out, map[string]any{
-			"name":      app.FullName,
-			"position":  app.Position,
-			"date":      handlers.FormatDate(app.SubmittedAt),
-			"status":    app.Status,
-			"education": app.Education,
+		out = append(out, dto.RecruitmentSummary{
+			Name:      app.FullName,
+			Position:  app.Position,
+			Date:      handlers.FormatDate(app.SubmittedAt),
+			Status:    app.Status,
+			Education: app.Education,
 		})
 	}
 	return out
@@ -81,23 +82,23 @@ func lookupUserName(db *sqlx.DB, userID int64) string {
 	return name
 }
 
-func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map[string]any {
-	result := make([]map[string]any, 0, len(letters))
+func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []dto.AdminLetter {
+	result := make([]dto.AdminLetter, 0, len(letters))
 	for _, surat := range letters {
 		replyHistories, _ := dbrepo.ListSuratReplyHistories(db, surat.SuratID)
-		historyPayload := make([]map[string]any, 0, len(replyHistories))
+		historyPayload := make([]dto.LetterReplyHistory, 0, len(replyHistories))
 		for _, history := range replyHistories {
 			authorName := ""
 			if history.RepliedBy != nil {
 				authorName = lookupUserName(db, *history.RepliedBy)
 			}
-			historyPayload = append(historyPayload, map[string]any{
-				"id":         history.ID,
-				"note":       history.Note,
-				"author":     authorName,
-				"division":   history.FromDivision,
-				"toDivision": history.ToDivision,
-				"timestamp":  handlers.FormatDateTime(history.RepliedAt),
+			historyPayload = append(historyPayload, dto.LetterReplyHistory{
+				ID:         history.ID,
+				Note:       history.Note,
+				Author:     authorName,
+				Division:   history.FromDivision,
+				ToDivision: history.ToDivision,
+				Timestamp:  handlers.FormatDateTime(history.RepliedAt),
 			})
 		}
 
@@ -117,55 +118,55 @@ func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 			letterType = "Tidak diketahui"
 		}
 		attachmentLink := handlers.AttachmentURL(c, surat.LampiranPath)
-		var attachmentPayload map[string]any
+		var attachmentPayload *dto.LetterAttachment
 		if attachmentLink != nil {
-			attachmentPayload = map[string]any{
-				"name": handlers.FirstString(surat.LampiranNama, "Lampiran"),
-				"size": nil,
-				"url":  attachmentLink,
+			attachmentPayload = &dto.LetterAttachment{
+				Name: handlers.FirstString(surat.LampiranNama, "Lampiran"),
+				Size: nil,
+				URL:  attachmentLink,
 			}
 		}
 
-		result = append(result, map[string]any{
-			"id":             surat.SuratID,
-			"letterNumber":   surat.NomorSurat,
-			"from":           senderDivision,
-			"sender":         senderName,
-			"senderName":     senderName,
-			"senderDivision": senderDivision,
-			"recipientName":  recipientName,
-			"letterType":     letterType,
-			"subject":        surat.Perihal,
-			"category":       surat.Kategori,
-			"date":           handlers.FormatDate(surat.TanggalSurat),
-			"status": func() string {
+		result = append(result, dto.AdminLetter{
+			ID:             surat.SuratID,
+			LetterNumber:   surat.NomorSurat,
+			From:           senderDivision,
+			Sender:         senderName,
+			SenderName:     senderName,
+			SenderDivision: senderDivision,
+			RecipientName:  recipientName,
+			LetterType:     letterType,
+			Subject:        surat.Perihal,
+			Category:       surat.Kategori,
+			Date:           handlers.FormatDate(surat.TanggalSurat),
+			Status: func() string {
 				if surat.IsFinalized {
 					return "Disposisi Final"
 				}
 				return surat.StatusPersetujuan
 			}(),
-			"isFinalized":             surat.IsFinalized,
-			"priority":                surat.Prioritas,
-			"hasAttachment":           surat.LampiranPath != nil,
-			"attachmentUrl":           attachmentLink,
-			"attachment":              attachmentPayload,
-			"content":                 surat.IsiSurat,
-			"dispositionNote":         surat.DispositionNote,
-			"replyNote":               surat.ReplyNote,
-			"replyBy":                 replyAuthorName,
-			"replyAt":                 handlers.FormatDateTime(surat.ReplyAt),
-			"replyHistory":            historyPayload,
-			"canReply":                surat.CurrentRecipient == "division" && surat.StatusPersetujuan != "Diarsipkan" && !surat.IsFinalized,
-			"targetDivision":          recipientName,
-			"recipient":               surat.Penerima,
-			"currentRecipient":        surat.CurrentRecipient,
-			"disposedBy":              disposerName,
-			"disposedAt":              handlers.FormatDateTime(surat.DisposedAt),
-			"approvalDate":            handlers.FormatDateTime(surat.TanggalPersetujuan),
-			"createdAt":               handlers.FormatDateTime(surat.CreatedAt),
-			"updatedAt":               handlers.FormatDateTime(surat.UpdatedAt),
-			"dispositionDocumentUrl":  handlers.AttachmentURL(c, surat.DispositionDocumentPath),
-			"dispositionDocumentName": surat.DispositionDocumentName,
+			IsFinalized:             surat.IsFinalized,
+			Priority:                surat.Prioritas,
+			HasAttachment:           surat.LampiranPath != nil,
+			AttachmentURL:           attachmentLink,
+			Attachment:              attachmentPayload,
+			Content:                 surat.IsiSurat,
+			DispositionNote:         surat.DispositionNote,
+			ReplyNote:               surat.ReplyNote,
+			ReplyBy:                 replyAuthorName,
+			ReplyAt:                 handlers.FormatDateTime(surat.ReplyAt),
+			ReplyHistory:            historyPayload,
+			CanReply:                surat.CurrentRecipient == "division" && surat.StatusPersetujuan != "Diarsipkan" && !surat.IsFinalized,
+			TargetDivision:          recipientName,
+			Recipient:               surat.Penerima,
+			CurrentRecipient:        surat.CurrentRecipient,
+			DisposedBy:              disposerName,
+			DisposedAt:              handlers.FormatDateTime(surat.DisposedAt),
+			ApprovalDate:            handlers.FormatDateTime(surat.TanggalPersetujuan),
+			CreatedAt:               handlers.FormatDateTime(surat.CreatedAt),
+			UpdatedAt:               handlers.FormatDateTime(surat.UpdatedAt),
+			DispositionDocumentURL:  handlers.AttachmentURL(c, surat.DispositionDocumentPath),
+			DispositionDocumentName: surat.DispositionDocumentName,
 		})
 	}
 	return result

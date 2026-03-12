@@ -21,12 +21,14 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	pagination := handlers.ParsePagination(c, 20, 100)
 
-	apps, err := dbrepo.ListRecruitmentApplications(db)
+	apps, err := dbrepo.ListRecruitmentApplicationsPaged(db, pagination.Limit, pagination.Offset)
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat data recruitment")
 		return
 	}
+	totalApplications, _ := dbrepo.CountRecruitmentApplications(db)
 	slaSettings := loadRecruitmentSLASettings(db)
 	now := time.Now()
 	slaOverview := map[string]any{
@@ -291,6 +293,7 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"applications":         applications,
+		"pagination":           handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalApplications),
 		"statusOptions":        models.ApplicationStatuses,
 		"interviews":           interviews,
 		"onboarding":           onboarding,

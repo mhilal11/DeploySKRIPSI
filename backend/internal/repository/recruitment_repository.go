@@ -56,6 +56,38 @@ func ListRecruitmentApplications(db *sqlx.DB) ([]models.Application, error) {
 	return rows, wrapRepoErr("list recruitment applications", err)
 }
 
+func CountRecruitmentApplications(db *sqlx.DB) (int, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+	var count int
+	err := db.Get(&count, "SELECT COUNT(*) FROM applications")
+	return count, wrapRepoErr("count recruitment applications", err)
+}
+
+func ListRecruitmentApplicationsPaged(db *sqlx.DB, limit, offset int) ([]models.Application, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows := []models.Application{}
+	err := db.Select(
+		&rows,
+		"SELECT * FROM applications ORDER BY submitted_at DESC LIMIT ? OFFSET ?",
+		limit,
+		offset,
+	)
+	return rows, wrapRepoErr("list recruitment applications paged", err)
+}
+
 func UpsertRecruitmentSLASetting(db *sqlx.DB, stage string, targetDays int, now time.Time) error {
 	if db == nil {
 		return errors.New("database tidak tersedia")

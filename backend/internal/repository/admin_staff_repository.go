@@ -57,6 +57,21 @@ func CountDivisionPendingLetters(db *sqlx.DB, division *string) (int, error) {
 	return count, wrapRepoErr("count division pending letters", err)
 }
 
+func CountDivisionArchiveLetters(db *sqlx.DB, division *string, userID int64) (int, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+	var count int
+	err := db.Get(
+		&count,
+		"SELECT COUNT(*) FROM surat WHERE status_persetujuan = 'Diarsipkan' AND (target_division = ? OR penerima = ? OR user_id = ?)",
+		division,
+		division,
+		userID,
+	)
+	return count, wrapRepoErr("count division archive letters", err)
+}
+
 func ListDivisionIncomingLetters(db *sqlx.DB, division *string, limit int) ([]models.Surat, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
@@ -69,6 +84,31 @@ func ListDivisionIncomingLetters(db *sqlx.DB, division *string, limit int) ([]mo
 	return rows, wrapRepoErr("list division incoming letters", err)
 }
 
+func ListDivisionInboxLettersPaged(db *sqlx.DB, division *string, limit, offset int) ([]models.Surat, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows := []models.Surat{}
+	err := db.Select(
+		&rows,
+		"SELECT * FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?) ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ? OFFSET ?",
+		division,
+		division,
+		limit,
+		offset,
+	)
+	return rows, wrapRepoErr("list division inbox letters paged", err)
+}
+
 func ListUserOutgoingLetters(db *sqlx.DB, userID int64, limit int) ([]models.Surat, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
@@ -79,6 +119,30 @@ func ListUserOutgoingLetters(db *sqlx.DB, userID int64, limit int) ([]models.Sur
 	rows := []models.Surat{}
 	err := db.Select(&rows, "SELECT * FROM surat WHERE user_id = ? ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ?", userID, limit)
 	return rows, wrapRepoErr("list user outgoing letters", err)
+}
+
+func ListUserOutgoingLettersPaged(db *sqlx.DB, userID int64, limit, offset int) ([]models.Surat, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows := []models.Surat{}
+	err := db.Select(
+		&rows,
+		"SELECT * FROM surat WHERE user_id = ? ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ? OFFSET ?",
+		userID,
+		limit,
+		offset,
+	)
+	return rows, wrapRepoErr("list user outgoing letters paged", err)
 }
 
 func ListUserOutgoingLettersAll(db *sqlx.DB, userID int64) ([]models.Surat, error) {
@@ -139,6 +203,32 @@ func ListDivisionArchiveLettersAll(db *sqlx.DB, division *string, userID int64) 
 	rows := []models.Surat{}
 	err := db.Select(&rows, "SELECT * FROM surat WHERE status_persetujuan = 'Diarsipkan' AND (target_division = ? OR penerima = ? OR user_id = ?) ORDER BY tanggal_surat DESC, surat_id DESC", division, division, userID)
 	return rows, wrapRepoErr("list division archive letters all", err)
+}
+
+func ListDivisionArchiveLettersPaged(db *sqlx.DB, division *string, userID int64, limit, offset int) ([]models.Surat, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows := []models.Surat{}
+	err := db.Select(
+		&rows,
+		"SELECT * FROM surat WHERE status_persetujuan = 'Diarsipkan' AND (target_division = ? OR penerima = ? OR user_id = ?) ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ? OFFSET ?",
+		division,
+		division,
+		userID,
+		limit,
+		offset,
+	)
+	return rows, wrapRepoErr("list division archive letters paged", err)
 }
 
 func InsertAdminStaffLetter(db *sqlx.DB, input AdminStaffLetterCreateInput) error {

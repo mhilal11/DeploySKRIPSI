@@ -34,6 +34,10 @@ type Config struct {
 	StoragePath             string
 	StorageEncryptionKey    string
 	StorageEncryptUploads   bool
+	RedisURL                string
+	RedisAddr               string
+	RedisPassword           string
+	RedisDB                 int
 	DisableBackgroundWorker bool
 	CookieSecure            bool
 	MaxRequestBodyBytes     int64
@@ -88,6 +92,10 @@ func Load() Config {
 		StoragePath:             storagePath,
 		StorageEncryptionKey:    strings.TrimSpace(getenv("STORAGE_ENCRYPTION_KEY", "")),
 		StorageEncryptUploads:   getenvBool("STORAGE_ENCRYPT_UPLOADS", strings.TrimSpace(getenv("STORAGE_ENCRYPTION_KEY", "")) != ""),
+		RedisURL:                strings.TrimSpace(getenv("REDIS_URL", "")),
+		RedisAddr:               strings.TrimSpace(getenv("REDIS_ADDR", "")),
+		RedisPassword:           getenv("REDIS_PASSWORD", ""),
+		RedisDB:                 getenvInt("REDIS_DB", 0),
 		DisableBackgroundWorker: getenvBool("DISABLE_BACKGROUND_WORKERS", false),
 		CookieSecure:            getenvBool("COOKIE_SECURE", false),
 		MaxRequestBodyBytes:     int64(getenvInt("MAX_REQUEST_BODY_MB", 25)) * 1024 * 1024,

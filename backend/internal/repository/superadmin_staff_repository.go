@@ -27,6 +27,79 @@ func ListStaffTerminationsByEffectiveDateDesc(db *sqlx.DB) ([]models.StaffTermin
 	return rows, wrapRepoErr("list staff terminations by effective date desc", err)
 }
 
+func ListActiveStaffTerminationsPaged(db *sqlx.DB, limit, offset int) ([]models.StaffTermination, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows := []models.StaffTermination{}
+	err := db.Select(
+		&rows,
+		"SELECT * FROM staff_terminations WHERE status <> 'Selesai' ORDER BY effective_date DESC, id DESC LIMIT ? OFFSET ?",
+		limit,
+		offset,
+	)
+	return rows, wrapRepoErr("list active staff terminations paged", err)
+}
+
+func ListArchivedStaffTerminationsPaged(db *sqlx.DB, limit, offset int) ([]models.StaffTermination, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows := []models.StaffTermination{}
+	err := db.Select(
+		&rows,
+		"SELECT * FROM staff_terminations WHERE status = 'Selesai' ORDER BY effective_date DESC, id DESC LIMIT ? OFFSET ?",
+		limit,
+		offset,
+	)
+	return rows, wrapRepoErr("list archived staff terminations paged", err)
+}
+
+func CountActiveStaffTerminations(db *sqlx.DB) (int, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+	var count int
+	err := db.Get(&count, "SELECT COUNT(*) FROM staff_terminations WHERE status <> 'Selesai'")
+	return count, wrapRepoErr("count active staff terminations", err)
+}
+
+func CountArchivedStaffTerminations(db *sqlx.DB) (int, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+	var count int
+	err := db.Get(&count, "SELECT COUNT(*) FROM staff_terminations WHERE status = 'Selesai'")
+	return count, wrapRepoErr("count archived staff terminations", err)
+}
+
+func CountStaffTerminationsByStatus(db *sqlx.DB, status string) (int, error) {
+	if db == nil {
+		return 0, errors.New("database tidak tersedia")
+	}
+	var count int
+	err := db.Get(&count, "SELECT COUNT(*) FROM staff_terminations WHERE status = ?", status)
+	return count, wrapRepoErr("count staff terminations by status", err)
+}
+
 func ListEligibleActiveStaffRows(db *sqlx.DB) ([]StaffPickerRow, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")

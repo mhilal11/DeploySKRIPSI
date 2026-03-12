@@ -26,6 +26,7 @@ func PelamarApplicationsIndex(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	pagination := handlers.ParsePagination(c, 20, 100)
 	profile := getOrCreateApplicantProfile(db, user)
 	if !isProfileComplete(profile) {
 		c.JSON(http.StatusOK, gin.H{
@@ -35,7 +36,8 @@ func PelamarApplicationsIndex(c *gin.Context) {
 		return
 	}
 
-	apps, _ := dbrepo.ListApplicationsByUserID(db, user.ID)
+	apps, _ := dbrepo.ListApplicationsByUserIDPaged(db, user.ID, pagination.Limit, pagination.Offset)
+	totalApplications, _ := dbrepo.CountApplicationsByUserID(db, user.ID)
 	applications := make([]map[string]any, 0, len(apps))
 	for _, app := range apps {
 		applications = append(applications, map[string]any{
@@ -58,6 +60,11 @@ func PelamarApplicationsIndex(c *gin.Context) {
 			"phone":     handlers.FirstString(profile.Phone, ""),
 		},
 		"divisions": divisions,
+		"pagination": handlers.BuildPaginationMeta(
+			pagination.Page,
+			pagination.Limit,
+			totalApplications,
+		),
 		"flash": gin.H{
 			"success": "",
 			"error":   "",

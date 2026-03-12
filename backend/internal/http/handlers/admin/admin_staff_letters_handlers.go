@@ -13,7 +13,54 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
+
+type adminLettersRepository interface {
+	ListDivisionInboxLettersPaged(division *string, limit, offset int) ([]models.Surat, error)
+	ListUserOutgoingLettersPaged(userID int64, limit, offset int) ([]models.Surat, error)
+	ListDivisionArchiveLettersPaged(division *string, userID int64, limit, offset int) ([]models.Surat, error)
+	CountDivisionInboxLetters(division *string) (int, error)
+	CountUserOutboxLetters(userID int64) (int, error)
+	CountDivisionPendingLetters(division *string) (int, error)
+	CountDivisionArchiveLetters(division *string, userID int64) (int, error)
+}
+
+type sqlAdminLettersRepository struct {
+	db *sqlx.DB
+}
+
+func newAdminLettersRepository(db *sqlx.DB) adminLettersRepository {
+	return &sqlAdminLettersRepository{db: db}
+}
+
+func (r *sqlAdminLettersRepository) ListDivisionInboxLettersPaged(division *string, limit, offset int) ([]models.Surat, error) {
+	return dbrepo.ListDivisionInboxLettersPaged(r.db, division, limit, offset)
+}
+
+func (r *sqlAdminLettersRepository) ListUserOutgoingLettersPaged(userID int64, limit, offset int) ([]models.Surat, error) {
+	return dbrepo.ListUserOutgoingLettersPaged(r.db, userID, limit, offset)
+}
+
+func (r *sqlAdminLettersRepository) ListDivisionArchiveLettersPaged(division *string, userID int64, limit, offset int) ([]models.Surat, error) {
+	return dbrepo.ListDivisionArchiveLettersPaged(r.db, division, userID, limit, offset)
+}
+
+func (r *sqlAdminLettersRepository) CountDivisionInboxLetters(division *string) (int, error) {
+	return dbrepo.CountDivisionInboxLetters(r.db, division)
+}
+
+func (r *sqlAdminLettersRepository) CountUserOutboxLetters(userID int64) (int, error) {
+	return dbrepo.CountUserOutboxLetters(r.db, userID)
+}
+
+func (r *sqlAdminLettersRepository) CountDivisionPendingLetters(division *string) (int, error) {
+	return dbrepo.CountDivisionPendingLetters(r.db, division)
+}
+
+func (r *sqlAdminLettersRepository) CountDivisionArchiveLetters(division *string, userID int64) (int, error) {
+	return dbrepo.CountDivisionArchiveLetters(r.db, division, userID)
+}
 
 func AdminStaffLettersIndex(c *gin.Context) {
 	user := middleware.CurrentUser(c)
@@ -27,16 +74,23 @@ func AdminStaffLettersIndex(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	repo := newAdminLettersRepository(db)
+	pagination := handlers.ParsePagination(c, 20, 100)
 
-	inbox, _ := dbrepo.ListDivisionInboxLettersAll(db, user.Division)
-	outbox, _ := dbrepo.ListUserOutgoingLettersAll(db, user.ID)
-	archive, _ := dbrepo.ListDivisionArchiveLettersAll(db, user.Division, user.ID)
+	inbox, _ := repo.ListDivisionInboxLettersPaged(user.Division, pagination.Limit, pagination.Offset)
+	outbox, _ := repo.ListUserOutgoingLettersPaged(user.ID, pagination.Limit, pagination.Offset)
+	archive, _ := repo.ListDivisionArchiveLettersPaged(user.Division, user.ID, pagination.Limit, pagination.Offset)
+
+	totalInbox, _ := repo.CountDivisionInboxLetters(user.Division)
+	totalOutbox, _ := repo.CountUserOutboxLetters(user.ID)
+	totalArchive, _ := repo.CountDivisionArchiveLetters(user.Division, user.ID)
+	totalPending, _ := repo.CountDivisionPendingLetters(user.Division)
 
 	stats := map[string]int{
-		"inbox":    len(inbox),
-		"outbox":   len(outbox),
-		"pending":  countPending(inbox),
-		"archived": len(archive),
+		"inbox":    totalInbox,
+		"outbox":   totalOutbox,
+		"pending":  totalPending,
+		"archived": totalArchive,
 	}
 
 	letterOptions := map[string]any{
@@ -55,8 +109,13 @@ func AdminStaffLettersIndex(c *gin.Context) {
 			"outbox":  transformLetters(c, db, outbox),
 			"archive": transformLetters(c, db, archive),
 		},
-		"recruitments":     recentRecruitments(db),
-		"stats":            stats,
+		"recruitments": recentRecruitments(db),
+		"stats":        stats,
+		"pagination": gin.H{
+			"inbox":   handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalInbox),
+			"outbox":  handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalOutbox),
+			"archive": handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalArchive),
+		},
 		"options":          letterOptions,
 		"nextLetterNumber": nextNumber,
 	})
