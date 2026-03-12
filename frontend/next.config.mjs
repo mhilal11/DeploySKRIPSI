@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false,
+  reactStrictMode: true,
+  allowedDevOrigins: ['127.0.0.1', 'localhost'],
   devIndicators: {
     buildActivity: true,
     buildActivityPosition: 'bottom-left',
