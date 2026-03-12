@@ -17,10 +17,17 @@ Salin template:
 - `CSRF_SECRET` : rahasia CSRF token
 - `MAX_REQUEST_BODY_MB` : batas ukuran request body dalam MB (default `25`)
 - `STORAGE_PATH` : lokasi penyimpanan file (default `./storage`)
+- `STORAGE_ENCRYPTION_KEY` : key enkripsi at-rest file storage (minimal 32 karakter atau base64 key 32-byte)
+- `STORAGE_ENCRYPT_UPLOADS` : `true|false` untuk aktifkan enkripsi file upload (default otomatis `true` jika key tersedia)
+- `DISABLE_BACKGROUND_WORKERS` : `true|false` untuk menonaktifkan worker background (berguna untuk test/integration environment)
 - `COOKIE_SECURE` : `true` jika pakai HTTPS
 - `GOOGLE_OAUTH_CLIENT_ID` : Client ID OAuth 2.0 dari Google Cloud Console (opsional, untuk Daftar via Google)
 - `GOOGLE_OAUTH_CLIENT_SECRET` : Client Secret OAuth 2.0 (opsional)
 - `GOOGLE_OAUTH_REDIRECT_URL` : callback URL Google OAuth (default `http://localhost:5173/api/auth/google/register/callback`)
+
+Catatan:
+- Koneksi database backend dijalankan dengan timezone `UTC` (`loc=UTC`) untuk mencegah mismatch tanggal lintas timezone server.
+- Verifikasi email menggunakan random token yang disimpan di tabel `email_verification_tokens` dengan masa berlaku 60 menit.
 
 ### SMTP (opsional)
 Jika SMTP tidak diisi, email akan disimpan ke outbox lokal `storage/mail_outbox`.
@@ -71,6 +78,13 @@ go run ./cmd/server
 ## API Documentation
 - OpenAPI spec: `GET /openapi.yaml`
 - Swagger UI: `GET /docs`
+
+## Background Job Queue
+- AI CV Screening otomatis dijalankan melalui tabel `jobs` (`queue = recruitment_ai_screening`).
+- Worker dipanggil saat server berjalan dan akan retry dengan backoff jika proses gagal.
+
+## Caching
+- Endpoint `GET /api/public/landing` menggunakan cache in-memory dengan TTL 30 detik untuk menurunkan beban query berulang.
 
 ## Hot Reload (Air)
 Install Air:
