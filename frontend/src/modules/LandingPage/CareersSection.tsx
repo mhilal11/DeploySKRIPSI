@@ -1,4 +1,3 @@
-import AOS from 'aos';
 import { MapPin, Clock, ArrowRight, Users, ListChecks } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -100,10 +99,12 @@ const formatDateIndo = (value?: string | null): string | null => {
 
 export function CareersSection({ jobs }: CareersSectionProps) {
   useEffect(() => {
-    AOS.init({
-      duration: 1000,
-      once: true,
-      offset: 100,
+    void import('aos').then(({ default: AOS }) => {
+      AOS.init({
+        duration: 1000,
+        once: true,
+        offset: 100,
+      });
     });
   }, []);
 

@@ -1,6 +1,8 @@
-﻿import { ImgHTMLAttributes, useState } from 'react';
+import Image, { type ImageProps } from 'next/image';
+import { useState } from 'react';
 
-type ImageWithFallbackProps = ImgHTMLAttributes<HTMLImageElement> & {
+type ImageWithFallbackProps = Omit<ImageProps, 'src'> & {
+  src?: string;
   fallbackSrc?: string;
 };
 
@@ -11,14 +13,21 @@ export function ImageWithFallback({
   fallbackSrc = DEFAULT_FALLBACK,
   alt,
   onError,
+  width,
+  height,
   ...rest
 }: ImageWithFallbackProps) {
   const [currentSrc, setCurrentSrc] = useState(src || fallbackSrc);
+  const resolvedWidth = typeof width === 'number' ? width : 1080;
+  const resolvedHeight = typeof height === 'number' ? height : 720;
 
   return (
-    <img
+    <Image
       src={currentSrc}
       alt={alt}
+      width={resolvedWidth}
+      height={resolvedHeight}
+      unoptimized
       onError={(event) => {
         if (currentSrc !== fallbackSrc) {
           setCurrentSrc(fallbackSrc);
@@ -29,5 +38,3 @@ export function ImageWithFallback({
     />
   );
 }
-
-
