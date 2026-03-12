@@ -1,7 +1,3 @@
-import { Suspense } from 'react';
-
-import AppClientRoot from '@/runtime/AppClientRoot';
-
 import type { Metadata } from 'next';
 import '@/shared/styles/app.css';
 
@@ -22,9 +18,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Suspense fallback={null}>
-          <AppClientRoot />
-        </Suspense>
         {children}
       </body>
     </html>

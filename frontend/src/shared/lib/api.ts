@@ -25,6 +25,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => {
+    const method = (response.config?.method ?? 'get').toLowerCase();
+    if (typeof window !== 'undefined' && method !== 'get' && method !== 'head' && method !== 'options') {
+      window.dispatchEvent(new Event('hris:cache:invalidate'));
+    }
+    return response;
+  },
+  (error) => Promise.reject(error),
+);
+
 export function apiUrl(path: string): string {
   if (!path) {
     return API_BASE;

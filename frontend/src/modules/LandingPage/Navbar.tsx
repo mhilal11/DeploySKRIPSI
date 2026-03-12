@@ -1,5 +1,6 @@
-﻿import { gsap } from 'gsap';
+import { gsap } from 'gsap';
 import { Menu, X } from 'lucide-react';
+import Image from 'next/image';
 import { useEffect, useRef, useState, MouseEvent } from 'react';
 
 import { Button } from '@/shared/components/ui/button';
@@ -133,10 +134,13 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
           <div className="relative flex items-center h-16 md:h-20">
             {/* Logo kiri */}
             <div ref={logoRef} className="flex items-center gap-2 flex-shrink-0">
-              <img
+              <Image
                 src={logo}
                 alt="Lintas Data Prima"
+                width={48}
+                height={48}
                 className="w-10 h-10 md:w-12 md:h-12"
+                priority
               />
               <span className="text-white hidden sm:inline">
                 Lintas Data Prima
@@ -223,7 +227,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
           {/* Header sidebar */}
           <div className="flex items-center justify-between p-6 border-b border-white/20">
             <div className="flex items-center gap-2">
-              <img src={logo} alt="Lintas Data Prima" className="w-8 h-8" />
+              <Image src={logo} alt="Lintas Data Prima" width={32} height={32} className="w-8 h-8" />
               <span className="text-white">Lintas Data Prima</span>
             </div>
             <button
@@ -286,6 +290,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
     </>
   );
 }
+
 
 
 

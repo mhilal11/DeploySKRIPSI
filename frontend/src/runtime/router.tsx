@@ -17,8 +17,50 @@ import {
 } from '@/runtime/routing';
 import { api, apiUrl, setCurrentRouteName, usePageManager } from '@/shared/lib';
 
-const pageDataCache = new Map<string, any>();
+interface CachedPagePayload {
+  data: any;
+  cachedAt: number;
+}
+
+const PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
+const PAGE_CACHE_MAX_ENTRIES = 150;
+const pageDataCache = new Map<string, CachedPagePayload>();
 const warmedApiCacheKeys = new Set<string>();
+
+function getCachedPageData(cacheKey: string | null): any | null {
+  if (!cacheKey) {
+    return null;
+  }
+  const cached = pageDataCache.get(cacheKey);
+  if (!cached) {
+    return null;
+  }
+  if (Date.now() - cached.cachedAt > PAGE_CACHE_TTL_MS) {
+    pageDataCache.delete(cacheKey);
+    warmedApiCacheKeys.delete(cacheKey);
+    return null;
+  }
+  return cached.data;
+}
+
+function setCachedPageData(cacheKey: string | null, data: any): void {
+  if (!cacheKey) {
+    return;
+  }
+  if (pageDataCache.size >= PAGE_CACHE_MAX_ENTRIES) {
+    const oldestKey = pageDataCache.keys().next().value as string | undefined;
+    if (oldestKey) {
+      pageDataCache.delete(oldestKey);
+      warmedApiCacheKeys.delete(oldestKey);
+    }
+  }
+  pageDataCache.set(cacheKey, { data, cachedAt: Date.now() });
+}
+
+function clearAllPageCache(): void {
+  pageDataCache.clear();
+  warmedApiCacheKeys.clear();
+}
 
 function buildPageCacheKey(apiEndpoint: string | null | undefined, search: string): string | null {
   if (!apiEndpoint) {
@@ -53,7 +95,7 @@ function PageShell({
   const routeKey = `${name}::${apiEndpoint ?? '__loader__'}::${normalizedSearch}`;
   const cacheKey = buildPageCacheKey(apiEndpoint ?? null, normalizedSearch);
   const disableTransitionFallback = name === 'login' || name === 'register';
-  const initialCachedProps = cacheKey ? pageDataCache.get(cacheKey) ?? null : null;
+  const initialCachedProps = getCachedPageData(cacheKey);
   const [pageProps, setPageProps] = useState<any>(initialCachedProps);
   const [renderedPage, setRenderedPage] = useState<RenderedPageSnapshot | null>(
     initialCachedProps ? { routeKey, component: Component, props: initialCachedProps } : null,
@@ -95,7 +137,7 @@ function PageShell({
       }
 
       if (cacheKey) {
-        const cached = pageDataCache.get(cacheKey);
+        const cached = getCachedPageData(cacheKey);
         if (cached && typeof cached === 'object') {
           setPageProps(cached);
           setRenderedPage({ routeKey, component: Component, props: cached });
@@ -131,7 +173,7 @@ function PageShell({
             return;
           }
           if (cacheKey) {
-            pageDataCache.set(cacheKey, data);
+            setCachedPageData(cacheKey, data);
           }
           setPageProps(data);
           setRenderedPage({ routeKey, component: Component, props: data });
@@ -299,7 +341,7 @@ export default function AppRoutes() {
           if (!active || !data || typeof data !== 'object') {
             return;
           }
-          pageDataCache.set(cacheKey, data);
+          setCachedPageData(cacheKey, data);
         })
         .catch(() => {
           warmedApiCacheKeys.delete(cacheKey);
@@ -316,6 +358,19 @@ export default function AppRoutes() {
     props?.auth?.user?.role,
     props?.auth?.user?.division,
   ]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const handleInvalidate = () => {
+      clearAllPageCache();
+    };
+    window.addEventListener('hris:cache:invalidate', handleInvalidate);
+    return () => {
+      window.removeEventListener('hris:cache:invalidate', handleInvalidate);
+    };
+  }, []);
 
   if (!matchedRoute) {
     return <NotFound />;

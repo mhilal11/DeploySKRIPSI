@@ -1,3 +1,5 @@
+'use client';
+
 import 'aos/dist/aos.css';
 
 import SplashScreen from '@/shared/components/SplashScreen';

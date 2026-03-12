@@ -15,6 +15,7 @@ Salin template:
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
 - `SESSION_SECRET` : rahasia session cookie
 - `CSRF_SECRET` : rahasia CSRF token
+- `MAX_REQUEST_BODY_MB` : batas ukuran request body dalam MB (default `25`)
 - `STORAGE_PATH` : lokasi penyimpanan file (default `./storage`)
 - `COOKIE_SECURE` : `true` jika pakai HTTPS
 - `GOOGLE_OAUTH_CLIENT_ID` : Client ID OAuth 2.0 dari Google Cloud Console (opsional, untuk Daftar via Google)
@@ -66,6 +67,10 @@ go run ./cmd/seed staff
 ```
 go run ./cmd/server
 ```
+
+## API Documentation
+- OpenAPI spec: `GET /openapi.yaml`
+- Swagger UI: `GET /docs`
 
 ## Hot Reload (Air)
 Install Air:
