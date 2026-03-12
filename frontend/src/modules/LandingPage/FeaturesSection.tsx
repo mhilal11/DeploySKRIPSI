@@ -1,4 +1,3 @@
-﻿import AOS from 'aos';
 import { Zap, Headphones, Network, DollarSign } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -35,11 +34,20 @@ const features = [
 
 export function FeaturesSection() {
   useEffect(() => {
-    AOS.init({
-      duration: 1000,
-      once: true,
-      offset: 100,
+    let mounted = true;
+    void import('aos').then(({ default: AOS }) => {
+      if (!mounted) {
+        return;
+      }
+      AOS.init({
+        duration: 1000,
+        once: true,
+        offset: 100,
+      });
     });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (
@@ -105,4 +113,5 @@ export function FeaturesSection() {
     </section>
   );
 }
+
 

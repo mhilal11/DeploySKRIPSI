@@ -1,4 +1,3 @@
-﻿import AOS from 'aos';
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect } from 'react';
@@ -10,11 +9,20 @@ const logo = '/img/LogoLDP.png';
 
 export function ContactSection() {
   useEffect(() => {
-    AOS.init({
-      duration: 1000,
-      once: true,
-      offset: 100,
+    let mounted = true;
+    void import('aos').then(({ default: AOS }) => {
+      if (!mounted) {
+        return;
+      }
+      AOS.init({
+        duration: 1000,
+        once: true,
+        offset: 100,
+      });
     });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (
@@ -144,5 +152,6 @@ export function ContactSection() {
     </footer>
   );
 }
+
 
 

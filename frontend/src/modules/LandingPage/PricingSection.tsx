@@ -1,4 +1,3 @@
-﻿import AOS from 'aos';
 import { Check, Star } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -51,11 +50,20 @@ const plans = [
 
 export function PricingSection() {
   useEffect(() => {
-    AOS.init({
-      duration: 1000,
-      once: true,
-      offset: 100,
+    let mounted = true;
+    void import('aos').then(({ default: AOS }) => {
+      if (!mounted) {
+        return;
+      }
+      AOS.init({
+        duration: 1000,
+        once: true,
+        offset: 100,
+      });
     });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (
@@ -149,5 +157,6 @@ export function PricingSection() {
     </section>
   );
 }
+
 
 

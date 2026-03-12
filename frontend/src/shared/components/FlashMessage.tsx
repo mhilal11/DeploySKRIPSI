@@ -1,5 +1,4 @@
-﻿import { useEffect } from "react";
-import Swal from "sweetalert2";
+import { useEffect } from "react";
 
 import { usePage } from "@/shared/lib/inertia";
 import { PageProps } from "@/shared/types/global"; // path sesuai alias kamu
@@ -10,27 +9,34 @@ export default function FlashMessage() {
   const error = page.props.flash?.error;
 
   useEffect(() => {
-    if (success) {
-      Swal.fire({
-        icon: "success",
-        title: "Berhasil",
-        text: success,
-        confirmButtonColor: "#3085d6",
-      });
+    if (!success && !error) {
+      return;
     }
 
-    if (error) {
-      Swal.fire({
-        icon: "error",
-        title: "Gagal",
-        text: error,
-        confirmButtonColor: "#d33",
-      });
-    }
+    void import("sweetalert2").then(({ default: Swal }) => {
+      if (success) {
+        void Swal.fire({
+          icon: "success",
+          title: "Berhasil",
+          text: success,
+          confirmButtonColor: "#3085d6",
+        });
+      }
+
+      if (error) {
+        void Swal.fire({
+          icon: "error",
+          title: "Gagal",
+          text: error,
+          confirmButtonColor: "#d33",
+        });
+      }
+    });
   }, [success, error]);
 
   return null;
 }
+
 
 
 
