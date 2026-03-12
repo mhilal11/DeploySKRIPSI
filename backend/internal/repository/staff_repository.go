@@ -136,6 +136,21 @@ func ListStaffTerminationsByUserID(db *sqlx.DB, userID int64) ([]models.StaffTer
 	return rows, wrapRepoErr("list staff terminations by user id", err)
 }
 
+func ListStaffTerminationsByUserIDPaged(db *sqlx.DB, userID int64, limit, offset int) ([]models.StaffTermination, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows := []models.StaffTermination{}
+	err := db.Select(&rows, "SELECT * FROM staff_terminations WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?", userID, limit, offset)
+	return rows, wrapRepoErr("list staff terminations by user id paged", err)
+}
+
 func ListDivisionIncomingRegulations(db *sqlx.DB, division string, limit int) ([]models.Surat, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")

@@ -1,6 +1,7 @@
 package staff
 
 import (
+	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	dbrepo "hris-backend/internal/repository"
 
@@ -13,7 +14,79 @@ import (
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
 )
+
+type staffRepository interface {
+	CountComplaintsByUserID(userID int64) (int, error)
+	CountComplaintsByUserIDAndStatuses(userID int64, statuses ...string) (int, error)
+	CountDivisionIncomingRegulations(division string, since *time.Time) (int, error)
+	CountStaffTerminationsByUserID(userID int64) (int, error)
+	ListComplaintsByUserID(userID int64, limit int) ([]models.Complaint, error)
+	ListComplaintsByUserIDPaged(userID int64, limit, offset int) ([]models.Complaint, error)
+	ListDivisionIncomingRegulations(division string, limit int) ([]models.Surat, error)
+	ListDivisionAnnouncements(division string, limit int) ([]models.Surat, error)
+	ListStaffTerminationsByUserID(userID int64) ([]models.StaffTermination, error)
+	ListStaffTerminationsByUserIDPaged(userID int64, limit, offset int) ([]models.StaffTermination, error)
+	InsertStaffComplaint(input dbrepo.StaffComplaintCreateInput) error
+	InsertStaffTermination(input dbrepo.StaffTerminationCreateInput) error
+}
+
+type sqlStaffRepository struct {
+	db *sqlx.DB
+}
+
+func newStaffRepository(db *sqlx.DB) staffRepository {
+	return &sqlStaffRepository{db: db}
+}
+
+func (r *sqlStaffRepository) CountComplaintsByUserID(userID int64) (int, error) {
+	return dbrepo.CountComplaintsByUserID(r.db, userID)
+}
+
+func (r *sqlStaffRepository) CountComplaintsByUserIDAndStatuses(userID int64, statuses ...string) (int, error) {
+	return dbrepo.CountComplaintsByUserIDAndStatuses(r.db, userID, statuses...)
+}
+
+func (r *sqlStaffRepository) CountDivisionIncomingRegulations(division string, since *time.Time) (int, error) {
+	return dbrepo.CountDivisionIncomingRegulations(r.db, division, since)
+}
+
+func (r *sqlStaffRepository) CountStaffTerminationsByUserID(userID int64) (int, error) {
+	return dbrepo.CountStaffTerminationsByUserID(r.db, userID)
+}
+
+func (r *sqlStaffRepository) ListComplaintsByUserID(userID int64, limit int) ([]models.Complaint, error) {
+	return dbrepo.ListComplaintsByUserID(r.db, userID, limit)
+}
+
+func (r *sqlStaffRepository) ListComplaintsByUserIDPaged(userID int64, limit, offset int) ([]models.Complaint, error) {
+	return dbrepo.ListComplaintsByUserIDPaged(r.db, userID, limit, offset)
+}
+
+func (r *sqlStaffRepository) ListDivisionIncomingRegulations(division string, limit int) ([]models.Surat, error) {
+	return dbrepo.ListDivisionIncomingRegulations(r.db, division, limit)
+}
+
+func (r *sqlStaffRepository) ListDivisionAnnouncements(division string, limit int) ([]models.Surat, error) {
+	return dbrepo.ListDivisionAnnouncements(r.db, division, limit)
+}
+
+func (r *sqlStaffRepository) ListStaffTerminationsByUserID(userID int64) ([]models.StaffTermination, error) {
+	return dbrepo.ListStaffTerminationsByUserID(r.db, userID)
+}
+
+func (r *sqlStaffRepository) ListStaffTerminationsByUserIDPaged(userID int64, limit, offset int) ([]models.StaffTermination, error) {
+	return dbrepo.ListStaffTerminationsByUserIDPaged(r.db, userID, limit, offset)
+}
+
+func (r *sqlStaffRepository) InsertStaffComplaint(input dbrepo.StaffComplaintCreateInput) error {
+	return dbrepo.InsertStaffComplaint(r.db, input)
+}
+
+func (r *sqlStaffRepository) InsertStaffTermination(input dbrepo.StaffTerminationCreateInput) error {
+	return dbrepo.InsertStaffTermination(r.db, input)
+}
 
 func RegisterStaffRoutes(rg *gin.RouterGroup) {
 	rg.GET("/staff/dashboard", StaffDashboard)
@@ -30,91 +103,92 @@ func StaffDashboard(c *gin.Context) {
 		return
 	}
 	db := middleware.GetDB(c)
+	repo := newStaffRepository(db)
 
-	totalComplaints, _ := dbrepo.CountComplaintsByUserID(db, user.ID)
-	activeComplaints, _ := dbrepo.CountComplaintsByUserIDAndStatuses(db, user.ID, models.ComplaintStatusNew, models.ComplaintStatusInProgress)
+	totalComplaints, _ := repo.CountComplaintsByUserID(user.ID)
+	activeComplaints, _ := repo.CountComplaintsByUserIDAndStatuses(user.ID, models.ComplaintStatusNew, models.ComplaintStatusInProgress)
 
 	var regulationsCount int
 	if user.Division != nil {
 		since := time.Now().AddDate(0, -3, 0)
-		regulationsCount, _ = dbrepo.CountDivisionIncomingRegulations(db, *user.Division, &since)
+		regulationsCount, _ = repo.CountDivisionIncomingRegulations(*user.Division, &since)
 	}
 
-	terminationCount, _ := dbrepo.CountStaffTerminationsByUserID(db, user.ID)
+	terminationCount, _ := repo.CountStaffTerminationsByUserID(user.ID)
 
-	stats := []map[string]any{
-		{"label": "Pengaduan Aktif", "value": activeComplaints, "icon": "alert"},
-		{"label": "Total Pengaduan", "value": totalComplaints, "icon": "message"},
-		{"label": "Regulasi Terbaru", "value": regulationsCount, "icon": "file"},
-		{"label": "Pengajuan Resign", "value": terminationCount, "icon": "briefcase"},
+	stats := []dto.StaffDashboardStat{
+		{Label: "Pengaduan Aktif", Value: activeComplaints, Icon: "alert"},
+		{Label: "Total Pengaduan", Value: totalComplaints, Icon: "message"},
+		{Label: "Regulasi Terbaru", Value: regulationsCount, Icon: "file"},
+		{Label: "Pengajuan Resign", Value: terminationCount, Icon: "briefcase"},
 	}
 
-	complaints, _ := dbrepo.ListComplaintsByUserID(db, user.ID, 5)
+	complaints, _ := repo.ListComplaintsByUserID(user.ID, 5)
 
-	recentComplaints := make([]map[string]any, 0, len(complaints))
+	recentComplaints := make([]dto.StaffComplaintSummary, 0, len(complaints))
 	for _, complaint := range complaints {
-		recentComplaints = append(recentComplaints, map[string]any{
-			"id":       complaint.ID,
-			"subject":  complaint.Subject,
-			"status":   models.ComplaintStatusLabels[complaint.Status],
-			"priority": models.ComplaintPriorityLabels[complaint.Priority],
-			"date":     handlers.FormatDate(complaint.SubmittedAt),
+		recentComplaints = append(recentComplaints, dto.StaffComplaintSummary{
+			ID:       complaint.ID,
+			Subject:  complaint.Subject,
+			Status:   models.ComplaintStatusLabels[complaint.Status],
+			Priority: models.ComplaintPriorityLabels[complaint.Priority],
+			Date:     handlers.FormatDate(complaint.SubmittedAt),
 		})
 	}
 
 	regulations := []models.Surat{}
 	if user.Division != nil {
-		regulations, _ = dbrepo.ListDivisionIncomingRegulations(db, *user.Division, 5)
+		regulations, _ = repo.ListDivisionIncomingRegulations(*user.Division, 5)
 	}
-	regulationsPayload := make([]map[string]any, 0, len(regulations))
+	regulationsPayload := make([]dto.StaffRegulationSummary, 0, len(regulations))
 	for _, surat := range regulations {
-		regulationsPayload = append(regulationsPayload, map[string]any{
-			"id":            surat.SuratID,
-			"title":         surat.Perihal,
-			"category":      surat.Kategori,
-			"date":          handlers.FormatDate(surat.TanggalSurat),
-			"attachmentUrl": attachmentURL(c, surat.LampiranPath),
+		regulationsPayload = append(regulationsPayload, dto.StaffRegulationSummary{
+			ID:            surat.SuratID,
+			Title:         surat.Perihal,
+			Category:      surat.Kategori,
+			Date:          handlers.FormatDate(surat.TanggalSurat),
+			AttachmentURL: attachmentURL(c, surat.LampiranPath),
 		})
 	}
 
-	terminations, _ := dbrepo.ListStaffTerminationsByUserID(db, user.ID)
+	terminations, _ := repo.ListStaffTerminationsByUserID(user.ID)
 	var activeTermination *models.StaffTermination
 	if len(terminations) > 0 {
 		activeTermination = &terminations[0]
 	}
 
-	var terminationSummary any
+	var terminationSummary *dto.StaffTerminationSummary
 	if activeTermination != nil {
-		terminationSummary = map[string]any{
-			"reference":     activeTermination.Reference,
-			"status":        activeTermination.Status,
-			"progress":      activeTermination.Progress,
-			"effectiveDate": handlers.FormatDate(activeTermination.EffectiveDate),
-			"requestDate":   handlers.FormatDate(activeTermination.RequestDate),
+		terminationSummary = &dto.StaffTerminationSummary{
+			Reference:     activeTermination.Reference,
+			Status:        activeTermination.Status,
+			Progress:      activeTermination.Progress,
+			EffectiveDate: handlers.FormatDate(activeTermination.EffectiveDate),
+			RequestDate:   handlers.FormatDate(activeTermination.RequestDate),
 		}
 	}
 
-	terminationHistory := make([]map[string]any, 0)
+	terminationHistory := make([]dto.StaffTerminationSummary, 0)
 	for i, termination := range terminations {
 		if i >= 5 {
 			break
 		}
-		terminationHistory = append(terminationHistory, map[string]any{
-			"reference":     termination.Reference,
-			"type":          termination.Type,
-			"status":        termination.Status,
-			"requestDate":   handlers.FormatDate(termination.RequestDate),
-			"effectiveDate": handlers.FormatDate(termination.EffectiveDate),
+		terminationHistory = append(terminationHistory, dto.StaffTerminationSummary{
+			Reference:     termination.Reference,
+			Type:          termination.Type,
+			Status:        termination.Status,
+			RequestDate:   handlers.FormatDate(termination.RequestDate),
+			EffectiveDate: handlers.FormatDate(termination.EffectiveDate),
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"stats":            stats,
-		"recentComplaints": recentComplaints,
-		"regulations":      regulationsPayload,
-		"termination": gin.H{
-			"active":  terminationSummary,
-			"history": terminationHistory,
+	c.JSON(http.StatusOK, dto.StaffDashboardResponse{
+		Stats:            stats,
+		RecentComplaints: recentComplaints,
+		Regulations:      regulationsPayload,
+		Termination: dto.StaffTerminationSection{
+			Active:  terminationSummary,
+			History: terminationHistory,
 		},
 	})
 }
@@ -126,9 +200,10 @@ func StaffComplaintsIndex(c *gin.Context) {
 		return
 	}
 	db := middleware.GetDB(c)
+	repo := newStaffRepository(db)
 	pagination := handlers.ParsePagination(c, 20, 100)
-	complaints, _ := dbrepo.ListComplaintsByUserIDPaged(db, user.ID, pagination.Limit, pagination.Offset)
-	totalComplaints, _ := dbrepo.CountComplaintsByUserID(db, user.ID)
+	complaints, _ := repo.ListComplaintsByUserIDPaged(user.ID, pagination.Limit, pagination.Offset)
+	totalComplaints, _ := repo.CountComplaintsByUserID(user.ID)
 
 	stats := map[string]int{
 		"new":          0,
@@ -136,12 +211,12 @@ func StaffComplaintsIndex(c *gin.Context) {
 		"resolved":     0,
 		"totalRecords": totalComplaints,
 	}
-	stats["new"], _ = dbrepo.CountComplaintsByUserIDAndStatuses(db, user.ID, models.ComplaintStatusNew)
-	stats["inProgress"], _ = dbrepo.CountComplaintsByUserIDAndStatuses(db, user.ID, models.ComplaintStatusInProgress)
-	stats["resolved"], _ = dbrepo.CountComplaintsByUserIDAndStatuses(db, user.ID, models.ComplaintStatusResolved)
+	stats["new"], _ = repo.CountComplaintsByUserIDAndStatuses(user.ID, models.ComplaintStatusNew)
+	stats["inProgress"], _ = repo.CountComplaintsByUserIDAndStatuses(user.ID, models.ComplaintStatusInProgress)
+	stats["resolved"], _ = repo.CountComplaintsByUserIDAndStatuses(user.ID, models.ComplaintStatusResolved)
 
 	if user.Division != nil {
-		regulationsCount, _ := dbrepo.CountDivisionIncomingRegulations(db, *user.Division, nil)
+		regulationsCount, _ := repo.CountDivisionIncomingRegulations(*user.Division, nil)
 		stats["regulations"] = regulationsCount
 	} else {
 		stats["regulations"] = 0
@@ -192,8 +267,8 @@ func StaffComplaintsIndex(c *gin.Context) {
 	regulations := []models.Surat{}
 	announcements := []models.Surat{}
 	if user.Division != nil {
-		regulations, _ = dbrepo.ListDivisionIncomingRegulations(db, *user.Division, 10)
-		announcements, _ = dbrepo.ListDivisionAnnouncements(db, *user.Division, 5)
+		regulations, _ = repo.ListDivisionIncomingRegulations(*user.Division, 10)
+		announcements, _ = repo.ListDivisionAnnouncements(*user.Division, 5)
 	}
 
 	regulationsPayload := make([]map[string]any, 0, len(regulations))
@@ -248,6 +323,7 @@ func StaffComplaintsStore(c *gin.Context) {
 		return
 	}
 	db := middleware.GetDB(c)
+	repo := newStaffRepository(db)
 
 	category := strings.TrimSpace(c.PostForm("category"))
 	subject := strings.TrimSpace(c.PostForm("subject"))
@@ -295,7 +371,7 @@ func StaffComplaintsStore(c *gin.Context) {
 	}
 
 	now := time.Now()
-	if err := dbrepo.InsertStaffComplaint(db, dbrepo.StaffComplaintCreateInput{
+	if err := repo.InsertStaffComplaint(dbrepo.StaffComplaintCreateInput{
 		ComplaintCode:  code,
 		UserID:         user.ID,
 		Category:       category,
@@ -326,53 +402,56 @@ func StaffResignationIndex(c *gin.Context) {
 		return
 	}
 	db := middleware.GetDB(c)
+	repo := newStaffRepository(db)
+	pagination := handlers.ParsePagination(c, 10, 100)
 
-	terminations, _ := dbrepo.ListStaffTerminationsByUserID(db, user.ID)
+	terminations, _ := repo.ListStaffTerminationsByUserIDPaged(user.ID, pagination.Limit, pagination.Offset)
+	totalTerminations, _ := repo.CountStaffTerminationsByUserID(user.ID)
 
-	var active any
-	for _, termination := range terminations {
+	allTerminations, _ := repo.ListStaffTerminationsByUserID(user.ID)
+	var active *dto.StaffTerminationSummary
+	for _, termination := range allTerminations {
 		if termination.Status == "Diajukan" || termination.Status == "Proses" {
-			active = map[string]any{
-				"reference":     termination.Reference,
-				"type":          termination.Type,
-				"status":        termination.Status,
-				"progress":      termination.Progress,
-				"requestDate":   handlers.FormatDate(termination.RequestDate),
-				"effectiveDate": handlers.FormatDate(termination.EffectiveDate),
-				"reason":        termination.Reason,
-				"suggestion":    termination.Suggestion,
+			active = &dto.StaffTerminationSummary{
+				Reference:     termination.Reference,
+				Type:          termination.Type,
+				Status:        termination.Status,
+				Progress:      termination.Progress,
+				RequestDate:   handlers.FormatDate(termination.RequestDate),
+				EffectiveDate: handlers.FormatDate(termination.EffectiveDate),
+				Reason:        termination.Reason,
+				Suggestion:    termination.Suggestion,
 			}
 			break
 		}
 	}
 
-	history := make([]map[string]any, 0, len(terminations))
+	history := make([]dto.StaffTerminationSummary, 0, len(terminations))
 	for _, termination := range terminations {
-		history = append(history, map[string]any{
-			"reference":     termination.Reference,
-			"type":          termination.Type,
-			"status":        termination.Status,
-			"progress":      termination.Progress,
-			"requestDate":   handlers.FormatDate(termination.RequestDate),
-			"effectiveDate": handlers.FormatDate(termination.EffectiveDate),
-			"reason":        termination.Reason,
-			"suggestion":    termination.Suggestion,
+		history = append(history, dto.StaffTerminationSummary{
+			Reference:     termination.Reference,
+			Type:          termination.Type,
+			Status:        termination.Status,
+			Progress:      termination.Progress,
+			RequestDate:   handlers.FormatDate(termination.RequestDate),
+			EffectiveDate: handlers.FormatDate(termination.EffectiveDate),
+			Reason:        termination.Reason,
+			Suggestion:    termination.Suggestion,
 		})
 	}
 
-	profile := map[string]any{
-		"name":          user.Name,
-		"employeeCode":  user.EmployeeCode,
-		"division":      user.Division,
-		"position":      user.Role,
-		"joinedAt":      handlers.FormatDateISO(user.RegisteredAt),
-		"joinedDisplay": handlers.FormatDate(user.RegisteredAt),
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"profile":       profile,
-		"activeRequest": active,
-		"history":       history,
+	c.JSON(http.StatusOK, dto.StaffResignationResponse{
+		Profile: dto.StaffResignationProfile{
+			Name:          user.Name,
+			EmployeeCode:  user.EmployeeCode,
+			Division:      user.Division,
+			Position:      user.Role,
+			JoinedAt:      handlers.FormatDateISO(user.RegisteredAt),
+			JoinedDisplay: handlers.FormatDate(user.RegisteredAt),
+		},
+		ActiveRequest: active,
+		History:       history,
+		Pagination:    handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalTerminations),
 	})
 }
 
@@ -383,6 +462,7 @@ func StaffResignationStore(c *gin.Context) {
 		return
 	}
 	db := middleware.GetDB(c)
+	repo := newStaffRepository(db)
 
 	var payload struct {
 		EffectiveDate string `form:"effective_date" json:"effective_date"`
@@ -408,7 +488,7 @@ func StaffResignationStore(c *gin.Context) {
 		return
 	}
 
-	submittedCount, _ := dbrepo.CountStaffTerminationsByUserID(db, user.ID)
+	submittedCount, _ := repo.CountStaffTerminationsByUserID(user.ID)
 	if submittedCount > 0 {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"effective_date": "Pengajuan resign hanya dapat dilakukan satu kali."})
 		return
@@ -421,7 +501,7 @@ func StaffResignationStore(c *gin.Context) {
 	}
 
 	now := time.Now()
-	if err := dbrepo.InsertStaffTermination(db, dbrepo.StaffTerminationCreateInput{
+	if err := repo.InsertStaffTermination(dbrepo.StaffTerminationCreateInput{
 		Reference:     reference,
 		UserID:        user.ID,
 		RequestedBy:   user.ID,
