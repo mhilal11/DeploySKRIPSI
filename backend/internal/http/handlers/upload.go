@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"hris-backend/internal/http/middleware"
+	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +29,12 @@ func SaveUploadedFile(c *gin.Context, field string, subdir string) (string, *Upl
 	}
 	if err := c.SaveUploadedFile(file, absPath); err != nil {
 		return "", nil, err
+	}
+	if cfg.StorageEncryptUploads && cfg.StorageEncryptionKey != "" {
+		if err := services.EncryptFileInPlace(absPath, cfg.StorageEncryptionKey); err != nil {
+			_ = os.Remove(absPath)
+			return "", nil, err
+		}
 	}
 
 	meta := &UploadMeta{
