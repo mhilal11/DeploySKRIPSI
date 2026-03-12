@@ -19,7 +19,7 @@ export function LetterTrackingView({ letter }: { letter: LetterRecord }) {
 
   const firstIncomplete = steps.findIndex((step) => !step.completed);
   const currentStepIndex = firstIncomplete === -1 ? Math.max(0, steps.length - 1) : firstIncomplete;
-  const currentStatus = steps[currentStepIndex]?.status ?? 'Status Tidak Diketahui';
+  const currentStatus = letter.status ?? steps[currentStepIndex]?.status ?? 'Status Tidak Diketahui';
   const totalSteps = steps.length;
 
   return (
