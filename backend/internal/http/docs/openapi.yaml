@@ -1,4 +1,4 @@
-openapi: 3.0.3
+﻿openapi: 3.0.3
 info:
   title: HRIS LDP API
   version: 1.0.0
@@ -13,6 +13,11 @@ tags:
   - name: Public
   - name: Profile
   - name: SuperAdmin
+  - name: AdminStaff
+  - name: Dashboard
+  - name: Pelamar
+  - name: Staff
+  - name: System
 paths:
   /csrf:
     get:
@@ -43,6 +48,12 @@ paths:
                   user:
                     $ref: '#/components/schemas/User'
   /login:
+    get:
+      tags: [Auth]
+      summary: Ambil data /login
+      responses:
+        '200':
+          description: OK
     post:
       tags: [Auth]
       summary: Login akun
@@ -76,6 +87,12 @@ paths:
         '200':
           description: Logout berhasil
   /register:
+    get:
+      tags: [Auth]
+      summary: Ambil data /register
+      responses:
+        '200':
+          description: OK
     post:
       tags: [Auth]
       summary: Registrasi pelamar
@@ -188,6 +205,16 @@ paths:
           description: Updated
         '422':
           description: Validasi gagal
+    delete:
+      tags: [Profile]
+      summary: Hapus data /profile
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
   /super-admin/kelola-pengaduan:
     get:
       tags: [SuperAdmin]
@@ -334,6 +361,1168 @@ paths:
           description: Created
         '422':
           description: Validasi gagal
+  /admin/dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Ambil data /admin/dashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /admin-staff/dashboard:
+    get:
+      tags: [AdminStaff]
+      summary: Ambil data /admin-staff/dashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /admin-staff/kelola-surat:
+    get:
+      tags: [AdminStaff]
+      summary: Ambil data /admin-staff/kelola-surat
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    post:
+      tags: [AdminStaff]
+      summary: Proses request /admin-staff/kelola-surat
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /admin-staff/kelola-surat/{id}/archive:
+    post:
+      tags: [AdminStaff]
+      summary: Proses request /admin-staff/kelola-surat/{id}/archive
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /admin-staff/kelola-surat/{id}/reply:
+    post:
+      tags: [AdminStaff]
+      summary: Proses request /admin-staff/kelola-surat/{id}/reply
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /admin-staff/kelola-surat/{id}/unarchive:
+    post:
+      tags: [AdminStaff]
+      summary: Proses request /admin-staff/kelola-surat/{id}/unarchive
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /admin-staff/recruitment:
+    get:
+      tags: [AdminStaff]
+      summary: Ambil data /admin-staff/recruitment
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /auth/google/register:
+    get:
+      tags: [Auth]
+      summary: Ambil data /auth/google/register
+      responses:
+        '200':
+          description: OK
+  /auth/google/register/callback:
+    get:
+      tags: [Auth]
+      summary: Ambil data /auth/google/register/callback
+      responses:
+        '200':
+          description: OK
+  /confirm-password:
+    post:
+      tags: [Auth]
+      summary: Proses request /confirm-password
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Ambil data /dashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /docs:
+    get:
+      tags: [System]
+      summary: Ambil data /docs
+      responses:
+        '200':
+          description: OK
+  /healthz:
+    get:
+      tags: [System]
+      summary: Ambil data /healthz
+      responses:
+        '200':
+          description: OK
+  /openapi.yaml:
+    get:
+      tags: [System]
+      summary: Ambil data /openapi.yaml
+      responses:
+        '200':
+          description: OK
+  /password:
+    post:
+      tags: [Profile]
+      summary: Proses request /password
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    put:
+      tags: [Profile]
+      summary: Perbarui data /password
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /pelamar/dashboard:
+    get:
+      tags: [Pelamar]
+      summary: Ambil data /pelamar/dashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /pelamar/lamaran-saya:
+    get:
+      tags: [Pelamar]
+      summary: Ambil data /pelamar/lamaran-saya
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    post:
+      tags: [Pelamar]
+      summary: Proses request /pelamar/lamaran-saya
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /pelamar/lamaran-saya/check-eligibility:
+    post:
+      tags: [Pelamar]
+      summary: Proses request /pelamar/lamaran-saya/check-eligibility
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /pelamar/profil:
+    get:
+      tags: [Pelamar]
+      summary: Ambil data /pelamar/profil
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    post:
+      tags: [Pelamar]
+      summary: Proses request /pelamar/profil
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /pelamar/references/education:
+    get:
+      tags: [Pelamar]
+      summary: Ambil data /pelamar/references/education
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /profile/password:
+    put:
+      tags: [Profile]
+      summary: Perbarui data /profile/password
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /staff/dashboard:
+    get:
+      tags: [Staff]
+      summary: Ambil data /staff/dashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /staff/keluhan-dan-saran:
+    get:
+      tags: [Staff]
+      summary: Ambil data /staff/keluhan-dan-saran
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    post:
+      tags: [Staff]
+      summary: Proses request /staff/keluhan-dan-saran
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /staff/pengajuan-resign:
+    get:
+      tags: [Staff]
+      summary: Ambil data /staff/pengajuan-resign
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    post:
+      tags: [Staff]
+      summary: Proses request /staff/pengajuan-resign
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /storage/{filepath}:
+    get:
+      tags: [System]
+      summary: Ambil data /storage/{filepath}
+      parameters:
+        - in: path
+          name: filepath
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /super-admin/accounts:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/accounts
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/accounts
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/accounts/{id}:
+    put:
+      tags: [SuperAdmin]
+      summary: Perbarui data /super-admin/accounts/{id}
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    patch:
+      tags: [SuperAdmin]
+      summary: Perbarui sebagian data /super-admin/accounts/{id}
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    delete:
+      tags: [SuperAdmin]
+      summary: Hapus data /super-admin/accounts/{id}
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/accounts/{id}/edit:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/accounts/{id}/edit
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/accounts/{id}/reset-password:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/accounts/{id}/reset-password
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/accounts/{id}/toggle-status:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/accounts/{id}/toggle-status
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/accounts/create:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/accounts/create
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/admin-hr/dashboard:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/admin-hr/dashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/audit-log:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/audit-log
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/audit-log/mark-viewed:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/audit-log/mark-viewed
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/dashboard:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/dashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-divisi:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/kelola-divisi
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-divisi
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-divisi/{id}:
+    patch:
+      tags: [SuperAdmin]
+      summary: Perbarui sebagian data /super-admin/kelola-divisi/{id}
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    delete:
+      tags: [SuperAdmin]
+      summary: Hapus data /super-admin/kelola-divisi/{id}
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-divisi/{id}/open-job:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-divisi/{id}/open-job
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    delete:
+      tags: [SuperAdmin]
+      summary: Hapus data /super-admin/kelola-divisi/{id}/open-job
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-staff:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/kelola-staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-staff
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-staff/{id}:
+    patch:
+      tags: [SuperAdmin]
+      summary: Perbarui sebagian data /super-admin/kelola-staff/{id}
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    delete:
+      tags: [SuperAdmin]
+      summary: Hapus data /super-admin/kelola-staff/{id}
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/{id}/archive:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-surat/{id}/archive
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/{id}/disposition:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-surat/{id}/disposition
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/{id}/export-final:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/kelola-surat/{id}/export-final
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/{id}/export-word:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/kelola-surat/{id}/export-word
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/{id}/unarchive:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-surat/{id}/unarchive
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/disposition/bulk:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-surat/disposition/bulk
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/disposition/final:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-surat/disposition/final
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/disposition/reject:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-surat/disposition/reject
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/templates:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/kelola-surat/templates
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-surat/templates
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/templates/{id}:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-surat/templates/{id}
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+    delete:
+      tags: [SuperAdmin]
+      summary: Hapus data /super-admin/kelola-surat/templates/{id}
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/templates/{id}/download:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/kelola-surat/templates/{id}/download
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/templates/{id}/toggle:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/kelola-surat/templates/{id}/toggle
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/templates/list:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/kelola-surat/templates/list
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/kelola-surat/templates/sample:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/kelola-surat/templates/sample
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/notifications:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/notifications
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/onboarding/{id}/convert-to-staff:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/onboarding/{id}/convert-to-staff
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/onboarding/{id}/update-checklist:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/onboarding/{id}/update-checklist
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/recruitment
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/{id}:
+    delete:
+      tags: [SuperAdmin]
+      summary: Hapus data /super-admin/recruitment/{id}
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/{id}/ai-screening:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/recruitment/{id}/ai-screening
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/{id}/ai-screening/run:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/recruitment/{id}/ai-screening/run
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/{id}/cv:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/recruitment/{id}/cv
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/{id}/reject:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/recruitment/{id}/reject
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/{id}/schedule-interview:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/recruitment/{id}/schedule-interview
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/{id}/update-status:
+    put:
+      tags: [SuperAdmin]
+      summary: Perbarui data /super-admin/recruitment/{id}/update-status
+      security:
+        - cookieAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/auto-shortlist:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/recruitment/auto-shortlist
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/export-score-report:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/recruitment/export-score-report
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/export-score-report-pdf:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/recruitment/export-score-report-pdf
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/recruitment/sla-settings:
+    post:
+      tags: [SuperAdmin]
+      summary: Proses request /super-admin/recruitment/sla-settings
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /super-admin/references/education:
+    get:
+      tags: [SuperAdmin]
+      summary: Ambil data /super-admin/references/education
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+  /verify-email/{id}/{hash}:
+    get:
+      tags: [Auth]
+      summary: Ambil data /verify-email/{id}/{hash}
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: path
+          name: hash
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
 components:
   securitySchemes:
     cookieAuth:
