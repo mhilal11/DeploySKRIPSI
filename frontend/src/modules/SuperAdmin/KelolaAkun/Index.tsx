@@ -10,7 +10,7 @@ import {
     PaginatedAccounts,
 } from '@/modules/SuperAdmin/components/accounts/types';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
-import { api, apiUrl } from '@/shared/lib/api';
+import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
 import { Head, Link, router } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
 
@@ -111,7 +111,19 @@ export default function Index(props: IndexPageProps) {
     const [detailOpen, setDetailOpen] = useState(false);
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const filterRequestAbortRef = useRef<AbortController | null>(null);
     const isFirstRender = useRef(true);
+
+    const clearPendingFilterFetch = () => {
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
+        }
+        if (filterRequestAbortRef.current) {
+            filterRequestAbortRef.current.abort();
+            filterRequestAbortRef.current = null;
+        }
+    };
 
     // Show queued toast from sessionStorage after page transition settles
     useEffect(() => {
@@ -146,16 +158,20 @@ export default function Index(props: IndexPageProps) {
             isFirstRender.current = false;
             return;
         }
-        if (debounceRef.current) {
-            clearTimeout(debounceRef.current);
-        }
+        clearPendingFilterFetch();
         debounceRef.current = setTimeout(() => {
             const params: Record<string, string> = {};
             if (search) params.search = search;
             if (roleFilter !== 'all') params.role = roleFilter;
             if (statusFilter !== 'all') params.status = statusFilter;
 
-            api.get(apiUrl('/super-admin/accounts'), { params })
+            const controller = new AbortController();
+            filterRequestAbortRef.current = controller;
+
+            api.get(apiUrl('/super-admin/accounts'), {
+                params,
+                signal: controller.signal,
+            })
                 .then(({ data }) => {
                     if (data.users) {
                         setAllUsers(data.users.data ?? []);
@@ -166,24 +182,29 @@ export default function Index(props: IndexPageProps) {
                         setCurrentStats(data.stats);
                     }
                 })
-                .catch(() => {
+                .catch((error) => {
+                    if (isAxiosError(error) && error.code === 'ERR_CANCELED') {
+                        return;
+                    }
                     // Silently ignore search errors
+                })
+                .finally(() => {
+                    if (filterRequestAbortRef.current === controller) {
+                        filterRequestAbortRef.current = null;
+                    }
                 });
         }, 350);
 
         return () => {
-            if (debounceRef.current) {
-                clearTimeout(debounceRef.current);
-            }
+            clearPendingFilterFetch();
         };
     }, [search, roleFilter, statusFilter]);
 
-    // Sync data saat props berubah dari navigasi pagination (Link click)
     useEffect(() => {
-        setAllUsers(users.data ?? []);
-        setPaginationLinks(users.links ?? []);
-        setCurrentFrom(users.from ?? 1);
-    }, [users.data, users.links, users.from]);
+        return () => {
+            clearPendingFilterFetch();
+        };
+    }, []);
 
     useEffect(() => {
         setCurrentStats(stats);
@@ -240,6 +261,36 @@ export default function Index(props: IndexPageProps) {
     const openDetail = (user: AccountRecord) => {
         setSelectedUser(user);
         setDetailOpen(true);
+    };
+
+    const handlePaginationNavigate = (url: string) => {
+        clearPendingFilterFetch();
+        const baseOrigin =
+            typeof window !== 'undefined'
+                ? window.location.origin
+                : 'http://localhost';
+        const parsed = new URL(url, baseOrigin);
+        const params: Record<string, string> = {};
+        parsed.searchParams.forEach((value, key) => {
+            params[key] = value;
+        });
+
+        api.get(apiUrl('/super-admin/accounts'), { params })
+            .then(({ data }) => {
+                if (data.users) {
+                    setAllUsers(data.users.data ?? []);
+                    setPaginationLinks(data.users.links ?? []);
+                    setCurrentFrom(data.users.from ?? 1);
+                }
+                if (data.stats) {
+                    setCurrentStats(data.stats);
+                }
+            })
+            .catch(() => {
+                router.visit(url, {
+                    preserveScroll: true,
+                });
+            });
     };
 
     const handleToggleStatus = (user: AccountRecord) => {
@@ -366,6 +417,8 @@ export default function Index(props: IndexPageProps) {
                         users={allUsers}
                         links={paginationLinks}
                         from={currentFrom}
+                        onPaginationNavigateStart={clearPendingFilterFetch}
+                        onPaginationNavigate={handlePaginationNavigate}
                         onView={openDetail}
                         onEdit={(user) =>
                             router.visit(
@@ -387,7 +440,3 @@ export default function Index(props: IndexPageProps) {
         </SuperAdminLayout>
     );
 }
-
-
-
-

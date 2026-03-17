@@ -18,7 +18,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
-import { Link } from '@/shared/lib/inertia';
 
 import { AccountRecord, PaginationLink } from './types';
 
@@ -26,6 +25,8 @@ interface AccountTableProps {
     users: AccountRecord[];
     links: PaginationLink[];
     from?: number;
+    onPaginationNavigateStart?: () => void;
+    onPaginationNavigate?: (url: string) => void;
     onView: (user: AccountRecord) => void;
     onEdit: (user: AccountRecord) => void;
     onToggleStatus: (user: AccountRecord) => void;
@@ -36,6 +37,8 @@ export default function AccountTable({
     users,
     links,
     from = 1,
+    onPaginationNavigateStart,
+    onPaginationNavigate,
     onView,
     onEdit,
     onToggleStatus,
@@ -276,14 +279,24 @@ export default function AccountTable({
                     </span>
                     <div className="flex flex-wrap justify-center gap-0.5 md:gap-2">
                         {links.map((link, index) => (
-                            <Link
+                            <a
                                 key={`${link.label}-${index}`}
                                 href={link.url ?? '#'}
                                 aria-disabled={!link.url}
                                 onClick={(event) => {
                                     if (!link.url) {
                                         event.preventDefault();
+                                        return;
                                     }
+
+                                    if (onPaginationNavigate) {
+                                        event.preventDefault();
+                                        onPaginationNavigateStart?.();
+                                        onPaginationNavigate(link.url);
+                                        return;
+                                    }
+
+                                    onPaginationNavigateStart?.();
                                 }}
                                 className={`rounded px-1.5 py-0.5 text-[10px] md:text-sm md:px-3 md:py-1 ${link.active
                                     ? 'bg-blue-900 text-white'
