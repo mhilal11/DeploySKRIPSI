@@ -43,6 +43,29 @@ export default function Edit({
     genderOptions,
     educationLevelOptions,
 }: EditProps) {
+    const indexURL = route('super-admin.accounts.index');
+    const returnURL =
+        typeof window !== 'undefined'
+            ? (() => {
+                const raw = new URLSearchParams(window.location.search).get('return_to') ?? '';
+                const trimmed = raw.trim();
+                if (trimmed.startsWith('/super-admin/accounts')) {
+                    return trimmed;
+                }
+                if (/^https?:\/\//i.test(trimmed)) {
+                    try {
+                        const parsed = new URL(trimmed);
+                        if (parsed.pathname.startsWith('/super-admin/accounts')) {
+                            return parsed.pathname + parsed.search;
+                        }
+                    } catch {
+                        // fall back to index URL
+                    }
+                }
+                return indexURL;
+            })()
+            : indexURL;
+
     const form = useForm({
         employee_code: user.employee_code ?? '',
         name: user.name,
@@ -106,7 +129,7 @@ export default function Edit({
                     sessionStorage.setItem(ACCOUNT_TOAST_STORAGE_KEY, message);
                 }
 
-                router.visit(route('super-admin.accounts.index'));
+                router.visit(returnURL);
             },
             onError: (errors) => {
                 const firstError = errors
@@ -129,7 +152,7 @@ export default function Edit({
             description={`Perbarui informasi akun ${user.name}`}
             breadcrumbs={[
                 { label: 'Super Admin', href: route('super-admin.dashboard') },
-                { label: 'Kelola Akun', href: route('super-admin.accounts.index') },
+                { label: 'Kelola Akun', href: returnURL },
                 { label: 'Edit Akun' },
             ]}
         >
@@ -151,7 +174,7 @@ export default function Edit({
                 showPasswordFields
                 submitLabel="Perbarui Akun"
                 secondaryAction={
-                    <ButtonLink href={route('super-admin.accounts.index')}>
+                    <ButtonLink href={returnURL}>
                         Kembali ke daftar
                     </ButtonLink>
                 }

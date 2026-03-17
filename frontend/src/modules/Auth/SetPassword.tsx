@@ -9,6 +9,15 @@ import { Head, useForm } from '@/shared/lib/inertia';
 
 const logo = '/img/LogoLDP.png';
 
+function resolveEmailFromURL(): string {
+    if (typeof window === 'undefined') {
+        return '';
+    }
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('email') ?? '';
+    return raw.trim().toLowerCase();
+}
+
 export default function SetPassword({
     token,
     email,
@@ -16,9 +25,10 @@ export default function SetPassword({
     token: string;
     email: string;
 }) {
+    const initialEmail = (email ?? '').trim().toLowerCase();
     const { data, setData, post, processing, errors, reset } = useForm({
         token: token,
-        email: email,
+        email: initialEmail,
         password: '',
         password_confirmation: '',
     });
@@ -56,6 +66,16 @@ export default function SetPassword({
             mounted = false;
         };
     }, []);
+
+    useEffect(() => {
+        if ((data.email ?? '').trim() !== '') {
+            return;
+        }
+        const fallbackEmail = resolveEmailFromURL();
+        if (fallbackEmail !== '') {
+            setData('email', fallbackEmail);
+        }
+    }, [data.email, setData]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -120,7 +140,7 @@ export default function SetPassword({
                                             value={data.email}
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
                                             autoComplete="username"
-                                            onChange={(e) => setData('email', e.target.value)}
+                                            readOnly
                                         />
                                     </div>
                                     <InputError message={errors.email} className="text-sm text-red-300" />

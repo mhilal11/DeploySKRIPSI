@@ -11,7 +11,7 @@ import {
 } from '@/modules/SuperAdmin/components/accounts/types';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
 import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
-import { Head, Link, router } from '@/shared/lib/inertia';
+import { Head, Link, router, usePageManager } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
 
 type IndexPageProps = PageProps<{
@@ -91,6 +91,7 @@ interface UserLoggedInPayload {
 }
 
 export default function Index(props: IndexPageProps) {
+    const { setProps } = usePageManager();
     const users = props.users ?? EMPTY_USERS;
     const filters = props.filters ?? {};
     const stats = props.stats ?? EMPTY_STATS;
@@ -105,6 +106,7 @@ export default function Index(props: IndexPageProps) {
     const [paginationLinks, setPaginationLinks] = useState(users.links ?? []);
     const [currentStats, setCurrentStats] = useState(stats);
     const [currentFrom, setCurrentFrom] = useState(users.from ?? 1);
+    const [currentPage, setCurrentPage] = useState(users.current_page ?? 1);
     const [selectedUser, setSelectedUser] = useState<AccountRecord | null>(
         null,
     );
@@ -177,9 +179,13 @@ export default function Index(props: IndexPageProps) {
                         setAllUsers(data.users.data ?? []);
                         setPaginationLinks(data.users.links ?? []);
                         setCurrentFrom(data.users.from ?? 1);
+                        setCurrentPage(data.users.current_page ?? 1);
                     }
                     if (data.stats) {
                         setCurrentStats(data.stats);
+                    }
+                    if (data && typeof data === 'object') {
+                        setProps(data);
                     }
                 })
                 .catch((error) => {
@@ -198,7 +204,7 @@ export default function Index(props: IndexPageProps) {
         return () => {
             clearPendingFilterFetch();
         };
-    }, [search, roleFilter, statusFilter]);
+    }, [search, roleFilter, statusFilter, setProps]);
 
     useEffect(() => {
         return () => {
@@ -281,9 +287,13 @@ export default function Index(props: IndexPageProps) {
                     setAllUsers(data.users.data ?? []);
                     setPaginationLinks(data.users.links ?? []);
                     setCurrentFrom(data.users.from ?? 1);
+                    setCurrentPage(data.users.current_page ?? 1);
                 }
                 if (data.stats) {
                     setCurrentStats(data.stats);
+                }
+                if (data && typeof data === 'object') {
+                    setProps(data);
                 }
             })
             .catch(() => {
@@ -370,6 +380,33 @@ export default function Index(props: IndexPageProps) {
         );
     };
 
+    const buildAccountsListURL = () => {
+        const params = new URLSearchParams();
+        const trimmedSearch = search.trim();
+        const trimmedRole = roleFilter.trim();
+        const trimmedStatus = statusFilter.trim();
+
+        if (trimmedSearch !== '') {
+            params.set('search', trimmedSearch);
+        }
+        if (trimmedRole !== '' && trimmedRole !== 'all') {
+            params.set('role', trimmedRole);
+        }
+        if (trimmedStatus !== '' && trimmedStatus !== 'all') {
+            params.set('status', trimmedStatus);
+        }
+        if (currentPage > 1) {
+            params.set('page', String(currentPage));
+        }
+
+        const base = route('super-admin.accounts.index');
+        const query = params.toString();
+        if (!query) {
+            return base;
+        }
+        return `${base}?${query}`;
+    };
+
     return (
         <SuperAdminLayout
             title="Account Management"
@@ -422,7 +459,7 @@ export default function Index(props: IndexPageProps) {
                         onView={openDetail}
                         onEdit={(user) =>
                             router.visit(
-                                route('super-admin.accounts.edit', user.id),
+                                `${route('super-admin.accounts.edit', user.id)}?return_to=${encodeURIComponent(buildAccountsListURL())}`,
                             )
                         }
                         onToggleStatus={handleToggleStatus}
