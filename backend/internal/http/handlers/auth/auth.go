@@ -330,23 +330,28 @@ func ForgotPassword(c *gin.Context) {
 
 	db := middleware.GetDB(c)
 	repo := newAuthRepository(db)
-	exists, _ := repo.UserEmailExists(req.Email, nil)
-
-	var token string
-	if exists {
-		token, _ = utils.RandomToken(24)
-		if token == "" {
-			token = "reset-token"
-		}
-		_ = repo.SavePasswordResetToken(req.Email, token, time.Now())
-
-		cfg := middleware.GetConfig(c)
-		resetURL := cfg.FrontendURL + "/reset-password/" + token + "?email=" + url.QueryEscape(req.Email)
-		body := fmt.Sprintf("Halo,\n\nSilakan klik tautan berikut untuk mereset kata sandi Anda:\n%s\n\nTautan ini berlaku selama 60 menit.\nJika Anda tidak meminta reset kata sandi, abaikan email ini.", resetURL)
-		_ = services.SendEmail(cfg, req.Email, "Reset Kata Sandi", body)
+	exists, err := repo.UserEmailExists(req.Email, nil)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memproses permintaan reset password.")
+		return
+	}
+	if !exists {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email tidak terdaftar."})
+		return
 	}
 
-	statusMessage := "Jika email terdaftar, link reset password telah dikirim."
+	token, _ := utils.RandomToken(24)
+	if token == "" {
+		token = "reset-token"
+	}
+	_ = repo.SavePasswordResetToken(req.Email, token, time.Now())
+
+	cfg := middleware.GetConfig(c)
+	resetURL := cfg.FrontendURL + "/reset-password/" + token + "?email=" + url.QueryEscape(req.Email)
+	body := fmt.Sprintf("Halo,\n\nSilakan klik tautan berikut untuk mereset kata sandi Anda:\n%s\n\nTautan ini berlaku selama 60 menit.\nJika Anda tidak meminta reset kata sandi, abaikan email ini.", resetURL)
+	_ = services.SendEmail(cfg, req.Email, "Reset Kata Sandi", body)
+
+	statusMessage := "Link reset password telah dikirim ke email Anda."
 	redirectURL := "/forgot-password?status=" + url.QueryEscape(statusMessage)
 	c.JSON(http.StatusOK, gin.H{"status": statusMessage, "redirect_to": redirectURL})
 }

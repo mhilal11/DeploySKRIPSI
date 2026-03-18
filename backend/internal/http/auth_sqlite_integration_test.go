@@ -129,6 +129,95 @@ func TestAuthLoginAndGetMe_SQLiteIntegration(t *testing.T) {
 	}
 }
 
+func TestForgotPasswordRejectsUnknownEmail_SQLiteIntegration(t *testing.T) {
+	t.Parallel()
+
+	db := mustOpenSQLiteAuthDB(t)
+	defer db.Close()
+
+	cfg := config.Config{
+		Env:                     "development",
+		FrontendURL:             "http://localhost:5173",
+		BaseURL:                 "http://localhost:8080",
+		SessionSecret:           "0123456789abcdef0123456789abcdef",
+		SessionSecretFromEnv:    true,
+		CSRFSecret:              "abcdef0123456789abcdef0123456789",
+		CSRFSecretFromEnv:       true,
+		MaxRequestBodyBytes:     25 * 1024 * 1024,
+		StoragePath:             "./storage",
+		DisableBackgroundWorker: true,
+	}
+
+	router := NewRouter(cfg, db)
+	server := httptest.NewServer(router)
+	defer server.Close()
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("failed creating cookie jar: %v", err)
+	}
+	client := &http.Client{Jar: jar}
+
+	csrfRes, err := client.Get(server.URL + "/api/csrf")
+	if err != nil {
+		t.Fatalf("failed calling csrf endpoint: %v", err)
+	}
+	defer csrfRes.Body.Close()
+	if csrfRes.StatusCode != http.StatusOK {
+		t.Fatalf("expected csrf 200, got %d", csrfRes.StatusCode)
+	}
+
+	csrfBody, err := io.ReadAll(csrfRes.Body)
+	if err != nil {
+		t.Fatalf("failed reading csrf response body: %v", err)
+	}
+	var csrfPayload struct {
+		Token string `json:"csrf_token"`
+	}
+	if err := json.Unmarshal(csrfBody, &csrfPayload); err != nil {
+		t.Fatalf("failed parsing csrf response: %v", err)
+	}
+	if strings.TrimSpace(csrfPayload.Token) == "" {
+		t.Fatalf("csrf token must not be empty")
+	}
+
+	req, err := http.NewRequest(
+		http.MethodPost,
+		server.URL+"/api/forgot-password",
+		strings.NewReader(`{"email":"unknown@example.com"}`),
+	)
+	if err != nil {
+		t.Fatalf("failed creating forgot password request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-CSRF-Token", csrfPayload.Token)
+
+	res, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("failed calling forgot password endpoint: %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusUnprocessableEntity {
+		body, _ := io.ReadAll(res.Body)
+		t.Fatalf("expected 422, got %d body=%s", res.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("failed reading forgot password response body: %v", err)
+	}
+	var payload struct {
+		Errors map[string]string `json:"errors"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("failed parsing forgot password response: %v", err)
+	}
+	if payload.Errors["email"] == "" {
+		t.Fatalf("expected email validation error, got %+v", payload.Errors)
+	}
+}
+
 func mustOpenSQLiteAuthDB(t *testing.T) *sqlx.DB {
 	t.Helper()
 
