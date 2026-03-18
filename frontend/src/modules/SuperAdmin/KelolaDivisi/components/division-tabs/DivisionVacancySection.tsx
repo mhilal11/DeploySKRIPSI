@@ -3,7 +3,7 @@ import {
     Briefcase,
     CheckCircle2,
     Edit,
-    Trash2,
+    XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -43,10 +43,10 @@ type VacancyCardProps = {
     division: DivisionRecord;
     job: DivisionJob;
     onEdit: () => void;
-    onDelete: () => void;
+    onClose: () => void;
 };
 
-function VacancyCard({ division, job, onEdit, onDelete }: VacancyCardProps) {
+function VacancyCard({ division, job, onEdit, onClose }: VacancyCardProps) {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const criteria: NonNullable<DivisionJob['job_eligibility_criteria']> =
         job.job_eligibility_criteria ?? {};
@@ -155,17 +155,18 @@ function VacancyCard({ division, job, onEdit, onDelete }: VacancyCardProps) {
                                         className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
                                         onClick={() => setIsAlertOpen(true)}
                                     >
-                                        <Trash2 className="h-4 w-4" />
+                                        <XCircle className="mr-2 h-4 w-4" />
+                                        Tutup Lowongan
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>Hapus Lowongan</p>
+                                    <p>Tutup Lowongan</p>
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
                         <AlertDialogContent className="bg-white">
                             <AlertDialogHeader>
-                                <AlertDialogTitle>Hapus Lowongan?</AlertDialogTitle>
+                                <AlertDialogTitle>Tutup Lowongan?</AlertDialogTitle>
                                 <AlertDialogDescription>
                                     Lowongan akan ditutup dan tidak lagi muncul pada portal pelamar.
                                 </AlertDialogDescription>
@@ -173,10 +174,10 @@ function VacancyCard({ division, job, onEdit, onDelete }: VacancyCardProps) {
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Batal</AlertDialogCancel>
                                 <AlertDialogAction
-                                    onClick={onDelete}
+                                    onClick={onClose}
                                     className="bg-red-600 text-white hover:bg-red-700"
                                 >
-                                    Hapus
+                                    Tutup Lowongan
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
@@ -199,6 +200,7 @@ export function DivisionVacancySection({
     onCloseJob,
 }: DivisionVacancySectionProps) {
     const activeJobs = getActiveDivisionJobs(division);
+    const [isCloseAllAlertOpen, setIsCloseAllAlertOpen] = useState(false);
 
     if (activeJobs.length > 0) {
         return (
@@ -213,14 +215,43 @@ export function DivisionVacancySection({
                             yang lebih fleksibel.
                         </p>
                     </div>
-                    <Button
-                        onClick={() => onOpenJob(division)}
-                        disabled={division.available_slots === 0}
-                        className="bg-green-600 hover:bg-green-700 disabled:opacity-60"
-                    >
-                        <Briefcase className="mr-2 h-4 w-4" />
-                        Buka Lowongan Baru
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <AlertDialog open={isCloseAllAlertOpen} onOpenChange={setIsCloseAllAlertOpen}>
+                            <Button
+                                variant="outline"
+                                className="border-red-200 bg-white text-red-600 hover:bg-red-50 hover:text-red-700"
+                                onClick={() => setIsCloseAllAlertOpen(true)}
+                            >
+                                <XCircle className="mr-2 h-4 w-4" />
+                                Tutup Semua Lowongan
+                            </Button>
+                            <AlertDialogContent className="bg-white">
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Tutup Semua Lowongan?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        Semua lowongan aktif pada divisi ini akan ditutup.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                                    <AlertDialogAction
+                                        onClick={() => onCloseJob(division)}
+                                        className="bg-red-600 text-white hover:bg-red-700"
+                                    >
+                                        Tutup Semua
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        <Button
+                            onClick={() => onOpenJob(division)}
+                            disabled={division.available_slots === 0}
+                            className="bg-green-600 hover:bg-green-700 disabled:opacity-60"
+                        >
+                            <Briefcase className="mr-2 h-4 w-4" />
+                            Buka Lowongan Baru
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="space-y-3">
@@ -230,7 +261,7 @@ export function DivisionVacancySection({
                             division={division}
                             job={job}
                             onEdit={() => onOpenJob(division, job)}
-                            onDelete={() => onCloseJob(division, job.id ?? undefined)}
+                            onClose={() => onCloseJob(division, job.id ?? undefined)}
                         />
                     ))}
                 </div>
