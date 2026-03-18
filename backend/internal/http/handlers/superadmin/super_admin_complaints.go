@@ -78,6 +78,7 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 	}
 	complaints, _ := repo.ListComplaintsByFiltersPaged(filterConfig, pagination.Limit, pagination.Offset)
 	totalComplaints, _ := repo.CountComplaintsByFilters(filterConfig)
+	allComplaints, _ := dbrepo.ListComplaintsByFilters(db, filterConfig)
 
 	data := make([]map[string]any, 0, len(complaints))
 	categoryOptions := map[string]bool{}
@@ -169,6 +170,10 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"filters": filters,
 		"stats":   stats,
+		"complaintTrend": gin.H{
+			"weekly":  buildComplaintTrendSeries(allComplaints, "weekly", 12, time.Now()),
+			"monthly": buildComplaintTrendSeries(allComplaints, "monthly", 12, time.Now()),
+		},
 		"complaints": gin.H{
 			"data":  data,
 			"links": []any{},
@@ -181,6 +186,110 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		"announcements":        []any{},
 		"sidebarNotifications": handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
 	})
+}
+
+type complaintTrendBucket struct {
+	start      time.Time
+	total      int
+	newCount   int
+	inProgress int
+	resolved   int
+	archived   int
+}
+
+func buildComplaintTrendSeries(rows []models.Complaint, period string, points int, now time.Time) []map[string]any {
+	if points <= 0 {
+		points = 12
+	}
+
+	location := now.Location()
+	if location == nil {
+		location = time.UTC
+	}
+
+	normalizedPeriod := strings.ToLower(strings.TrimSpace(period))
+	if normalizedPeriod != "weekly" {
+		normalizedPeriod = "monthly"
+	}
+
+	buckets := make([]complaintTrendBucket, 0, points)
+	indexByKey := make(map[string]int, points)
+
+	for offset := points - 1; offset >= 0; offset-- {
+		var bucketStart time.Time
+		if normalizedPeriod == "weekly" {
+			bucketStart = startOfWeek(now.AddDate(0, 0, -7*offset).In(location))
+		} else {
+			cursor := now.AddDate(0, -offset, 0).In(location)
+			bucketStart = time.Date(cursor.Year(), cursor.Month(), 1, 0, 0, 0, 0, location)
+		}
+		key := bucketStart.Format("2006-01-02")
+		indexByKey[key] = len(buckets)
+		buckets = append(buckets, complaintTrendBucket{start: bucketStart})
+	}
+
+	for _, row := range rows {
+		if row.SubmittedAt == nil || row.SubmittedAt.IsZero() {
+			continue
+		}
+
+		submittedAt := row.SubmittedAt.In(location)
+		var bucketStart time.Time
+		if normalizedPeriod == "weekly" {
+			bucketStart = startOfWeek(submittedAt)
+		} else {
+			bucketStart = time.Date(submittedAt.Year(), submittedAt.Month(), 1, 0, 0, 0, 0, location)
+		}
+
+		key := bucketStart.Format("2006-01-02")
+		bucketIndex, exists := indexByKey[key]
+		if !exists {
+			continue
+		}
+
+		buckets[bucketIndex].total++
+
+		switch normalizeComplaintStatus(row.Status) {
+		case models.ComplaintStatusNew:
+			buckets[bucketIndex].newCount++
+		case models.ComplaintStatusInProgress:
+			buckets[bucketIndex].inProgress++
+		case models.ComplaintStatusResolved:
+			buckets[bucketIndex].resolved++
+		case models.ComplaintStatusArchived:
+			buckets[bucketIndex].archived++
+		default:
+			buckets[bucketIndex].newCount++
+		}
+	}
+
+	result := make([]map[string]any, 0, len(buckets))
+	for _, bucket := range buckets {
+		label := bucket.start.Format("Jan 2006")
+		if normalizedPeriod == "weekly" {
+			label = bucket.start.Format("02 Jan")
+		}
+		result = append(result, map[string]any{
+			"key":         bucket.start.Format("2006-01-02"),
+			"label":       label,
+			"total":       bucket.total,
+			"new":         bucket.newCount,
+			"in_progress": bucket.inProgress,
+			"resolved":    bucket.resolved,
+			"archived":    bucket.archived,
+		})
+	}
+
+	return result
+}
+
+func startOfWeek(value time.Time) time.Time {
+	offset := int(value.Weekday()) - int(time.Monday)
+	if offset < 0 {
+		offset += 7
+	}
+	start := value.AddDate(0, 0, -offset)
+	return time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, value.Location())
 }
 
 func SuperAdminComplaintsUpdate(c *gin.Context) {

@@ -9,7 +9,9 @@ import ComplaintDetailDialog from './components/ComplaintDetailDialog';
 import ComplaintFilters from './components/ComplaintFilters';
 import ComplaintStats from './components/ComplaintStats';
 import ComplaintTable from './components/ComplaintTable';
+import ComplaintTrendChart from './components/ComplaintTrendChart';
 import {
+    ComplaintTrendSeries,
     ComplaintRecord,
     Option,
     PaginatedComplaints,
@@ -29,6 +31,7 @@ type ComplaintsPageProps = PageProps<{
         in_progress: number;
         resolved: number;
     };
+    complaintTrend: ComplaintTrendSeries;
     complaints: PaginatedComplaints;
     statusOptions: Option[];
     priorityOptions: Option[];
@@ -43,6 +46,7 @@ export default function KelolaPengaduanIndex(initialProps: ComplaintsPageProps) 
 
     const filters = props.filters ?? initialProps.filters;
     const stats = props.stats ?? initialProps.stats;
+    const complaintTrend = props.complaintTrend ?? initialProps.complaintTrend;
     const complaints = props.complaints ?? initialProps.complaints;
     const statusOptions = props.statusOptions ?? initialProps.statusOptions;
     const priorityOptions = props.priorityOptions ?? initialProps.priorityOptions;
@@ -87,7 +91,7 @@ export default function KelolaPengaduanIndex(initialProps: ComplaintsPageProps) 
                 preserveState: true,
                 preserveScroll: true,
                 replace: true,
-                only: ['complaints', 'filters', 'stats'],
+                only: ['complaints', 'filters', 'stats', 'complaintTrend'],
             });
         }, 250);
 
@@ -162,6 +166,8 @@ export default function KelolaPengaduanIndex(initialProps: ComplaintsPageProps) 
                         onPriorityChange={setPriority}
                         onCategoryChange={setCategory}
                     />
+
+                    <ComplaintTrendChart trend={complaintTrend} />
 
                     <ComplaintTable
                         complaints={complaints.data}

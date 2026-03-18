@@ -47,6 +47,21 @@ export interface Option {
     label: string;
 }
 
+export interface ComplaintTrendPoint {
+    key: string;
+    label: string;
+    total: number;
+    new: number;
+    in_progress: number;
+    resolved: number;
+    archived: number;
+}
+
+export interface ComplaintTrendSeries {
+    weekly: ComplaintTrendPoint[];
+    monthly: ComplaintTrendPoint[];
+}
+
 export interface RegulationRecord {
     id: number;
     title: string;
