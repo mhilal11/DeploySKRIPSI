@@ -298,6 +298,9 @@ export interface OnboardingItem {
     startedAt: string;
     status: 'Selesai' | 'In Progress';
     is_staff: boolean;
+    staff_assignment_selected?: boolean;
+    joined_in_application_id?: number | null;
+    joined_in_position?: string | null;
     steps: Array<{
         label: string;
         complete: boolean;
@@ -328,4 +331,3 @@ export type StatusSummary = Partial<Record<ApplicantStatus, number>>;
 
 export const formatApplicationId = (id: number) =>
     `APL${String(id).padStart(3, '0')}`;
-

@@ -82,6 +82,11 @@ export default function OnboardingTab({
                 });
                 setConfirmConvertOpen(false);
                 setConvertTarget(null);
+                void router.reload({
+                    preserveScroll: true,
+                    replace: true,
+                    only: ['onboarding'],
+                });
             },
             onError: (errors) => {
                 toast.error('Gagal menjadikan staff', {
@@ -122,10 +127,17 @@ export default function OnboardingTab({
                                         {item.status === 'Selesai' && (
                                             <>
                                                 {item.is_staff ? (
-                                                    <div className="flex items-center gap-1 px-3 py-1 text-sm font-medium text-green-600 bg-green-50 rounded-md border border-green-200">
-                                                        <Check className="h-4 w-4" />
-                                                        Berhasil
-                                                    </div>
+                                                    item.staff_assignment_selected === false && item.joined_in_position ? (
+                                                        <div className="flex items-center gap-1 px-3 py-1 text-sm font-medium text-amber-700 bg-amber-50 rounded-md border border-amber-200">
+                                                            <Check className="h-4 w-4" />
+                                                            Join di {item.joined_in_position}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1 px-3 py-1 text-sm font-medium text-green-600 bg-green-50 rounded-md border border-green-200">
+                                                            <Check className="h-4 w-4" />
+                                                            Berhasil
+                                                        </div>
+                                                    )
                                                 ) : (
                                                     <Button
                                                         size="sm"

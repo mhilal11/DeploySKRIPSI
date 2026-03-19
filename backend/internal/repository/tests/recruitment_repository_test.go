@@ -147,3 +147,34 @@ func TestGetOnboardingChecklistByApplicationID_UsesLatestRowOrder(t *testing.T) 
 		t.Fatalf("expected ID 99, got %d", checklist.ID)
 	}
 }
+
+func TestSetStaffAssignmentSelection_Success(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE applications SET staff_assignment_selected = 0, updated_at = NOW() WHERE user_id = ? AND status = 'Hired'")).
+		WithArgs(int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE applications SET staff_assignment_selected = 1, updated_at = NOW() WHERE id = ? AND user_id = ?")).
+		WithArgs(int64(42), int64(7)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	err := repository.SetStaffAssignmentSelection(db, 7, 42)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
+
+func TestSetStaffAssignmentSelection_UnknownColumnIgnored(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE applications SET staff_assignment_selected = 0, updated_at = NOW() WHERE user_id = ? AND status = 'Hired'")).
+		WithArgs(int64(7)).
+		WillReturnError(errors.New("Error 1054: Unknown column 'staff_assignment_selected' in 'field list'"))
+
+	err := repository.SetStaffAssignmentSelection(db, 7, 42)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}

@@ -96,13 +96,16 @@ type RecruitmentOnboardingStep struct {
 }
 
 type RecruitmentOnboarding struct {
-	ApplicationID int64                       `json:"application_id"`
-	Name          string                      `json:"name"`
-	Position      string                      `json:"position"`
-	StartedAt     string                      `json:"startedAt"`
-	Status        string                      `json:"status"`
-	IsStaff       bool                        `json:"is_staff"`
-	Steps         []RecruitmentOnboardingStep `json:"steps"`
+	ApplicationID           int64                       `json:"application_id"`
+	Name                    string                      `json:"name"`
+	Position                string                      `json:"position"`
+	StartedAt               string                      `json:"startedAt"`
+	Status                  string                      `json:"status"`
+	IsStaff                 bool                        `json:"is_staff"`
+	StaffAssignmentSelected bool                        `json:"staff_assignment_selected"`
+	JoinedInApplicationID   *int64                      `json:"joined_in_application_id,omitempty"`
+	JoinedInPosition        *string                     `json:"joined_in_position,omitempty"`
+	Steps                   []RecruitmentOnboardingStep `json:"steps"`
 }
 
 type RecruitmentIndexResponse struct {

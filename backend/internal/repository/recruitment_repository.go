@@ -355,6 +355,37 @@ func UpdateUserToStaff(db *sqlx.DB, userID int64, employeeCode string, division 
 	return wrapRepoErr("update user to staff", err)
 }
 
+func SetStaffAssignmentSelection(db *sqlx.DB, userID int64, selectedApplicationID int64) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+
+	_, err := db.Exec(
+		"UPDATE applications SET staff_assignment_selected = 0, updated_at = NOW() WHERE user_id = ? AND status = 'Hired'",
+		userID,
+	)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unknown column") {
+			return nil
+		}
+		return wrapRepoErr("set staff assignment selection", err)
+	}
+
+	_, err = db.Exec(
+		"UPDATE applications SET staff_assignment_selected = 1, updated_at = NOW() WHERE id = ? AND user_id = ?",
+		selectedApplicationID,
+		userID,
+	)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "unknown column") {
+			return nil
+		}
+		return wrapRepoErr("set staff assignment selection", err)
+	}
+
+	return nil
+}
+
 func UpsertStaffProfileFromApplicant(db *sqlx.DB, userID int64, religion, gender *string, educationLevel string) error {
 	if db == nil {
 		return errors.New("database tidak tersedia")

@@ -184,13 +184,21 @@ func SuperAdminOnboardingConvertToStaff(c *gin.Context) {
 	}
 
 	if userModel.Role == models.RoleStaff {
-		c.JSON(http.StatusOK, gin.H{"status": "User sudah menjadi staff."})
+		if err := dbrepo.SetStaffAssignmentSelection(db, userModel.ID, app.ID); err != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui penugasan staff")
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "User sudah menjadi staff. Penugasan diperbarui."})
 		return
 	}
 
 	employeeCode, _ := services.GenerateEmployeeCode(db, models.RoleStaff)
 	if err := dbrepo.UpdateUserToStaff(db, userModel.ID, employeeCode, app.Division); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui role user")
+		return
+	}
+	if err := dbrepo.SetStaffAssignmentSelection(db, userModel.ID, app.ID); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui penugasan staff")
 		return
 	}
 

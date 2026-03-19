@@ -3,6 +3,7 @@ package superadmin
 import (
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"hris-backend/internal/dto"
@@ -85,6 +86,100 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 	}
 	aiScreeningByApplicationID := loadLatestRecruitmentAIScreeningsIndex(db, applicationIDs)
 	scoringAudits := loadRecruitmentScoringAudits(db, 25)
+
+	type selectedStaffAssignment struct {
+		ApplicationID int64
+		Position      string
+	}
+	selectedStaffAssignmentByUser := map[int64]selectedStaffAssignment{}
+	hiredApplicationsByUser := map[int64][]models.Application{}
+	for _, app := range apps {
+		if app.UserID == nil {
+			continue
+		}
+		if app.Status == "Hired" {
+			hiredApplicationsByUser[*app.UserID] = append(hiredApplicationsByUser[*app.UserID], app)
+		}
+		if app.StaffAssignmentSelected {
+			selectedStaffAssignmentByUser[*app.UserID] = selectedStaffAssignment{
+				ApplicationID: app.ID,
+				Position:      app.Position,
+			}
+		}
+	}
+
+	// Fallback untuk data lama (sebelum flag selection tersedia).
+	// Pilih 1 lamaran Hired per user staff berdasarkan kecocokan divisi lalu tanggal terbaru.
+	for userID, hiredApps := range hiredApplicationsByUser {
+		if _, alreadySelected := selectedStaffAssignmentByUser[userID]; alreadySelected {
+			continue
+		}
+		if len(hiredApps) == 0 {
+			continue
+		}
+		if len(hiredApps) == 1 {
+			selectedStaffAssignmentByUser[userID] = selectedStaffAssignment{
+				ApplicationID: hiredApps[0].ID,
+				Position:      hiredApps[0].Position,
+			}
+			continue
+		}
+
+		userDivision, _ := dbrepo.GetUserDivisionByID(db, userID)
+		normalizedUserDivision := strings.ToLower(strings.TrimSpace(userDivision))
+
+		var chosen *models.Application
+		chosenDivisionMatch := false
+		chosenTime := time.Time{}
+
+		for i := range hiredApps {
+			candidate := hiredApps[i]
+
+			candidateDivision := ""
+			if candidate.Division != nil {
+				candidateDivision = strings.ToLower(strings.TrimSpace(*candidate.Division))
+			}
+			candidateDivisionMatch := normalizedUserDivision != "" && candidateDivision != "" && candidateDivision == normalizedUserDivision
+
+			candidateTime := time.Time{}
+			if candidate.HiredAt != nil {
+				candidateTime = *candidate.HiredAt
+			} else if candidate.UpdatedAt != nil {
+				candidateTime = *candidate.UpdatedAt
+			} else if candidate.SubmittedAt != nil {
+				candidateTime = *candidate.SubmittedAt
+			}
+
+			if chosen == nil {
+				chosen = &candidate
+				chosenDivisionMatch = candidateDivisionMatch
+				chosenTime = candidateTime
+				continue
+			}
+
+			if candidateDivisionMatch != chosenDivisionMatch {
+				if candidateDivisionMatch {
+					chosen = &candidate
+					chosenDivisionMatch = candidateDivisionMatch
+					chosenTime = candidateTime
+				}
+				continue
+			}
+
+			if candidateTime.After(chosenTime) || (candidateTime.Equal(chosenTime) && candidate.ID > chosen.ID) {
+				chosen = &candidate
+				chosenDivisionMatch = candidateDivisionMatch
+				chosenTime = candidateTime
+			}
+		}
+
+		if chosen != nil {
+			selectedStaffAssignmentByUser[userID] = selectedStaffAssignment{
+				ApplicationID: chosen.ID,
+				Position:      chosen.Position,
+			}
+		}
+	}
 
 	for _, app := range apps {
 		var profile *models.ApplicantProfile
@@ -278,6 +373,23 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 			inventoryDone := checklist.InventoryHandover
 			trainingDone := checklist.TrainingOrientation
 			allComplete := contractDone && inventoryDone && trainingDone
+			isStaff := isUserStaff(db, app.UserID)
+			staffAssignmentSelected := app.StaffAssignmentSelected
+
+			var joinedInApplicationID *int64
+			var joinedInPosition *string
+			if isStaff && app.UserID != nil {
+				if selected, ok := selectedStaffAssignmentByUser[*app.UserID]; ok {
+					if selected.ApplicationID == app.ID {
+						staffAssignmentSelected = true
+					} else {
+						joinedID := selected.ApplicationID
+						joinedPos := selected.Position
+						joinedInApplicationID = &joinedID
+						joinedInPosition = &joinedPos
+					}
+				}
+			}
 
 			onboarding = append(onboarding, dto.RecruitmentOnboarding{
 				ApplicationID: app.ID,
@@ -290,7 +402,10 @@ func SuperAdminRecruitmentIndex(c *gin.Context) {
 					}
 					return "In Progress"
 				}(),
-				IsStaff: isUserStaff(db, app.UserID),
+				IsStaff:                 isStaff,
+				StaffAssignmentSelected: staffAssignmentSelected,
+				JoinedInApplicationID:   joinedInApplicationID,
+				JoinedInPosition:        joinedInPosition,
 				Steps: []dto.RecruitmentOnboardingStep{
 					{Label: "Kontrak ditandatangani", Complete: contractDone},
 					{Label: "Serah terima inventaris", Complete: inventoryDone, Pending: !inventoryDone && contractDone},

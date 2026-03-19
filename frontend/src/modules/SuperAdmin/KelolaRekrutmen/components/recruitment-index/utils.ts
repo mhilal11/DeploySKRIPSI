@@ -191,6 +191,9 @@ export const buildOnboardingItem = (
       '-',
     status: allComplete ? 'Selesai' : 'In Progress',
     is_staff: current?.is_staff ?? false,
+    staff_assignment_selected: current?.staff_assignment_selected ?? false,
+    joined_in_application_id: current?.joined_in_application_id ?? null,
+    joined_in_position: current?.joined_in_position ?? null,
     steps,
   };
 };
