@@ -2,6 +2,16 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/shared/components/ui/alert-dialog';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
@@ -31,6 +41,9 @@ export default function OnboardingTab({
 }: OnboardingTabProps) {
     const [detailOpen, setDetailOpen] = useState(false);
     const [selectedItem, setSelectedItem] = useState<OnboardingItem | null>(null);
+    const [confirmConvertOpen, setConfirmConvertOpen] = useState(false);
+    const [convertTarget, setConvertTarget] = useState<OnboardingItem | null>(null);
+    const [convertingApplicationId, setConvertingApplicationId] = useState<number | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 10;
 
@@ -47,18 +60,36 @@ export default function OnboardingTab({
         setDetailOpen(true);
     };
 
-    const handleConvertToStaff = (applicationId: number) => {
+    const handleOpenConvertConfirmation = (item: OnboardingItem) => {
+        setConvertTarget(item);
+        setConfirmConvertOpen(true);
+    };
+
+    const handleConvertToStaff = () => {
+        if (!convertTarget) {
+            return;
+        }
+
+        const applicationId = convertTarget.application_id;
+        setConvertingApplicationId(applicationId);
+
         router.post(route('super-admin.onboarding.convert-to-staff', applicationId), {}, {
+            preserveScroll: true,
             onSuccess: () => {
                 onConvertToStaffSuccess?.(applicationId);
                 toast.success('Berhasil menjadikan staff', {
                     description: 'Akun pelamar telah diubah menjadi akun staff.',
                 });
+                setConfirmConvertOpen(false);
+                setConvertTarget(null);
             },
             onError: (errors) => {
                 toast.error('Gagal menjadikan staff', {
                     description: errors.message || 'Terjadi kesalahan saat memproses permintaan.',
                 });
+            },
+            onFinish: () => {
+                setConvertingApplicationId(null);
             },
         });
     };
@@ -99,10 +130,13 @@ export default function OnboardingTab({
                                                     <Button
                                                         size="sm"
                                                         className="bg-blue-600 hover:bg-blue-700 text-white"
-                                                        onClick={() => handleConvertToStaff(item.application_id)}
+                                                        onClick={() => handleOpenConvertConfirmation(item)}
+                                                        disabled={convertingApplicationId !== null}
                                                     >
                                                         <UserPlus className="mr-2 h-4 w-4" />
-                                                        Jadikan Akun Staff
+                                                        {convertingApplicationId === item.application_id
+                                                            ? 'Memproses...'
+                                                            : 'Jadikan Akun Staff'}
                                                     </Button>
                                                 )}
                                             </>
@@ -198,6 +232,36 @@ export default function OnboardingTab({
                 item={selectedItem}
                 onSaved={onChecklistSaved}
             />
+
+            <AlertDialog open={confirmConvertOpen} onOpenChange={setConfirmConvertOpen}>
+                <AlertDialogContent className="bg-white">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Jadikan akun staff?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {convertTarget
+                                ? `Akun ${convertTarget.name} akan diubah menjadi akun staff.`
+                                : 'Akun pelamar akan diubah menjadi akun staff.'}{' '}
+                            Tindakan ini digunakan setelah proses onboarding selesai.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel
+                            disabled={convertingApplicationId !== null}
+                        >
+                            Batal
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConvertToStaff}
+                            disabled={convertingApplicationId !== null}
+                            className="bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                            {convertingApplicationId !== null ? 'Memproses...' : 'Ya, Jadikan Staff'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }
