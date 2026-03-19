@@ -71,14 +71,41 @@ func SuperAdminOnboardingUpdateChecklist(c *gin.Context) {
 		handlers.JSONError(c, http.StatusBadRequest, "ID lamaran tidak valid")
 		return
 	}
-	contract := c.PostForm("contract_signed")
-	inventory := c.PostForm("inventory_handover")
-	training := c.PostForm("training_orientation")
+
+	type onboardingChecklistPayload struct {
+		ContractSigned      *bool `form:"contract_signed" json:"contract_signed"`
+		InventoryHandover   *bool `form:"inventory_handover" json:"inventory_handover"`
+		TrainingOrientation *bool `form:"training_orientation" json:"training_orientation"`
+	}
+
+	payload := onboardingChecklistPayload{}
+	_ = c.ShouldBind(&payload)
+
+	contractRaw := c.PostForm("contract_signed")
+	inventoryRaw := c.PostForm("inventory_handover")
+	trainingRaw := c.PostForm("training_orientation")
+
+	resolveChecklistValue := func(pointerValue *bool, rawValue string) bool {
+		if pointerValue != nil {
+			return *pointerValue
+		}
+		return parseBool(rawValue) == 1
+	}
+
+	contractDone := resolveChecklistValue(payload.ContractSigned, contractRaw)
+	inventoryDone := resolveChecklistValue(payload.InventoryHandover, inventoryRaw)
+	trainingDone := resolveChecklistValue(payload.TrainingOrientation, trainingRaw)
 
 	db := middleware.GetDB(c)
 	previousChecklist := loadChecklist(db, applicationID)
 
-	if err := dbrepo.UpsertOnboardingChecklist(db, applicationID, parseBool(contract), parseBool(inventory), parseBool(training)); err != nil {
+	if err := dbrepo.UpsertOnboardingChecklist(
+		db,
+		applicationID,
+		boolToInt(contractDone),
+		boolToInt(inventoryDone),
+		boolToInt(trainingDone),
+	); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui checklist")
 		return
 	}
@@ -95,13 +122,20 @@ func SuperAdminOnboardingUpdateChecklist(c *gin.Context) {
 			"training_orientation": previousChecklist.TrainingOrientation,
 		},
 		NewValues: map[string]any{
-			"contract_signed":      parseBool(contract) == 1,
-			"inventory_handover":   parseBool(inventory) == 1,
-			"training_orientation": parseBool(training) == 1,
+			"contract_signed":      contractDone,
+			"inventory_handover":   inventoryDone,
+			"training_orientation": trainingDone,
 		},
 	})
 
 	c.JSON(http.StatusOK, gin.H{"status": "Progress onboarding berhasil disimpan."})
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func SuperAdminOnboardingConvertToStaff(c *gin.Context) {

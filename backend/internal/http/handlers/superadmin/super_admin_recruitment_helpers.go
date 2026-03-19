@@ -247,7 +247,8 @@ func conflictInterview(db *sqlx.DB, currentID int64, date, start, end string) bo
 }
 
 func parseBool(value string) int {
-	if value == "true" || value == "1" {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "t", "yes", "y", "on":
 		return 1
 	}
 	return 0

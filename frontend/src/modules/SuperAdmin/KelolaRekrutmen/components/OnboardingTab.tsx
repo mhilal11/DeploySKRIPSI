@@ -82,7 +82,7 @@ export default function OnboardingTab({
                                         <p className="font-medium text-slate-900">
                                             {item.name} - {item.position}
                                         </p>
-                                        <p className="text-sm text-slate-600">Mulai: {item.startedAt}</p>
+                                        <p className="text-sm text-slate-600">Tanggal Melamar: {item.startedAt}</p>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Badge className={item.status === 'Selesai' ? 'bg-green-500' : 'bg-orange-500'}>

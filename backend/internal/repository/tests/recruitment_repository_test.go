@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	sqlmock "github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestListRecruitmentApplications_ErrorWrapped(t *testing.T) {
@@ -82,5 +84,66 @@ func TestListRecruitmentSLASettings_MissingTableReturnsEmpty(t *testing.T) {
 	}
 	if len(rows) != 0 {
 		t.Fatalf("expected empty rows, got %d", len(rows))
+	}
+}
+
+func TestUpsertOnboardingChecklist_UpdateExisting(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	mock.ExpectExec("UPDATE onboarding_checklists").
+		WithArgs(1, 1, 1, int64(42)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	err := repository.UpsertOnboardingChecklist(db, 42, 1, 1, 1)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
+
+func TestUpsertOnboardingChecklist_InsertWhenMissing(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	mock.ExpectExec("UPDATE onboarding_checklists").
+		WithArgs(1, 0, 1, int64(42)).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("INSERT INTO onboarding_checklists").
+		WithArgs(int64(42), 1, 0, 1).
+		WillReturnResult(sqlmock.NewResult(11, 1))
+
+	err := repository.UpsertOnboardingChecklist(db, 42, 1, 0, 1)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
+
+func TestGetOnboardingChecklistByApplicationID_UsesLatestRowOrder(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	rows := sqlmock.NewRows([]string{
+		"id",
+		"application_id",
+		"contract_signed",
+		"inventory_handover",
+		"training_orientation",
+		"created_at",
+		"updated_at",
+	}).AddRow(99, 42, 1, 1, 0, time.Now(), time.Now())
+
+	mock.ExpectQuery(`(?s)SELECT \* FROM onboarding_checklists\s+WHERE application_id = \?\s+ORDER BY updated_at DESC, id DESC\s+LIMIT 1`).
+		WithArgs(int64(42)).
+		WillReturnRows(rows)
+
+	checklist, err := repository.GetOnboardingChecklistByApplicationID(db, 42)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if checklist == nil {
+		t.Fatalf("expected checklist, got nil")
+	}
+	if checklist.ID != 99 {
+		t.Fatalf("expected ID 99, got %d", checklist.ID)
 	}
 }

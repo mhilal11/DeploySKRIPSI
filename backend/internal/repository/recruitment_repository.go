@@ -280,10 +280,23 @@ func UpsertOnboardingChecklist(db *sqlx.DB, applicationID int64, contract, inven
 	if db == nil {
 		return errors.New("database tidak tersedia")
 	}
-	_, err := db.Exec(`
+	updateResult, err := db.Exec(`
+		UPDATE onboarding_checklists
+		SET contract_signed = ?, inventory_handover = ?, training_orientation = ?, updated_at = NOW()
+		WHERE application_id = ?
+	`, contract, inventory, training, applicationID)
+	if err != nil {
+		return wrapRepoErr("upsert onboarding checklist", err)
+	}
+
+	rowsAffected, rowsErr := updateResult.RowsAffected()
+	if rowsErr == nil && rowsAffected > 0 {
+		return nil
+	}
+
+	_, err = db.Exec(`
 		INSERT INTO onboarding_checklists (application_id, contract_signed, inventory_handover, training_orientation, created_at, updated_at)
 		VALUES (?, ?, ?, ?, NOW(), NOW())
-		ON DUPLICATE KEY UPDATE contract_signed=VALUES(contract_signed), inventory_handover=VALUES(inventory_handover), training_orientation=VALUES(training_orientation), updated_at=NOW()
 	`, applicationID, contract, inventory, training)
 	return wrapRepoErr("upsert onboarding checklist", err)
 }
@@ -293,7 +306,14 @@ func GetOnboardingChecklistByApplicationID(db *sqlx.DB, applicationID int64) (*m
 		return nil, errors.New("database tidak tersedia")
 	}
 	var checklist models.OnboardingChecklist
-	err := db.Get(&checklist, "SELECT * FROM onboarding_checklists WHERE application_id = ?", applicationID)
+	err := db.Get(
+		&checklist,
+		`SELECT * FROM onboarding_checklists
+		 WHERE application_id = ?
+		 ORDER BY updated_at DESC, id DESC
+		 LIMIT 1`,
+		applicationID,
+	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil

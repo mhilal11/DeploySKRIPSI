@@ -133,7 +133,7 @@ export default function OnboardingDetailDialog({
                                 </Badge>
                             </div>
                             <div className="mt-2 text-xs text-slate-500 font-medium bg-white/50 w-fit px-2 py-1 rounded-md border border-slate-100">
-                                Mulai: {item.startedAt}
+                                Tanggal Melamar: {item.startedAt}
                             </div>
                         </div>
                     </div>
