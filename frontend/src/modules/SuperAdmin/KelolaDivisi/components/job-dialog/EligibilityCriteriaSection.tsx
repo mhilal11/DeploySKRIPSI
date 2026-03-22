@@ -192,7 +192,7 @@ export function EligibilityCriteriaSection({
                         </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        Sumber referensi: `education_reference_id.json`. Ketik minimal {minSearchCharacters}{' '}
+                        Ketik minimal {minSearchCharacters}{' '}
                         karakter.
                     </p>
                     {programReferenceError && (
