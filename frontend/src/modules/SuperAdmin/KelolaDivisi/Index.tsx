@@ -179,6 +179,36 @@ export default function KelolaDivisiIndex({
         });
     };
 
+    const reopenJob = async (division: DivisionRecord, job: DivisionJob) => {
+        if (!job.id) {
+            openJobDialog(division, job);
+            return;
+        }
+
+        try {
+            const response = await api.post(
+                apiUrl(`/super-admin/kelola-divisi/${division.id}/open-job`),
+                { job_id: job.id },
+            );
+            toast.success(
+                response.data?.flash?.success || 'Lowongan pekerjaan berhasil dibuka kembali.',
+            );
+            await refreshData(division.id.toString());
+        } catch (error) {
+            if (isAxiosError(error)) {
+                const payload = error.response?.data as any;
+                const message =
+                    payload?.errors?.capacity ||
+                    payload?.errors?.job_id ||
+                    payload?.errors?._form ||
+                    payload?.message;
+                toast.error(message || 'Gagal membuka kembali lowongan.');
+            } else {
+                toast.error('Gagal membuka kembali lowongan.');
+            }
+        }
+    };
+
     const submitEditForm = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (!editDivision) return;
@@ -335,6 +365,7 @@ export default function KelolaDivisiIndex({
                             onTabChange={(value) => setActiveDivisionId(value)}
                             onEditDivision={openEditDialog}
                             onOpenJobDialog={openJobDialog}
+                            onReopenJob={reopenJob}
                             onCloseJob={closeJob}
                             onDeleteDivision={deleteDivision}
                             deletingDivisionId={deletingDivisionId}

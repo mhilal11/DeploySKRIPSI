@@ -3,6 +3,7 @@ import {
     Briefcase,
     CheckCircle2,
     Edit,
+    RotateCcw,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -31,11 +32,12 @@ import {
 } from '@/shared/components/ui/tooltip';
 
 
-import { getActiveDivisionJobs } from './utils';
+import { getActiveDivisionJobs, getInactiveDivisionJobs } from './utils';
 
 type DivisionVacancySectionProps = {
     division: DivisionRecord;
     onOpenJob: (division: DivisionRecord, job?: DivisionJob) => void;
+    onReopenJob: (division: DivisionRecord, job: DivisionJob) => void;
     onCloseJob: (division: DivisionRecord, jobId?: number) => void;
 };
 
@@ -194,12 +196,80 @@ function VacancyCard({ division, job, onEdit, onClose }: VacancyCardProps) {
     );
 }
 
+type ClosedVacancyCardProps = {
+    division: DivisionRecord;
+    job: DivisionJob;
+    onReopen: () => void;
+};
+
+function ClosedVacancyCard({ division, job, onReopen }: ClosedVacancyCardProps) {
+    const cleanRequirements = (job.job_requirements ?? []).filter(
+        (requirement) => requirement && requirement.trim() !== '',
+    );
+
+    return (
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <div className="mb-2 flex items-center gap-2">
+                        <Badge variant="outline" className="border-slate-300 bg-slate-50 text-slate-700">
+                            Ditutup
+                        </Badge>
+                    </div>
+                    <h5 className="text-base font-semibold text-slate-900 md:text-lg">
+                        {job.job_title ?? 'Lowongan tanpa judul'}
+                    </h5>
+                    <p className="text-xs text-slate-700 md:text-sm">
+                        {job.job_description || 'Belum ada deskripsi pekerjaan.'}
+                    </p>
+
+                    {cleanRequirements.length > 0 && (
+                        <ul className="mt-2 space-y-1 text-xs text-slate-700 md:mt-3 md:text-sm">
+                            {cleanRequirements.slice(0, 3).map((requirement, index) => (
+                                <li
+                                    key={`${job.id ?? 'closed'}-req-${index}`}
+                                    className="flex items-start gap-2"
+                                >
+                                    <CheckCircle2 className="mt-0.5 h-4 w-4 text-slate-500" />
+                                    <span>{requirement}</span>
+                                </li>
+                            ))}
+                            {cleanRequirements.length > 3 && (
+                                <li className="text-xs text-slate-500">+{cleanRequirements.length - 3} persyaratan lain</li>
+                            )}
+                        </ul>
+                    )}
+                </div>
+                <div className="flex flex-col gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-blue-200 text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                        onClick={onReopen}
+                        disabled={division.available_slots === 0}
+                    >
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Buka Lagi
+                    </Button>
+                </div>
+            </div>
+            {division.available_slots <= 0 && (
+                <p className="mt-3 text-xs text-red-600">
+                    Kapasitas divisi penuh. Tingkatkan kapasitas sebelum membuka kembali lowongan.
+                </p>
+            )}
+        </div>
+    );
+}
+
 export function DivisionVacancySection({
     division,
     onOpenJob,
+    onReopenJob,
     onCloseJob,
 }: DivisionVacancySectionProps) {
     const activeJobs = getActiveDivisionJobs(division);
+    const closedJobs = getInactiveDivisionJobs(division);
     const [isCloseAllAlertOpen, setIsCloseAllAlertOpen] = useState(false);
 
     if (activeJobs.length > 0) {
@@ -272,6 +342,29 @@ export function DivisionVacancySection({
                         Kapasitas sudah penuh. Edit kapasitas divisi terlebih dahulu.
                     </div>
                 )}
+
+                {closedJobs.length > 0 && (
+                    <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3 md:p-4">
+                        <div>
+                            <h5 className="text-sm font-semibold text-slate-900 md:text-base">
+                                Lowongan Ditutup ({closedJobs.length})
+                            </h5>
+                            <p className="text-xs text-slate-600 md:text-sm">
+                                Lowongan yang ditutup tidak dihapus dan bisa dibuka kembali.
+                            </p>
+                        </div>
+                        <div className="space-y-3">
+                            {closedJobs.map((job, index) => (
+                                <ClosedVacancyCard
+                                    key={job.id ?? `closed-${division.id}-${index}`}
+                                    division={division}
+                                    job={job}
+                                    onReopen={() => onReopenJob(division, job)}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -299,6 +392,29 @@ export function DivisionVacancySection({
                 <div className="mt-4 rounded-lg bg-orange-50 p-3 text-sm text-orange-700">
                     <AlertCircle className="mr-2 inline h-4 w-4" />
                     Kapasitas sudah penuh. Edit kapasitas divisi terlebih dahulu.
+                </div>
+            )}
+
+            {closedJobs.length > 0 && (
+                <div className="mt-5 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left md:p-4">
+                    <div>
+                        <h5 className="text-sm font-semibold text-slate-900 md:text-base">
+                            Riwayat Lowongan Ditutup ({closedJobs.length})
+                        </h5>
+                        <p className="text-xs text-slate-600 md:text-sm">
+                            Pilih lowongan untuk dibuka kembali tanpa membuat data baru.
+                        </p>
+                    </div>
+                    <div className="space-y-3">
+                        {closedJobs.map((job, index) => (
+                            <ClosedVacancyCard
+                                key={job.id ?? `closed-empty-${division.id}-${index}`}
+                                division={division}
+                                job={job}
+                                onReopen={() => onReopenJob(division, job)}
+                            />
+                        ))}
+                    </div>
                 </div>
             )}
         </div>

@@ -37,7 +37,8 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 	for _, profile := range profiles {
 		divisionIDs = append(divisionIDs, profile.ID)
 	}
-	activeJobsByDivisionID := loadActiveDivisionJobsByDivisionIDs(db, divisionIDs)
+	jobsByDivisionID := loadDivisionJobsByDivisionIDs(db, divisionIDs)
+	closedJobsFromAuditByDivisionID := loadClosedDivisionJobsFromAuditByDivisionIDs(db, divisionIDs)
 
 	for _, profile := range profiles {
 		currentStaff, err := dbrepo.CountActiveDivisionUsers(db, profile.Name)
@@ -52,9 +53,16 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 		if availableSlots < 0 {
 			availableSlots = 0
 		}
-		jobs := activeJobsByDivisionID[profile.ID]
-		if len(jobs) == 0 && profile.IsHiring && profile.JobTitle != nil && strings.TrimSpace(*profile.JobTitle) != "" {
-			jobs = append(jobs, map[string]any{
+		jobs := jobsByDivisionID[profile.ID]
+		jobs = mergeDivisionJobsWithClosedAuditFallback(jobs, closedJobsFromAuditByDivisionID[profile.ID])
+		activeJobs := make([]map[string]any, 0, len(jobs))
+		for _, job := range jobs {
+			if isActive, ok := job["is_active"].(bool); ok && isActive {
+				activeJobs = append(activeJobs, job)
+			}
+		}
+		if len(activeJobs) == 0 && profile.IsHiring && profile.JobTitle != nil && strings.TrimSpace(*profile.JobTitle) != "" {
+			legacyActiveJob := map[string]any{
 				"id":                       nil,
 				"job_title":                profile.JobTitle,
 				"job_description":          profile.JobDescription,
@@ -62,10 +70,13 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 				"job_eligibility_criteria": handlers.DecodeJSONMap(profile.JobEligibility),
 				"is_active":                true,
 				"opened_at":                profile.HiringOpenedAt,
-			})
+				"closed_at":                nil,
+			}
+			activeJobs = append(activeJobs, legacyActiveJob)
+			jobs = append(jobs, legacyActiveJob)
 		}
-		isHiring := len(jobs) > 0
-		activeVacancies += len(jobs)
+		isHiring := len(activeJobs) > 0
+		activeVacancies += len(activeJobs)
 		totalStaff += currentStaff
 		availableSlotsTotal += availableSlots
 
@@ -74,17 +85,17 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 		var primaryJobDescription *string
 		var primaryJobRequirements []string
 		var primaryJobEligibility map[string]any
-		if len(jobs) > 0 {
-			if value, ok := jobs[0]["job_title"].(*string); ok {
+		if len(activeJobs) > 0 {
+			if value, ok := activeJobs[0]["job_title"].(*string); ok {
 				primaryJobTitle = value
 			}
-			if value, ok := jobs[0]["job_description"].(*string); ok {
+			if value, ok := activeJobs[0]["job_description"].(*string); ok {
 				primaryJobDescription = value
 			}
-			if value, ok := jobs[0]["job_requirements"].([]string); ok {
+			if value, ok := activeJobs[0]["job_requirements"].([]string); ok {
 				primaryJobRequirements = value
 			}
-			if value, ok := jobs[0]["job_eligibility_criteria"].(map[string]any); ok {
+			if value, ok := activeJobs[0]["job_eligibility_criteria"].(map[string]any); ok {
 				primaryJobEligibility = value
 			}
 		}

@@ -19,6 +19,7 @@ type DivisionTabsProps = {
     onTabChange: (value: string) => void;
     onEditDivision: (division: DivisionRecord) => void;
     onOpenJobDialog: (division: DivisionRecord, job?: DivisionJob) => void;
+    onReopenJob: (division: DivisionRecord, job: DivisionJob) => void;
     onCloseJob: (division: DivisionRecord, jobId?: number) => void;
     onDeleteDivision: (division: DivisionRecord) => void;
     deletingDivisionId: number | null;
@@ -30,6 +31,7 @@ export function DivisionTabs({
     onTabChange,
     onEditDivision,
     onOpenJobDialog,
+    onReopenJob,
     onCloseJob,
     onDeleteDivision,
     deletingDivisionId,
@@ -95,6 +97,7 @@ export function DivisionTabs({
                         <DivisionVacancySection
                             division={division}
                             onOpenJob={onOpenJobDialog}
+                            onReopenJob={onReopenJob}
                             onCloseJob={onCloseJob}
                         />
                     </TabsContent>

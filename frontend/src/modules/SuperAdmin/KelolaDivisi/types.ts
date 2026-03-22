@@ -41,6 +41,7 @@ export type DivisionJob = {
     job_eligibility_criteria: EligibilityCriteria | null;
     is_active: boolean;
     opened_at?: string | null;
+    closed_at?: string | null;
 };
 
 export type DivisionRecord = {

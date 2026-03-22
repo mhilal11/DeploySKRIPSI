@@ -38,7 +38,7 @@ const DEFAULT_SCORING_WEIGHTS = {
     experience: 25,
     certification: 10,
     profile: 5,
-    ai_screening: 15,
+    ai_screening: 35,
 } as const;
 
 const DEFAULT_SCORING_THRESHOLDS = {

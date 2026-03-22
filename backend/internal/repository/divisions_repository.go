@@ -174,6 +174,21 @@ func GetActiveDivisionJobByID(db *sqlx.DB, jobID, divisionID int64) (*models.Div
 	return &row, nil
 }
 
+func GetDivisionJobByID(db *sqlx.DB, jobID, divisionID int64) (*models.DivisionJob, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	var row models.DivisionJob
+	err := db.Get(&row, "SELECT * FROM division_jobs WHERE id = ? AND division_profile_id = ? LIMIT 1", jobID, divisionID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapRepoErr("get division job by id", err)
+	}
+	return &row, nil
+}
+
 func UpdateDivisionJob(db *sqlx.DB, input DivisionJobMutationInput) error {
 	if db == nil {
 		return errors.New("database tidak tersedia")
@@ -258,6 +273,23 @@ func DeactivateAllDivisionJobs(db *sqlx.DB, divisionID int64, at time.Time) erro
 	return wrapRepoErr("deactivate all division jobs", err)
 }
 
+func ReactivateDivisionJob(db *sqlx.DB, divisionID, jobID int64, at time.Time) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	if at.IsZero() {
+		at = time.Now()
+	}
+	_, err := db.Exec(
+		"UPDATE division_jobs SET is_active = 1, opened_at = ?, closed_at = NULL, updated_at = ? WHERE id = ? AND division_profile_id = ?",
+		at,
+		at,
+		jobID,
+		divisionID,
+	)
+	return wrapRepoErr("reactivate division job", err)
+}
+
 func ListActiveDivisionJobs(db *sqlx.DB) ([]models.DivisionJob, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
@@ -297,6 +329,34 @@ func ListActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) ([]mo
 			return []models.DivisionJob{}, nil
 		}
 		return nil, wrapRepoErr("list active division jobs by division ids", err)
+	}
+	return rows, nil
+}
+
+func ListDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) ([]models.DivisionJob, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if len(divisionIDs) == 0 {
+		return []models.DivisionJob{}, nil
+	}
+
+	query, args, err := sqlx.In(
+		"SELECT * FROM division_jobs WHERE division_profile_id IN (?) ORDER BY division_profile_id ASC, is_active DESC, COALESCE(opened_at, created_at) DESC, id DESC",
+		divisionIDs,
+	)
+	if err != nil {
+		return nil, wrapRepoErr("list division jobs by division ids build query", err)
+	}
+
+	query = db.Rebind(query)
+	rows := []models.DivisionJob{}
+	err = db.Select(&rows, query, args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "doesn't exist") {
+			return []models.DivisionJob{}, nil
+		}
+		return nil, wrapRepoErr("list division jobs by division ids", err)
 	}
 	return rows, nil
 }

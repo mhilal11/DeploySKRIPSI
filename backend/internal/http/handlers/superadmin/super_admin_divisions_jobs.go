@@ -67,6 +67,93 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 		}
 	}
 
+	now := time.Now()
+	currentStaff, _ := dbrepo.CountActiveDivisionUsers(db, profile.Name)
+	availableSlots := profile.Capacity - currentStaff
+
+	var existingJob *models.DivisionJob
+	if req.JobID != nil {
+		existing, err := dbrepo.GetDivisionJobByID(db, *req.JobID, divisionID)
+		if err != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat lowongan")
+			return
+		}
+		if existing == nil {
+			handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
+			return
+		}
+		existingJob = existing
+	}
+
+	isReopenOnlyRequest := req.JobID != nil &&
+		strings.TrimSpace(req.JobTitle) == "" &&
+		strings.TrimSpace(req.JobDescription) == "" &&
+		len(req.JobRequirements) == 0 &&
+		(req.JobEligibilityCriteria == nil || len(req.JobEligibilityCriteria) == 0)
+
+	if isReopenOnlyRequest {
+		if existingJob == nil {
+			handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
+			return
+		}
+		if existingJob.IsActive {
+			c.JSON(http.StatusOK, gin.H{
+				"flash": gin.H{"success": "Lowongan sudah aktif."},
+			})
+			return
+		}
+		if availableSlots <= 0 {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"capacity": "Kapasitas divisi saat ini penuh. Tingkatkan kapasitas sebelum membuka kembali lowongan."})
+			return
+		}
+		if err := dbrepo.ReactivateDivisionJob(db, divisionID, existingJob.ID, now); err != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuka kembali lowongan. Coba lagi.")
+			return
+		}
+		syncDivisionProfilePrimaryJob(db, divisionID)
+
+		requirementsForAudit := handlers.DecodeJSONStringArray(existingJob.JobRequirements)
+		criteriaForAudit := handlers.DecodeJSONMap(existingJob.JobEligibility)
+
+		actorID := user.ID
+		appendRecruitmentScoringAudit(
+			db,
+			&actorID,
+			recruitmentAuditActionConfigUpdated,
+			profile.Name,
+			existingJob.JobTitle,
+			map[string]any{
+				"action":             "membuka kembali",
+				"job_title":          existingJob.JobTitle,
+				"job_requirements":   requirementsForAudit,
+				"requirements_count": len(requirementsForAudit),
+				"eligibility":        criteriaForAudit,
+			},
+		)
+
+		appendAuditLog(c, db, auditLogPayload{
+			Module:      "Divisions",
+			Action:      "OPEN_JOB",
+			EntityType:  "division_profile",
+			EntityID:    id,
+			Description: "Membuka kembali lowongan divisi.",
+			NewValues: map[string]any{
+				"action":              "membuka kembali",
+				"division_name":       profile.Name,
+				"job_title":           existingJob.JobTitle,
+				"job_description":     existingJob.JobDescription,
+				"job_requirements":    requirementsForAudit,
+				"eligibility":         criteriaForAudit,
+				"available_slots_now": availableSlots,
+			},
+		})
+
+		c.JSON(http.StatusOK, gin.H{
+			"flash": gin.H{"success": "Lowongan pekerjaan berhasil dibuka kembali."},
+		})
+		return
+	}
+
 	validationErrors := handlers.FieldErrors{}
 	if strings.TrimSpace(req.JobTitle) == "" {
 		validationErrors["job_title"] = "Judul pekerjaan wajib diisi."
@@ -105,19 +192,15 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 
 	criteriaBytes, _ := json.Marshal(criteria)
 	requirementsBytes, _ := json.Marshal(cleaned)
-	now := time.Now()
-	currentStaff, _ := dbrepo.CountActiveDivisionUsers(db, profile.Name)
-	availableSlots := profile.Capacity - currentStaff
 
 	actionLabel := "menambahkan"
 	if req.JobID != nil {
-		existing, err := dbrepo.GetActiveDivisionJobByID(db, *req.JobID, divisionID)
-		if err != nil {
-			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat lowongan")
+		if existingJob == nil {
+			handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
 			return
 		}
-		if existing == nil {
-			handlers.JSONError(c, http.StatusNotFound, "Lowongan tidak ditemukan")
+		if !existingJob.IsActive && availableSlots <= 0 {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"capacity": "Kapasitas divisi saat ini penuh. Tingkatkan kapasitas sebelum membuka kembali lowongan."})
 			return
 		}
 		err = dbrepo.UpdateDivisionJob(db, dbrepo.DivisionJobMutationInput{
@@ -133,7 +216,15 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui lowongan. Coba lagi.")
 			return
 		}
-		actionLabel = "memperbarui"
+		if !existingJob.IsActive {
+			if err := dbrepo.ReactivateDivisionJob(db, divisionID, *req.JobID, now); err != nil {
+				handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuka kembali lowongan. Coba lagi.")
+				return
+			}
+			actionLabel = "membuka kembali"
+		} else {
+			actionLabel = "memperbarui"
+		}
 	} else {
 		if availableSlots <= 0 {
 			handlers.ValidationErrors(c, handlers.FieldErrors{"capacity": "Kapasitas divisi saat ini penuh. Tingkatkan kapasitas sebelum membuka lowongan."})
@@ -194,7 +285,11 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 
 	message := "Lowongan pekerjaan berhasil dipublikasikan."
 	if req.JobID != nil {
-		message = "Lowongan pekerjaan berhasil diperbarui."
+		if actionLabel == "membuka kembali" {
+			message = "Lowongan pekerjaan berhasil dibuka kembali."
+		} else {
+			message = "Lowongan pekerjaan berhasil diperbarui."
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"flash": gin.H{"success": message},
@@ -251,21 +346,23 @@ func SuperAdminDivisionsCloseJob(c *gin.Context) {
 			return
 		}
 		oldValues = map[string]any{
-			"division_name":    profile.Name,
-			"job_id":           existing.ID,
-			"job_title":        existing.JobTitle,
-			"job_description":  existing.JobDescription,
-			"job_requirements": handlers.DecodeJSONStringArray(existing.JobRequirements),
-			"is_active":        existing.IsActive,
+			"division_name":            profile.Name,
+			"job_id":                   existing.ID,
+			"job_title":                existing.JobTitle,
+			"job_description":          existing.JobDescription,
+			"job_requirements":         handlers.DecodeJSONStringArray(existing.JobRequirements),
+			"job_eligibility_criteria": handlers.DecodeJSONMap(existing.JobEligibility),
+			"is_active":                existing.IsActive,
 		}
 		_ = dbrepo.DeactivateDivisionJob(db, divisionID, *jobID, time.Now())
 	} else {
 		oldValues = map[string]any{
-			"division_name":    profile.Name,
-			"job_title":        profile.JobTitle,
-			"job_description":  profile.JobDescription,
-			"job_requirements": handlers.DecodeJSONStringArray(profile.JobRequirements),
-			"is_hiring":        profile.IsHiring,
+			"division_name":            profile.Name,
+			"job_title":                profile.JobTitle,
+			"job_description":          profile.JobDescription,
+			"job_requirements":         handlers.DecodeJSONStringArray(profile.JobRequirements),
+			"job_eligibility_criteria": handlers.DecodeJSONMap(profile.JobEligibility),
+			"is_hiring":                profile.IsHiring,
 		}
 		_ = dbrepo.DeactivateAllDivisionJobs(db, divisionID, time.Now())
 	}
@@ -292,7 +389,7 @@ func SuperAdminDivisionsCloseJob(c *gin.Context) {
 	})
 }
 
-func loadActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) map[int64][]map[string]any {
+func loadDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) map[int64][]map[string]any {
 	result := make(map[int64][]map[string]any, len(divisionIDs))
 	if db == nil || len(divisionIDs) == 0 {
 		return result
@@ -303,7 +400,7 @@ func loadActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) map[i
 		idSet[divisionID] = struct{}{}
 	}
 
-	rows, err := dbrepo.ListActiveDivisionJobsByDivisionIDs(db, divisionIDs)
+	rows, err := dbrepo.ListDivisionJobsByDivisionIDs(db, divisionIDs)
 	if err != nil {
 		return result
 	}
@@ -332,10 +429,183 @@ func loadActiveDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) map[i
 			"job_eligibility_criteria": handlers.DecodeJSONMap(row.JobEligibility),
 			"is_active":                row.IsActive,
 			"opened_at":                row.OpenedAt,
+			"closed_at":                row.ClosedAt,
 		})
 	}
 
 	return result
+}
+
+func loadClosedDivisionJobsFromAuditByDivisionIDs(db *sqlx.DB, divisionIDs []int64) map[int64][]map[string]any {
+	result := make(map[int64][]map[string]any, len(divisionIDs))
+	if db == nil || len(divisionIDs) == 0 {
+		return result
+	}
+
+	query, args, err := sqlx.In(
+		`SELECT entity_id, old_values, created_at
+		 FROM audit_logs
+		 WHERE module = 'Divisions'
+		   AND action = 'CLOSE_JOB'
+		   AND entity_id IN (?)
+		 ORDER BY id DESC`,
+		divisionIDs,
+	)
+	if err != nil {
+		return result
+	}
+
+	query = db.Rebind(query)
+	rows := []struct {
+		EntityID  string          `db:"entity_id"`
+		OldValues json.RawMessage `db:"old_values"`
+		CreatedAt *time.Time      `db:"created_at"`
+	}{}
+	if err := db.Select(&rows, query, args...); err != nil {
+		return result
+	}
+
+	seenByDivision := make(map[int64]map[string]struct{}, len(divisionIDs))
+	for _, row := range rows {
+		divisionID, parseErr := strconv.ParseInt(strings.TrimSpace(row.EntityID), 10, 64)
+		if parseErr != nil || divisionID <= 0 {
+			continue
+		}
+
+		oldValues := map[string]any{}
+		if len(row.OldValues) == 0 {
+			continue
+		}
+		if err := json.Unmarshal(row.OldValues, &oldValues); err != nil {
+			continue
+		}
+
+		jobTitle := strings.TrimSpace(handlers.AnyToString(oldValues["job_title"]))
+		jobDescription := strings.TrimSpace(handlers.AnyToString(oldValues["job_description"]))
+		if jobTitle == "" && jobDescription == "" {
+			continue
+		}
+
+		requirements := []string{}
+		if rawRequirements, ok := oldValues["job_requirements"]; ok {
+			if list, ok := rawRequirements.([]any); ok {
+				for _, item := range list {
+					req := strings.TrimSpace(handlers.AnyToString(item))
+					if req != "" {
+						requirements = append(requirements, req)
+					}
+				}
+			}
+		}
+
+		eligibility := map[string]any{}
+		if rawEligibility, ok := oldValues["eligibility"]; ok {
+			if parsedEligibility, ok := rawEligibility.(map[string]any); ok {
+				eligibility = parsedEligibility
+			}
+		}
+		if len(eligibility) == 0 {
+			if rawEligibility, ok := oldValues["job_eligibility_criteria"]; ok {
+				if parsedEligibility, ok := rawEligibility.(map[string]any); ok {
+					eligibility = parsedEligibility
+				}
+			}
+		}
+
+		dedupeKey := strings.ToLower(jobTitle + "|" + jobDescription + "|" + strings.Join(requirements, "|"))
+		if _, exists := seenByDivision[divisionID]; !exists {
+			seenByDivision[divisionID] = map[string]struct{}{}
+		}
+		if _, exists := seenByDivision[divisionID][dedupeKey]; exists {
+			continue
+		}
+		seenByDivision[divisionID][dedupeKey] = struct{}{}
+
+		var titlePtr *string
+		var descriptionPtr *string
+		if jobTitle != "" {
+			value := jobTitle
+			titlePtr = &value
+		}
+		if jobDescription != "" {
+			value := jobDescription
+			descriptionPtr = &value
+		}
+
+		result[divisionID] = append(result[divisionID], map[string]any{
+			"id":                       nil,
+			"job_title":                titlePtr,
+			"job_description":          descriptionPtr,
+			"job_requirements":         requirements,
+			"job_eligibility_criteria": eligibility,
+			"is_active":                false,
+			"opened_at":                nil,
+			"closed_at":                row.CreatedAt,
+		})
+	}
+
+	return result
+}
+
+func mergeDivisionJobsWithClosedAuditFallback(existingJobs []map[string]any, closedAuditJobs []map[string]any) []map[string]any {
+	if len(closedAuditJobs) == 0 {
+		return existingJobs
+	}
+
+	merged := make([]map[string]any, 0, len(existingJobs)+len(closedAuditJobs))
+	merged = append(merged, existingJobs...)
+
+	seenSignatures := make(map[string]struct{}, len(existingJobs))
+	for _, job := range existingJobs {
+		signature := buildDivisionJobSignature(job)
+		if signature == "" {
+			continue
+		}
+		seenSignatures[signature] = struct{}{}
+	}
+
+	for _, closedJob := range closedAuditJobs {
+		signature := buildDivisionJobSignature(closedJob)
+		if signature == "" {
+			continue
+		}
+		if _, exists := seenSignatures[signature]; exists {
+			continue
+		}
+		seenSignatures[signature] = struct{}{}
+		merged = append(merged, closedJob)
+	}
+
+	return merged
+}
+
+func buildDivisionJobSignature(job map[string]any) string {
+	title := strings.ToLower(strings.TrimSpace(handlers.AnyToString(job["job_title"])))
+	description := strings.ToLower(strings.TrimSpace(handlers.AnyToString(job["job_description"])))
+
+	requirements := []string{}
+	switch value := job["job_requirements"].(type) {
+	case []string:
+		for _, item := range value {
+			requirement := strings.ToLower(strings.TrimSpace(item))
+			if requirement != "" {
+				requirements = append(requirements, requirement)
+			}
+		}
+	case []any:
+		for _, item := range value {
+			requirement := strings.ToLower(strings.TrimSpace(handlers.AnyToString(item)))
+			if requirement != "" {
+				requirements = append(requirements, requirement)
+			}
+		}
+	}
+
+	if title == "" && description == "" && len(requirements) == 0 {
+		return ""
+	}
+
+	return title + "|" + description + "|" + strings.Join(requirements, "|")
 }
 
 func syncDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64) {

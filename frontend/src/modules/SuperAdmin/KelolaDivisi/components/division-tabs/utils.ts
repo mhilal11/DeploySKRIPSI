@@ -26,3 +26,11 @@ export function getActiveDivisionJobs(division: DivisionRecord): DivisionJob[] {
 
     return [];
 }
+
+export function getInactiveDivisionJobs(division: DivisionRecord): DivisionJob[] {
+    if (!Array.isArray(division.jobs)) {
+        return [];
+    }
+
+    return division.jobs.filter((job) => job && job.is_active === false);
+}
