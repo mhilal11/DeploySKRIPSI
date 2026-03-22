@@ -23,9 +23,10 @@ func SuperAdminAccountsIndex(c *gin.Context) {
 
 	db := middleware.GetDB(c)
 	filters := map[string]string{
-		"search": c.Query("search"),
-		"role":   c.Query("role"),
-		"status": c.Query("status"),
+		"search":   c.Query("search"),
+		"role":     c.Query("role"),
+		"status":   c.Query("status"),
+		"division": c.Query("division"),
 	}
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -35,9 +36,10 @@ func SuperAdminAccountsIndex(c *gin.Context) {
 	perPage := 10
 
 	users, total, err := dbrepo.ListUsers(db, dbrepo.UserListFilters{
-		Search: filters["search"],
-		Role:   filters["role"],
-		Status: filters["status"],
+		Search:   filters["search"],
+		Role:     filters["role"],
+		Status:   filters["status"],
+		Division: filters["division"],
 	}, page, perPage)
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat daftar akun")
@@ -51,9 +53,10 @@ func SuperAdminAccountsIndex(c *gin.Context) {
 	if page > lastPage {
 		page = lastPage
 		users, total, err = dbrepo.ListUsers(db, dbrepo.UserListFilters{
-			Search: filters["search"],
-			Role:   filters["role"],
-			Status: filters["status"],
+			Search:   filters["search"],
+			Role:     filters["role"],
+			Status:   filters["status"],
+			Division: filters["division"],
 		}, page, perPage)
 		if err != nil {
 			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat daftar akun")

@@ -13,9 +13,10 @@ import (
 )
 
 type UserListFilters struct {
-	Search string
-	Role   string
-	Status string
+	Search   string
+	Role     string
+	Status   string
+	Division string
 }
 
 type CreateUserInput struct {
@@ -322,6 +323,12 @@ func buildUsersWhereClause(filters UserListFilters) (string, []any) {
 	if status != "" && !strings.EqualFold(status, "all") {
 		clauses = append(clauses, "status = ?")
 		args = append(args, status)
+	}
+
+	division := strings.TrimSpace(filters.Division)
+	if division != "" && !strings.EqualFold(division, "all") {
+		clauses = append(clauses, "division = ?")
+		args = append(args, division)
 	}
 
 	if len(clauses) == 0 {

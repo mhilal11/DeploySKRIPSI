@@ -20,6 +20,7 @@ type IndexPageProps = PageProps<{
         search?: string | null;
         role?: string | null;
         status?: string | null;
+        division?: string | null;
     };
     stats: {
         total: number;
@@ -97,11 +98,13 @@ export default function Index(props: IndexPageProps) {
     const stats = props.stats ?? EMPTY_STATS;
     const roleOptions = props.roleOptions ?? [];
     const statusOptions = props.statusOptions ?? [];
+    const divisionOptions = props.divisionOptions ?? [];
     const flash = props.flash;
 
     const [search, setSearch] = useState(filters.search ?? '');
     const [roleFilter, setRoleFilter] = useState(filters.role ?? 'all');
     const [statusFilter, setStatusFilter] = useState(filters.status ?? 'all');
+    const [divisionFilter, setDivisionFilter] = useState(filters.division ?? 'all');
     const [allUsers, setAllUsers] = useState<AccountRecord[]>(users.data ?? []);
     const [paginationLinks, setPaginationLinks] = useState(users.links ?? []);
     const [currentStats, setCurrentStats] = useState(stats);
@@ -166,6 +169,7 @@ export default function Index(props: IndexPageProps) {
             if (search) params.search = search;
             if (roleFilter !== 'all') params.role = roleFilter;
             if (statusFilter !== 'all') params.status = statusFilter;
+            if (divisionFilter !== 'all') params.division = divisionFilter;
 
             const controller = new AbortController();
             filterRequestAbortRef.current = controller;
@@ -204,7 +208,7 @@ export default function Index(props: IndexPageProps) {
         return () => {
             clearPendingFilterFetch();
         };
-    }, [search, roleFilter, statusFilter, setProps]);
+    }, [search, roleFilter, statusFilter, divisionFilter, setProps]);
 
     useEffect(() => {
         return () => {
@@ -380,11 +384,27 @@ export default function Index(props: IndexPageProps) {
         );
     };
 
+    const hasActiveFilters =
+        search.trim() !== '' ||
+        roleFilter !== 'all' ||
+        statusFilter !== 'all' ||
+        divisionFilter !== 'all';
+
+    const handleResetFilters = () => {
+        clearPendingFilterFetch();
+        setSearch('');
+        setRoleFilter('all');
+        setStatusFilter('all');
+        setDivisionFilter('all');
+        setCurrentPage(1);
+    };
+
     const buildAccountsListURL = () => {
         const params = new URLSearchParams();
         const trimmedSearch = search.trim();
         const trimmedRole = roleFilter.trim();
         const trimmedStatus = statusFilter.trim();
+        const trimmedDivision = divisionFilter.trim();
 
         if (trimmedSearch !== '') {
             params.set('search', trimmedSearch);
@@ -394,6 +414,9 @@ export default function Index(props: IndexPageProps) {
         }
         if (trimmedStatus !== '' && trimmedStatus !== 'all') {
             params.set('status', trimmedStatus);
+        }
+        if (trimmedDivision !== '' && trimmedDivision !== 'all') {
+            params.set('division', trimmedDivision);
         }
         if (currentPage > 1) {
             params.set('page', String(currentPage));
@@ -443,11 +466,16 @@ export default function Index(props: IndexPageProps) {
                         search={search}
                         role={roleFilter}
                         status={statusFilter}
+                        division={divisionFilter}
                         onSearchChange={setSearch}
                         onRoleChange={setRoleFilter}
                         onStatusChange={setStatusFilter}
+                        onDivisionChange={setDivisionFilter}
+                        onReset={handleResetFilters}
+                        canReset={hasActiveFilters}
                         roleOptions={roleOptions}
                         statusOptions={statusOptions}
+                        divisionOptions={divisionOptions}
                     />
 
                     <AccountTable

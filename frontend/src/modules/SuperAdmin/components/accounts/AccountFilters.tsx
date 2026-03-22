@@ -1,15 +1,20 @@
-﻿import { ChevronDown, Filter, Search, Sparkles } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { ChevronDown, Filter, RotateCcw, Search, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 interface AccountFiltersProps {
     search: string;
     role: string;
     status: string;
+    division: string;
     onSearchChange: (value: string) => void;
     onRoleChange: (value: string) => void;
     onStatusChange: (value: string) => void;
+    onDivisionChange: (value: string) => void;
+    onReset: () => void;
+    canReset: boolean;
     roleOptions: string[];
     statusOptions: string[];
+    divisionOptions: string[];
     inputRef?: React.RefObject<HTMLInputElement>;
 }
 
@@ -133,16 +138,20 @@ export default function AccountFilters({
     search,
     role,
     status,
+    division,
     onSearchChange,
     onRoleChange,
     onStatusChange,
+    onDivisionChange,
+    onReset,
+    canReset,
     roleOptions,
     statusOptions,
+    divisionOptions,
     inputRef,
 }: AccountFiltersProps) {
     return (
         <div className="space-y-3 md:space-y-4">
-            {/* Search Bar */}
             <div className="relative group">
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 blur transition-opacity duration-300 group-hover:opacity-100" />
                 <div className="relative flex items-center">
@@ -162,7 +171,6 @@ export default function AccountFilters({
                 </div>
             </div>
 
-            {/* Filter Section */}
             <div className="flex flex-col gap-3 md:gap-4 sm:flex-row">
                 <CustomSelect
                     value={role}
@@ -181,8 +189,26 @@ export default function AccountFilters({
                     icon={<Sparkles className="h-4 w-4" />}
                     className="flex-1"
                 />
+
+                <CustomSelect
+                    value={division}
+                    onChange={onDivisionChange}
+                    options={divisionOptions}
+                    placeholder="Semua Divisi"
+                    icon={<Filter className="h-4 w-4" />}
+                    className="flex-1"
+                />
+
+                <button
+                    type="button"
+                    onClick={onReset}
+                    disabled={!canReset}
+                    className="inline-flex h-11 md:h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs md:text-sm font-semibold text-slate-600 transition-all hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    <RotateCcw className="h-4 w-4" />
+                    Reset Filter
+                </button>
             </div>
         </div>
     );
 }
-
