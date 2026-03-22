@@ -239,6 +239,23 @@ func AdminStaffLettersReply(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"reply_note": "Balasan wajib diisi."})
 		return
 	}
+	replyNote = strings.TrimSpace(replyNote)
+
+	var attachmentPath *string
+	var attachmentName *string
+	var attachmentMime *string
+	var attachmentSize *int64
+	if _, err := c.FormFile("lampiran"); err == nil {
+		path, meta, saveErr := handlers.SaveUploadedFile(c, "lampiran", "letters")
+		if saveErr != nil {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"lampiran": "Lampiran balasan gagal diunggah."})
+			return
+		}
+		attachmentPath = &path
+		attachmentName = &meta.OriginalName
+		attachmentMime = &meta.Mime
+		attachmentSize = &meta.Size
+	}
 
 	originDivision := lookupDepartemenName(db, surat.DepartemenID, surat.UserID)
 	currentDivision := handlers.FirstString(user.Division, handlers.FirstString(surat.TargetDivision, originDivision))
@@ -249,7 +266,19 @@ func AdminStaffLettersReply(c *gin.Context) {
 	}
 
 	now := time.Now()
-	_ = dbrepo.ReplySuratToHRWithHistory(db, surat.SuratID, replyNote, user.ID, now, nextTarget, currentDivision)
+	_ = dbrepo.ReplySuratToHRWithHistory(
+		db,
+		surat.SuratID,
+		replyNote,
+		user.ID,
+		now,
+		nextTarget,
+		currentDivision,
+		attachmentPath,
+		attachmentName,
+		attachmentMime,
+		attachmentSize,
+	)
 
 	c.JSON(http.StatusOK, gin.H{"status": "Balasan surat dikirim ke HR untuk diteruskan."})
 }

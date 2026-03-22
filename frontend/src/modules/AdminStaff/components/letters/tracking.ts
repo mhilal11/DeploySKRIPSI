@@ -4,6 +4,39 @@ function hasText(value?: string | null): boolean {
   return Boolean(value && value.trim() !== '');
 }
 
+function buildReplyHistory(letter: LetterRecord) {
+  if (letter.replyHistory && letter.replyHistory.length > 0) {
+    return letter.replyHistory;
+  }
+
+  if (letter.replyNote) {
+    return [
+      {
+        id: null,
+        note: letter.replyNote,
+        author: letter.replyBy,
+        division: letter.targetDivision ?? letter.recipient ?? letter.from,
+        toDivision: letter.recipient ?? letter.targetDivision,
+        timestamp: letter.replyAt,
+      },
+    ];
+  }
+
+  return [];
+}
+
+function getInitialTargetDivision(letter: LetterRecord, replyHistory: ReturnType<typeof buildReplyHistory>): string {
+  const firstReplyDivision = replyHistory[0]?.division;
+  if (hasText(firstReplyDivision)) {
+    return firstReplyDivision!.trim();
+  }
+  const currentTarget = letter.targetDivision ?? letter.recipient;
+  if (hasText(currentTarget)) {
+    return currentTarget!.trim();
+  }
+  return 'Divisi terkait';
+}
+
 export function buildTrackingSteps(letter: LetterRecord): TrackingStep[] {
   const normalizedStatus = (letter.status ?? '').toLowerCase();
   const isArchived = normalizedStatus.includes('arsip');
@@ -11,93 +44,53 @@ export function buildTrackingSteps(letter: LetterRecord): TrackingStep[] {
   const isFinalized = Boolean(letter.isFinalized) || normalizedStatus.includes('final');
   const isCompletedStatus = normalizedStatus.includes('selesai');
   const isClosed = normalizedStatus.includes('tutup');
-
-  const replyHistory =
-    letter.replyHistory && letter.replyHistory.length > 0
-      ? letter.replyHistory
-      : letter.replyNote
-        ? [
-          {
-            id: null,
-            note: letter.replyNote,
-            author: letter.replyBy,
-            division: letter.targetDivision ?? letter.recipient ?? letter.from,
-            toDivision: letter.recipient ?? letter.targetDivision,
-            timestamp: letter.replyAt,
-          },
-        ]
-        : [];
+  const replyHistory = buildReplyHistory(letter);
+  const firstReply = replyHistory.length > 0 ? replyHistory[0] : null;
   const lastReply = replyHistory.length > 0 ? replyHistory[replyHistory.length - 1] : null;
-
-  const creationTimestamp = letter.createdAt ?? letter.date ?? null;
-
-  const hrReviewed =
+  const creationTimestamp = letter.createdAt ?? letter.date ?? undefined;
+  const initialTargetDivision = getInitialTargetDivision(letter, replyHistory);
+  const finalTargetDivision = letter.targetDivision ?? letter.recipient ?? initialTargetDivision;
+  const hasProcessProgress =
+    replyHistory.length > 0 ||
     Boolean(letter.disposedAt) ||
     hasText(letter.dispositionNote) ||
-    letter.currentRecipient === 'division' ||
-    letter.currentRecipient === 'archive' ||
-    replyHistory.length > 0 ||
-    isArchived ||
+    Boolean(letter.isFinalized) ||
     isRejected ||
-    isFinalized ||
-    isCompletedStatus ||
-    isClosed;
-
-  const sentToDivision =
-    letter.currentRecipient === 'division' ||
-    letter.currentRecipient === 'archive' ||
-    replyHistory.length > 0 ||
     isArchived ||
-    isRejected ||
-    isFinalized ||
-    isCompletedStatus ||
-    isClosed;
-
-  const isFinalStepReached =
-    isArchived ||
-    isRejected ||
-    isFinalized ||
     isCompletedStatus ||
     isClosed ||
+    letter.currentRecipient === 'division' ||
     letter.currentRecipient === 'archive';
 
   const steps: TrackingStep[] = [];
 
-  if (creationTimestamp) {
-    steps.push({
-      id: 'created',
-      status: 'Dibuat',
-      description: `Surat dibuat oleh ${letter.sender ?? 'pengirim tidak diketahui'}.`,
-      location: letter.from ?? 'Internal',
-      timestamp: creationTimestamp,
-      person: letter.sender,
-      completed: true,
-    });
-  }
+  steps.push({
+    id: 'created',
+    status: 'Dibuat',
+    description: `Surat dibuat oleh ${letter.sender ?? 'pengirim tidak diketahui'} dan dikirim ke Admin HC.`,
+    location: letter.from ?? 'Internal',
+    timestamp: creationTimestamp,
+    person: letter.sender,
+    completed: true,
+  });
 
-  if (hrReviewed) {
+  if (hasProcessProgress) {
     steps.push({
-      id: 'hr',
-      status: 'Ditinjau HR',
-      description: hasText(letter.dispositionNote)
-        ? 'HR telah memberikan disposisi dan catatan.'
-        : 'Surat telah melalui proses peninjauan HR.',
+      id: 'hr-received',
+      status: 'Diterima Admin HC',
+      description: 'Admin HC menerima surat dan menyiapkan disposisi ke divisi tujuan.',
       location: 'Human Capital',
-      timestamp: letter.disposedAt ?? letter.approvalDate ?? undefined,
+      timestamp: letter.approvalDate ?? firstReply?.timestamp ?? letter.disposedAt ?? undefined,
       person: letter.disposedBy,
       completed: true,
     });
-  }
 
-  if (sentToDivision) {
     steps.push({
-      id: 'division',
+      id: 'to-target-division',
       status: 'Dikirim ke Divisi',
-      description: letter.targetDivision
-        ? `Surat diteruskan ke divisi ${letter.targetDivision}.`
-        : 'Surat diteruskan ke divisi terkait.',
-      location: letter.targetDivision ?? letter.recipient ?? 'Divisi terkait',
-      timestamp: letter.disposedAt ?? letter.approvalDate ?? undefined,
+      description: `Surat diteruskan ke divisi ${initialTargetDivision}.`,
+      location: initialTargetDivision,
+      timestamp: firstReply?.timestamp ?? letter.approvalDate ?? letter.disposedAt ?? undefined,
       person: letter.disposedBy,
       completed: true,
     });
@@ -105,47 +98,47 @@ export function buildTrackingSteps(letter: LetterRecord): TrackingStep[] {
 
   replyHistory.forEach((entry, index) => {
     steps.push({
-      id: `follow-up-${entry.id ?? index}`,
-      status: 'Tindak Lanjut Divisi',
+      id: `division-reply-${entry.id ?? index}`,
+      status: 'Balasan Divisi',
       description: entry.note
-        ? `Balasan divisi: ${entry.note}`
-        : 'Divisi telah memberikan tindak lanjut.',
-      location: entry.division ?? letter.targetDivision ?? letter.recipient ?? 'Divisi terkait',
+        ? `Divisi ${entry.division ?? initialTargetDivision} membalas: ${entry.note}`
+        : `Divisi ${entry.division ?? initialTargetDivision} mengirim balasan ke Admin HC.`,
+      location: `${entry.division ?? initialTargetDivision} -> Human Capital`,
       timestamp: entry.timestamp ?? letter.replyAt ?? undefined,
       person: entry.author ?? letter.replyBy,
       completed: true,
     });
   });
 
-  if (isFinalStepReached) {
-    const finalStatus = isArchived
-      ? 'Diarsipkan'
-      : isRejected
-        ? letter.status ?? 'Ditolak HR'
-        : isFinalized
-          ? 'Disposisi Final'
-          : letter.status ?? 'Selesai';
+  if (replyHistory.length > 0 && (isFinalized || isRejected || isArchived || isCompletedStatus || isClosed)) {
+    steps.push({
+      id: 'hr-after-reply',
+      status: 'Ditinjau Ulang Admin HC',
+      description: 'Admin HC meninjau balasan divisi untuk menentukan keputusan akhir.',
+      location: 'Human Capital',
+      timestamp: letter.disposedAt ?? letter.updatedAt ?? undefined,
+      person: letter.disposedBy,
+      completed: true,
+    });
+  }
 
+  if (isFinalized || isRejected || isArchived || isCompletedStatus || isClosed) {
+    const finalStatus = isFinalized
+      ? 'Disposisi Final'
+      : isRejected
+        ? 'Ditolak HR'
+        : isArchived
+          ? 'Diarsipkan'
+          : letter.status ?? 'Selesai';
     steps.push({
       id: 'final',
       status: finalStatus,
-      description: `Status saat ini: ${finalStatus}.`,
-      location:
-        letter.currentRecipient === 'archive'
-          ? 'Arsip Sistem'
-          : letter.currentRecipient === 'division'
-            ? letter.targetDivision ?? letter.recipient ?? 'Divisi terkait'
-            : letter.currentRecipient === 'hr'
-              ? 'Human Capital'
-              : letter.targetDivision ?? letter.recipient ?? '-',
-      timestamp:
-        letter.updatedAt ??
-        lastReply?.timestamp ??
-        letter.replyAt ??
-        letter.disposedAt ??
-        creationTimestamp ??
-        undefined,
-      person: lastReply?.author ?? letter.replyBy ?? letter.disposedBy ?? letter.sender,
+      description: isFinalized
+        ? `Surat didisposisi final ke ${finalTargetDivision}.`
+        : `Status akhir surat: ${finalStatus}.`,
+      location: isArchived ? 'Arsip Sistem' : finalTargetDivision,
+      timestamp: letter.disposedAt ?? letter.updatedAt ?? lastReply?.timestamp ?? undefined,
+      person: letter.disposedBy ?? letter.replyBy ?? lastReply?.author ?? letter.sender,
       completed: true,
     });
   }

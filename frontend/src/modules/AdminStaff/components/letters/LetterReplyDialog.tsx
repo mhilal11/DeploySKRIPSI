@@ -1,4 +1,4 @@
-import { AlertCircle, FileText, Loader2, MessageSquare, Send } from 'lucide-react';
+import { AlertCircle, FileText, Loader2, MessageSquare, Paperclip, Send, Upload, X } from 'lucide-react';
 
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
@@ -19,6 +19,9 @@ interface LetterReplyDialogProps {
   replyNote: string;
   onReplyNoteChange: (value: string) => void;
   replyNoteError?: string;
+  replyAttachment: File | null;
+  onReplyAttachmentChange: (file: File | null) => void;
+  replyAttachmentError?: string;
   processing: boolean;
   onSubmit: () => void;
 }
@@ -30,6 +33,9 @@ export function LetterReplyDialog({
   replyNote,
   onReplyNoteChange,
   replyNoteError,
+  replyAttachment,
+  onReplyAttachmentChange,
+  replyAttachmentError,
   processing,
   onSubmit,
 }: LetterReplyDialogProps) {
@@ -94,6 +100,58 @@ export function LetterReplyDialog({
                 <div className="flex items-center gap-2 text-rose-600">
                   <AlertCircle className="h-4 w-4" />
                   <p className="text-xs font-medium">{replyNoteError}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-4 w-4 text-slate-600" />
+                <label htmlFor="reply-attachment" className="text-sm font-semibold text-slate-900">
+                  Lampiran Balasan (opsional)
+                </label>
+              </div>
+
+              <label
+                htmlFor="reply-attachment"
+                className="block cursor-pointer rounded-lg border-2 border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 transition hover:border-blue-500 hover:text-blue-600"
+              >
+                <Upload className="mx-auto mb-2 h-5 w-5" />
+                Klik untuk mengunggah lampiran PDF/Word
+              </label>
+              <input
+                id="reply-attachment"
+                type="file"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="hidden"
+                onChange={(event) => onReplyAttachmentChange(event.target.files?.[0] ?? null)}
+              />
+
+              {replyAttachment && (
+                <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-slate-900">{replyAttachment.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {(replyAttachment.size / 1024).toFixed(2)} KB
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-rose-500 hover:text-rose-600"
+                    onClick={() => onReplyAttachmentChange(null)}
+                    disabled={processing}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+
+              {replyAttachmentError && (
+                <div className="flex items-center gap-2 text-rose-600">
+                  <AlertCircle className="h-4 w-4" />
+                  <p className="text-xs font-medium">{replyAttachmentError}</p>
                 </div>
               )}
             </div>

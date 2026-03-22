@@ -1,12 +1,13 @@
 package dto
 
 type LetterReplyHistory struct {
-	ID         int64   `json:"id"`
-	Note       string  `json:"note"`
-	Author     string  `json:"author"`
-	Division   *string `json:"division"`
-	ToDivision *string `json:"toDivision"`
-	Timestamp  string  `json:"timestamp"`
+	ID         int64             `json:"id"`
+	Note       string            `json:"note"`
+	Author     string            `json:"author"`
+	Division   *string           `json:"division"`
+	ToDivision *string           `json:"toDivision"`
+	Timestamp  string            `json:"timestamp"`
+	Attachment *LetterAttachment `json:"attachment,omitempty"`
 }
 
 type LetterAttachment struct {
@@ -27,6 +28,7 @@ type AdminLetter struct {
 	Subject                 string               `json:"subject"`
 	Category                string               `json:"category"`
 	Date                    string               `json:"date"`
+	ReceivedAt              string               `json:"receivedAt"`
 	Status                  string               `json:"status"`
 	IsFinalized             bool                 `json:"isFinalized"`
 	Priority                string               `json:"priority"`

@@ -20,14 +20,14 @@ func TestReplySuratToHRWithHistory_Success(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec("(?s)UPDATE surat SET reply_note").
-		WithArgs("ok", int64(7), now, &nextTarget, "IT", now, int64(99)).
+		WithArgs("ok", int64(7), now, &nextTarget, "IT", nil, nil, nil, nil, now, int64(99)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("(?s)INSERT INTO surat_reply_histories").
-		WithArgs(int64(99), int64(7), "IT", &nextTarget, "ok", now, now, now).
+		WithArgs(int64(99), int64(7), "IT", &nextTarget, "ok", nil, nil, nil, nil, now, now, now).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	err := repository.ReplySuratToHRWithHistory(db, 99, "ok", 7, now, &nextTarget, "IT")
+	err := repository.ReplySuratToHRWithHistory(db, 99, "ok", 7, now, &nextTarget, "IT", nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -46,14 +46,14 @@ func TestReplySuratToHRWithHistory_HistoryFailRollback(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec("(?s)UPDATE surat SET reply_note").
-		WithArgs("ok", int64(7), now, &nextTarget, "IT", now, int64(99)).
+		WithArgs("ok", int64(7), now, &nextTarget, "IT", nil, nil, nil, nil, now, int64(99)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("(?s)INSERT INTO surat_reply_histories").
-		WithArgs(int64(99), int64(7), "IT", &nextTarget, "ok", now, now, now).
+		WithArgs(int64(99), int64(7), "IT", &nextTarget, "ok", nil, nil, nil, nil, now, now, now).
 		WillReturnError(historyErr)
 	mock.ExpectRollback()
 
-	err := repository.ReplySuratToHRWithHistory(db, 99, "ok", 7, now, &nextTarget, "IT")
+	err := repository.ReplySuratToHRWithHistory(db, 99, "ok", 7, now, &nextTarget, "IT", nil, nil, nil, nil)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}

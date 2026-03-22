@@ -217,6 +217,15 @@ func TransformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 			if history.RepliedBy != nil {
 				authorName = LookupUserName(db, *history.RepliedBy)
 			}
+			replyAttachmentURL := AttachmentURL(c, history.LampiranPath)
+			var replyAttachment map[string]any
+			if replyAttachmentURL != nil {
+				replyAttachment = map[string]any{
+					"name": FirstString(history.LampiranNama, "Lampiran Balasan"),
+					"size": history.LampiranSize,
+					"url":  replyAttachmentURL,
+				}
+			}
 			historyPayload = append(historyPayload, map[string]any{
 				"id":         history.ID,
 				"note":       history.Note,
@@ -224,6 +233,7 @@ func TransformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 				"division":   history.FromDivision,
 				"toDivision": history.ToDivision,
 				"timestamp":  FormatDateTime(history.RepliedAt),
+				"attachment": replyAttachment,
 			})
 		}
 

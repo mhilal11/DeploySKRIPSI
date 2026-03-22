@@ -152,6 +152,7 @@ export default function LetterDetailDialog({
                                     division: letter.targetDivision ?? letter.senderDivision,
                                     toDivision: letter.recipientName,
                                     timestamp: letter.replyAt,
+                                    attachment: letter.attachment ?? null,
                                 }]
                                 : [];
 
@@ -181,6 +182,30 @@ export default function LetterDetailDialog({
                                                     )}
                                                 </div>
                                                 <p className="text-sm text-slate-700 whitespace-pre-wrap">{entry.note}</p>
+                                                {entry.attachment?.url && (
+                                                    <div className="mt-3 flex items-center justify-between gap-2 rounded-md border border-emerald-200 bg-white px-3 py-2">
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-xs font-semibold text-emerald-900">
+                                                                {entry.attachment.name ?? 'Lampiran Balasan'}
+                                                            </p>
+                                                            <p className="text-[11px] text-emerald-700">Lampiran balasan divisi</p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Button variant="outline" size="sm" asChild className="h-7 border-emerald-300 px-2 text-emerald-700">
+                                                                <a href={entry.attachment.url} target="_blank" rel="noopener noreferrer">
+                                                                    <Eye className="mr-1 h-3.5 w-3.5" />
+                                                                    Lihat
+                                                                </a>
+                                                            </Button>
+                                                            <Button variant="outline" size="sm" asChild className="h-7 px-2">
+                                                                <a href={entry.attachment.url} download target="_blank" rel="noopener noreferrer">
+                                                                    <Download className="mr-1 h-3.5 w-3.5" />
+                                                                    Unduh
+                                                                </a>
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}

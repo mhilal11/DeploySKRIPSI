@@ -69,6 +69,31 @@ const EMPTY_OPTIONS: LettersPageProps['options'] = {
   priorities: {},
   divisions: [],
 };
+const SEEN_INBOX_LETTER_IDS_KEY = 'admin_staff_seen_inbox_letter_ids_v1';
+
+function loadSeenInboxLetterIds(): number[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const saved = window.localStorage.getItem(SEEN_INBOX_LETTER_IDS_KEY);
+    if (!saved) {
+      return [];
+    }
+
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value) && value > 0);
+  } catch {
+    return [];
+  }
+}
 
 export default function AdminStaffLetters() {
   const { props } = usePage<PageProps<Partial<LettersPageProps>>>();
@@ -84,10 +109,11 @@ export default function AdminStaffLetters() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [selectedLetter, setSelectedLetter] = useState<LetterRecord | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detailTab, setDetailTab] = useState<'detail' | 'tracking'>('detail');
+  const [detailTab, setDetailTab] = useState<'detail' | 'replies' | 'tracking'>('detail');
   const [replyOpen, setReplyOpen] = useState(false);
   const [archivingLetterId, setArchivingLetterId] = useState<number | null>(null);
   const [unarchivingLetterId, setUnarchivingLetterId] = useState<number | null>(null);
+  const [seenInboxLetterIds, setSeenInboxLetterIds] = useState<number[]>(() => loadSeenInboxLetterIds());
 
   const form = useForm({
     penerima: 'Admin HR',
@@ -101,6 +127,7 @@ export default function AdminStaffLetters() {
   });
   const replyForm = useForm({
     reply_note: '',
+    lampiran: null as File | null,
   });
   const archiveForm = useForm({});
   const unarchiveForm = useForm({});
@@ -119,6 +146,24 @@ export default function AdminStaffLetters() {
       setDetailTab('detail');
     }
   }, [detailOpen, replyOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(SEEN_INBOX_LETTER_IDS_KEY, JSON.stringify(seenInboxLetterIds));
+  }, [seenInboxLetterIds]);
+
+  const inboxLetterIdSet = useMemo(
+    () => new Set((letters.inbox ?? []).map((item) => item.id)),
+    [letters.inbox],
+  );
+  const unseenInboxLetterIds = useMemo(() => {
+    const seen = new Set(seenInboxLetterIds);
+    return (letters.inbox ?? [])
+      .filter((item) => !seen.has(item.id))
+      .map((item) => item.id);
+  }, [letters.inbox, seenInboxLetterIds]);
 
   const filteredLetters = useMemo(() => {
     const filterList = (items: LetterRecord[]) => {
@@ -157,6 +202,9 @@ export default function AdminStaffLetters() {
   };
 
   const openDetail = (letter: LetterRecord) => {
+    if (inboxLetterIdSet.has(letter.id)) {
+      setSeenInboxLetterIds((prev) => (prev.includes(letter.id) ? prev : [...prev, letter.id]));
+    }
     setSelectedLetter(letter);
     setDetailOpen(true);
     setDetailTab('detail');
@@ -224,6 +272,31 @@ export default function AdminStaffLetters() {
     replyForm.clearErrors();
     setDetailOpen(false);
     setReplyOpen(true);
+  };
+
+  const isAllowedReplyAttachment = (file: File) => {
+    const allowedMimeTypes = new Set([
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]);
+    const allowedExtensions = new Set(['pdf', 'doc', 'docx']);
+
+    if (allowedMimeTypes.has(file.type.toLowerCase())) {
+      return true;
+    }
+
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    return extension ? allowedExtensions.has(extension) : false;
+  };
+
+  const handleReplyAttachmentChange = (file: File | null) => {
+    if (file && !isAllowedReplyAttachment(file)) {
+      replyForm.setData('lampiran', null);
+      toast.error('File balasan harus PDF atau Word (.doc/.docx).');
+      return;
+    }
+    replyForm.setData('lampiran', file);
   };
 
   const handleReplyDialogChange = (open: boolean) => {
@@ -367,6 +440,7 @@ export default function AdminStaffLetters() {
           <TabsContent value="inbox">
             <LettersTable
               letters={activeLetters}
+              newLetterIds={unseenInboxLetterIds}
               onViewDetail={openDetail}
               onArchive={handleArchive}
               archivingId={archivingLetterId}
@@ -412,6 +486,9 @@ export default function AdminStaffLetters() {
         replyNote={replyForm.data.reply_note}
         onReplyNoteChange={(value) => replyForm.setData('reply_note', value)}
         replyNoteError={replyForm.errors.reply_note}
+        replyAttachment={replyForm.data.lampiran}
+        onReplyAttachmentChange={handleReplyAttachmentChange}
+        replyAttachmentError={replyForm.errors.lampiran}
         processing={replyForm.processing}
         onSubmit={handleReplySubmit}
       />

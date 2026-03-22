@@ -127,7 +127,7 @@ func TestReplySuratToHRWithHistory_BeginErrorWrapped(t *testing.T) {
 
 	mock.ExpectBegin().WillReturnError(beginErr)
 
-	err := repository.ReplySuratToHRWithHistory(db, 99, "ok", 7, now, &nextTarget, "IT")
+	err := repository.ReplySuratToHRWithHistory(db, 99, "ok", 7, now, &nextTarget, "IT", nil, nil, nil, nil)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}

@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/shared/components/ui/alert-dialog';
+import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import {
   Pagination,
@@ -43,6 +44,7 @@ import { LetterRecord, TabValue } from './types';
 interface LettersTableProps {
   letters: LetterRecord[];
   variant?: TabValue;
+  newLetterIds?: number[];
   onViewDetail: (letter: LetterRecord) => void;
   onArchive?: (letter: LetterRecord) => void;
   archivingId?: number | null;
@@ -55,6 +57,7 @@ interface LettersTableProps {
 export function LettersTable({
   letters,
   variant = 'inbox',
+  newLetterIds = [],
   onViewDetail,
   onArchive,
   archivingId,
@@ -77,6 +80,7 @@ export function LettersTable({
   const totalPages = Math.ceil(letters.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedLetters = letters.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const newIdSet = new Set(newLetterIds);
 
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
@@ -108,7 +112,7 @@ export function LettersTable({
               <TableHead>Subjek</TableHead>
               <TableHead>Kategori</TableHead>
               <TableHead>Prioritas</TableHead>
-              <TableHead>Tanggal</TableHead>
+              <TableHead>Tanggal Terima</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
@@ -120,9 +124,10 @@ export function LettersTable({
                   ? letter.replyHistory[letter.replyHistory.length - 1]
                   : undefined;
               const hasReply = Boolean(latestReply || letter.replyNote);
+              const isNewlyReceived = variant === 'inbox' && newIdSet.has(letter.id);
 
               return (
-                <TableRow key={letter.id}>
+                <TableRow key={letter.id} className={isNewlyReceived ? 'bg-blue-50/60' : undefined}>
                   <TableCell>{letter.letterNumber}</TableCell>
                   <TableCell>
                     <div>
@@ -134,6 +139,9 @@ export function LettersTable({
                     <div className="flex items-center gap-2">
                       <span>{letter.subject}</span>
                       {letter.hasAttachment && <FileText className="h-4 w-4 text-slate-400" />}
+                      {isNewlyReceived && (
+                        <Badge className="bg-blue-600 text-white hover:bg-blue-600">Baru</Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -144,9 +152,17 @@ export function LettersTable({
                   <TableCell>
                     <PriorityBadge priority={letter.priority} />
                   </TableCell>
-                  <TableCell>{letter.date}</TableCell>
+                  <TableCell>
+                    <p className="text-sm text-slate-900">{letter.receivedAt ?? '-'}</p>
+                    <p className="text-[11px] text-slate-500">Surat dibuat: {letter.date}</p>
+                  </TableCell>
                   <TableCell>
                     <StatusBadge status={letter.status} />
+                    {isNewlyReceived && (
+                      <p className="mt-1 text-[11px] font-medium text-blue-600">
+                        Surat baru diterima
+                      </p>
+                    )}
                     {hasReply && (
                       <p className="mt-1 text-[11px] font-medium text-emerald-600">
                         Balasan dikirim

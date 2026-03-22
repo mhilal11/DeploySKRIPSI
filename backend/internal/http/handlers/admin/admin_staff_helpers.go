@@ -92,6 +92,15 @@ func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []dto
 			if history.RepliedBy != nil {
 				authorName = lookupUserName(db, *history.RepliedBy)
 			}
+			replyAttachmentURL := handlers.AttachmentURL(c, history.LampiranPath)
+			var replyAttachment *dto.LetterAttachment
+			if replyAttachmentURL != nil {
+				replyAttachment = &dto.LetterAttachment{
+					Name: handlers.FirstString(history.LampiranNama, "Lampiran Balasan"),
+					Size: history.LampiranSize,
+					URL:  replyAttachmentURL,
+				}
+			}
 			historyPayload = append(historyPayload, dto.LetterReplyHistory{
 				ID:         history.ID,
 				Note:       history.Note,
@@ -99,6 +108,7 @@ func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []dto
 				Division:   history.FromDivision,
 				ToDivision: history.ToDivision,
 				Timestamp:  handlers.FormatDateTime(history.RepliedAt),
+				Attachment: replyAttachment,
 			})
 		}
 
@@ -126,6 +136,13 @@ func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []dto
 				URL:  attachmentLink,
 			}
 		}
+		receivedAt := handlers.FormatDateTime(surat.DisposedAt)
+		if strings.TrimSpace(receivedAt) == "" {
+			receivedAt = handlers.FormatDateTime(surat.CreatedAt)
+		}
+		if strings.TrimSpace(receivedAt) == "" {
+			receivedAt = handlers.FormatDate(surat.TanggalSurat)
+		}
 
 		result = append(result, dto.AdminLetter{
 			ID:             surat.SuratID,
@@ -139,6 +156,7 @@ func transformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []dto
 			Subject:        surat.Perihal,
 			Category:       surat.Kategori,
 			Date:           handlers.FormatDate(surat.TanggalSurat),
+			ReceivedAt:     receivedAt,
 			Status: func() string {
 				if surat.IsFinalized {
 					return "Disposisi Final"

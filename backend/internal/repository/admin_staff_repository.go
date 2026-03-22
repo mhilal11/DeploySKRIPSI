@@ -80,7 +80,7 @@ func ListDivisionIncomingLetters(db *sqlx.DB, division *string, limit int) ([]mo
 		limit = 5
 	}
 	rows := []models.Surat{}
-	err := db.Select(&rows, "SELECT * FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?) ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ?", division, division, limit)
+	err := db.Select(&rows, "SELECT * FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?) ORDER BY COALESCE(disposed_at, created_at, tanggal_surat) DESC, surat_id DESC LIMIT ?", division, division, limit)
 	return rows, wrapRepoErr("list division incoming letters", err)
 }
 
@@ -100,7 +100,7 @@ func ListDivisionInboxLettersPaged(db *sqlx.DB, division *string, limit, offset 
 	rows := []models.Surat{}
 	err := db.Select(
 		&rows,
-		"SELECT * FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?) ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ? OFFSET ?",
+		"SELECT * FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?) ORDER BY COALESCE(disposed_at, created_at, tanggal_surat) DESC, surat_id DESC LIMIT ? OFFSET ?",
 		division,
 		division,
 		limit,
@@ -192,7 +192,7 @@ func ListDivisionInboxLettersAll(db *sqlx.DB, division *string) ([]models.Surat,
 		return nil, errors.New("database tidak tersedia")
 	}
 	rows := []models.Surat{}
-	err := db.Select(&rows, "SELECT * FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?) ORDER BY tanggal_surat DESC, surat_id DESC", division, division)
+	err := db.Select(&rows, "SELECT * FROM surat WHERE current_recipient = 'division' AND (target_division = ? OR penerima = ?) ORDER BY COALESCE(disposed_at, created_at, tanggal_surat) DESC, surat_id DESC", division, division)
 	return rows, wrapRepoErr("list division inbox letters all", err)
 }
 
@@ -294,15 +294,40 @@ func UpdateSuratReplyToHR(db *sqlx.DB, suratID int64, replyNote string, replyBy 
 	return wrapRepoErr("update surat reply to hr", err)
 }
 
-func InsertSuratReplyHistory(db *sqlx.DB, suratID int64, repliedBy int64, fromDivision string, toDivision *string, note string, repliedAt time.Time) error {
+func InsertSuratReplyHistory(
+	db *sqlx.DB,
+	suratID int64,
+	repliedBy int64,
+	fromDivision string,
+	toDivision *string,
+	note string,
+	repliedAt time.Time,
+	lampiranPath *string,
+	lampiranNama *string,
+	lampiranMime *string,
+	lampiranSize *int64,
+) error {
 	if db == nil {
 		return errors.New("database tidak tersedia")
 	}
 	if repliedAt.IsZero() {
 		repliedAt = time.Now()
 	}
-	_, err := db.Exec(`INSERT INTO surat_reply_histories (surat_id, replied_by, from_division, to_division, note, replied_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		suratID, repliedBy, fromDivision, toDivision, note, repliedAt, repliedAt, repliedAt)
+	_, err := db.Exec(
+		`INSERT INTO surat_reply_histories (surat_id, replied_by, from_division, to_division, note, lampiran_path, lampiran_nama, lampiran_mime, lampiran_size, replied_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		suratID,
+		repliedBy,
+		fromDivision,
+		toDivision,
+		note,
+		lampiranPath,
+		lampiranNama,
+		lampiranMime,
+		lampiranSize,
+		repliedAt,
+		repliedAt,
+		repliedAt,
+	)
 	return wrapRepoErr("insert surat reply history", err)
 }
 
@@ -314,6 +339,10 @@ func ReplySuratToHRWithHistory(
 	repliedAt time.Time,
 	nextTarget *string,
 	currentDivision string,
+	attachmentPath *string,
+	attachmentName *string,
+	attachmentMime *string,
+	attachmentSize *int64,
 ) error {
 	if db == nil {
 		return errors.New("database tidak tersedia")
@@ -329,12 +358,16 @@ func ReplySuratToHRWithHistory(
 	defer tx.Rollback()
 
 	if _, err := tx.Exec(
-		`UPDATE surat SET reply_note=?, reply_by=?, reply_at=?, current_recipient='hr', penerima='Admin HR', target_division=?, previous_division=?, status_persetujuan='Menunggu HR', updated_at=? WHERE surat_id = ?`,
+		`UPDATE surat SET reply_note=?, reply_by=?, reply_at=?, current_recipient='hr', penerima='Admin HR', target_division=?, previous_division=?, status_persetujuan='Menunggu HR', lampiran_path=COALESCE(?, lampiran_path), lampiran_nama=COALESCE(?, lampiran_nama), lampiran_mime=COALESCE(?, lampiran_mime), lampiran_size=COALESCE(?, lampiran_size), updated_at=? WHERE surat_id = ?`,
 		replyNote,
 		replyBy,
 		repliedAt,
 		nextTarget,
 		currentDivision,
+		attachmentPath,
+		attachmentName,
+		attachmentMime,
+		attachmentSize,
 		repliedAt,
 		suratID,
 	); err != nil {
@@ -342,12 +375,16 @@ func ReplySuratToHRWithHistory(
 	}
 
 	if _, err := tx.Exec(
-		`INSERT INTO surat_reply_histories (surat_id, replied_by, from_division, to_division, note, replied_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO surat_reply_histories (surat_id, replied_by, from_division, to_division, note, lampiran_path, lampiran_nama, lampiran_mime, lampiran_size, replied_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		suratID,
 		replyBy,
 		currentDivision,
 		nextTarget,
 		replyNote,
+		attachmentPath,
+		attachmentName,
+		attachmentMime,
+		attachmentSize,
 		repliedAt,
 		repliedAt,
 		repliedAt,

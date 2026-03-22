@@ -9,6 +9,10 @@ type SuratReplyHistory struct {
 	FromDivision *string    `db:"from_division" json:"from_division"`
 	ToDivision   *string    `db:"to_division" json:"to_division"`
 	Note         string     `db:"note" json:"note"`
+	LampiranPath *string    `db:"lampiran_path" json:"lampiran_path"`
+	LampiranNama *string    `db:"lampiran_nama" json:"lampiran_nama"`
+	LampiranMime *string    `db:"lampiran_mime" json:"lampiran_mime"`
+	LampiranSize *int64     `db:"lampiran_size" json:"lampiran_size"`
 	RepliedAt    *time.Time `db:"replied_at" json:"replied_at"`
 	CreatedAt    *time.Time `db:"created_at" json:"created_at"`
 	UpdatedAt    *time.Time `db:"updated_at" json:"updated_at"`

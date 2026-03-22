@@ -35,6 +35,11 @@ export type ReplyHistoryEntry = {
     division?: string | null;
     toDivision?: string | null;
     timestamp?: string | null;
+    attachment?: {
+        name?: string | null;
+        size?: string | number | null;
+        url?: string | null;
+    } | null;
 };
 
 export interface LetterRecord {
