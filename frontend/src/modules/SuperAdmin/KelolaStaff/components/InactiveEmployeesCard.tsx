@@ -1,5 +1,5 @@
-﻿import { FileText, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+﻿import { FileText, Search, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -24,6 +24,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/shared/components/ui/dialog';
+import { Input } from '@/shared/components/ui/input';
 import { router, useForm } from '@/shared/lib/inertia';
 
 
@@ -34,16 +35,54 @@ interface InactiveEmployeesCardProps {
 }
 
 export default function InactiveEmployeesCard({ employees }: InactiveEmployeesCardProps) {
+    const [searchQuery, setSearchQuery] = useState('');
+    const filteredEmployees = useMemo(() => {
+        const normalizedQuery = searchQuery.trim().toLowerCase();
+        if (!normalizedQuery) {
+            return employees;
+        }
+
+        return employees.filter((employee) => {
+            const haystack = [
+                employee.name,
+                employee.employeeCode,
+                employee.division,
+                employee.position,
+                employee.exitReason,
+                employee.type,
+                employee.joinDate,
+                employee.exitDate,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            return haystack.includes(normalizedQuery);
+        });
+    }, [employees, searchQuery]);
+
     return (
         <Card className="p-6">
             <h3 className="mb-4 text-lg font-semibold text-blue-900">
                 Arsip Karyawan Nonaktif
             </h3>
+            <div className="mb-4 w-full md:max-w-sm">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        placeholder="Cari arsip karyawan..."
+                        className="pl-9"
+                    />
+                </div>
+            </div>
             {employees.length === 0 ? (
                 <p className="text-sm text-slate-500">Belum ada data karyawan nonaktif.</p>
+            ) : filteredEmployees.length === 0 ? (
+                <p className="text-sm text-slate-500">Tidak ada arsip karyawan yang cocok dengan pencarian.</p>
             ) : (
                 <div className="space-y-3">
-                    {employees.map((employee) => (
+                    {filteredEmployees.map((employee) => (
                         <div
                             key={employee.id ?? `${employee.employeeCode}-${employee.exitDate}`}
                             className="rounded-lg bg-slate-50 p-4"

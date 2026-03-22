@@ -1,5 +1,5 @@
-﻿import { CheckSquare, FileText, XCircle, AlertTriangle } from 'lucide-react';
-import { useState } from 'react';
+﻿import { AlertTriangle, CheckSquare, FileText, Search, XCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -15,6 +15,7 @@ import {
 } from '@/shared/components/ui/alert-dialog';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
 import {
     Table,
     TableBody,
@@ -46,6 +47,8 @@ export default function ActiveTerminationsTable({
     terminations,
     checklistTemplate,
 }: ActiveTerminationsTableProps) {
+    const [searchQuery, setSearchQuery] = useState('');
+
     const getDisplayProgress = (request: TerminationRecord) => {
         const status = (request.status ?? '').toLowerCase();
         if (status.includes('diajukan') || status.includes('menunggu') || status.includes('pending') || status.includes('baru')) {
@@ -76,6 +79,30 @@ export default function ActiveTerminationsTable({
         );
     };
 
+    const filteredTerminations = useMemo(() => {
+        const normalizedQuery = searchQuery.trim().toLowerCase();
+        if (!normalizedQuery) {
+            return terminations;
+        }
+
+        return terminations.filter((request) => {
+            const haystack = [
+                request.reference,
+                request.employeeName,
+                request.employeeCode,
+                request.division,
+                request.position,
+                request.type,
+                request.status,
+                request.effectiveDate,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            return haystack.includes(normalizedQuery);
+        });
+    }, [terminations, searchQuery]);
+
     if (terminations.length === 0) {
         return (
             <p className="py-6 text-center text-xs md:text-sm text-slate-500">
@@ -86,166 +113,188 @@ export default function ActiveTerminationsTable({
 
     return (
         <>
-            {/* Mobile Card View */}
-            <div className="block md:hidden space-y-3">
-                {terminations.map((request) => (
-                    <div key={request.id} className="rounded-lg border p-3 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                                <p className="font-semibold text-xs text-slate-900 truncate">{request.employeeName}</p>
-                                <p className="text-[10px] text-slate-500">{request.employeeCode}</p>
-                            </div>
-                            {statusBadge(request.status, true)}
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                            <div>
-                                <p className="text-[10px] text-slate-400">ID</p>
-                                <p className="text-[11px] text-slate-700">{request.reference}</p>
-                            </div>
-                            <div>
-                                <p className="text-[10px] text-slate-400">Divisi</p>
-                                <p className="text-[11px] text-slate-700 truncate">{request.division ?? '-'}</p>
-                            </div>
-                            <div>
-                                <p className="text-[10px] text-slate-400">Tipe</p>
-                                {typeBadge(request.type, true)}
-                            </div>
-                            <div>
-                                <p className="text-[10px] text-slate-400">Tanggal Efektif</p>
-                                <p className="text-[10px] text-slate-700">{request.effectiveDate ?? '-'}</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="h-1.5 flex-1 rounded-full bg-slate-200">
-                                <div
-                                    className="h-1.5 rounded-full bg-blue-900"
-                                    style={{ width: `${getDisplayProgress(request)}%` }}
-                                />
-                            </div>
-                            <span className="text-[10px] text-slate-500">{getDisplayProgress(request)}%</span>
-                        </div>
-                        <div className="flex items-center gap-1 pt-1 border-t border-slate-100">
-                            <ChecklistDialog
-                                termination={request}
-                                checklistTemplate={checklistTemplate}
-                                tooltip="Checklist Offboarding"
-                                trigger={
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 text-xs px-2"
-                                    >
-                                        <CheckSquare className="h-3 w-3" />
-                                    </Button>
-                                }
-                            />
-                            <TerminationDetailDialog
-                                termination={request}
-                                tooltip="Lihat Detail"
-                                trigger={
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 text-xs px-2"
-                                    >
-                                        <FileText className="h-3 w-3" />
-                                    </Button>
-                                }
-                            />
-                            <CancelTerminationButton
-                                termination={request}
-                                onConfirm={handleCancelOffboarding}
-                                mobile
-                            />
-                        </div>
-                    </div>
-                ))}
+            <div className="mb-3 md:mb-4 w-full md:max-w-sm">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        placeholder="Cari offboarding karyawan..."
+                        className="pl-9"
+                    />
+                </div>
             </div>
 
-            {/* Desktop Table View */}
-            <div className="hidden md:block">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>ID</TableHead>
-                            <TableHead>Nama Karyawan</TableHead>
-                            <TableHead>Divisi</TableHead>
-                            <TableHead>Tipe</TableHead>
-                            <TableHead>Tanggal Efektif</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Progress</TableHead>
-                            <TableHead className="text-right">Aksi</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {terminations.map((request) => (
-                            <TableRow key={request.id}>
-                                <TableCell>{request.reference}</TableCell>
-                                <TableCell>
+            {filteredTerminations.length === 0 && (
+                <p className="py-4 text-center text-xs md:text-sm text-slate-500">
+                    Tidak ada data offboarding yang cocok dengan pencarian.
+                </p>
+            )}
+
+            {filteredTerminations.length > 0 && (
+                <>
+                    {/* Mobile Card View */}
+                    <div className="block md:hidden space-y-3">
+                        {filteredTerminations.map((request) => (
+                            <div key={request.id} className="rounded-lg border p-3 space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-xs text-slate-900 truncate">{request.employeeName}</p>
+                                        <p className="text-[10px] text-slate-500">{request.employeeCode}</p>
+                                    </div>
+                                    {statusBadge(request.status, true)}
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                                     <div>
-                                        <p className="font-medium text-slate-900">
-                                            {request.employeeName}
-                                        </p>
-                                        <p className="text-xs text-slate-500">
-                                            {request.employeeCode}
-                                        </p>
+                                        <p className="text-[10px] text-slate-400">ID</p>
+                                        <p className="text-[11px] text-slate-700">{request.reference}</p>
                                     </div>
-                                </TableCell>
-                                <TableCell>{request.division ?? '-'}</TableCell>
-                                <TableCell>{typeBadge(request.type)}</TableCell>
-                                <TableCell>{request.effectiveDate ?? '-'}</TableCell>
-                                <TableCell>{statusBadge(request.status)}</TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-2 flex-1 rounded-full bg-slate-200">
-                                            <div
-                                                className="h-2 rounded-full bg-blue-900"
-                                                style={{ width: `${getDisplayProgress(request)}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-xs text-slate-500">
-                                            {getDisplayProgress(request)}%
-                                        </span>
+                                    <div>
+                                        <p className="text-[10px] text-slate-400">Divisi</p>
+                                        <p className="text-[11px] text-slate-700 truncate">{request.division ?? '-'}</p>
                                     </div>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <div className="flex justify-end gap-2">
-                                        <ChecklistDialog
-                                            termination={request}
-                                            checklistTemplate={checklistTemplate}
-                                            tooltip="Checklist Offboarding"
-                                            trigger={
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                >
-                                                    <CheckSquare className="h-4 w-4" />
-                                                </Button>
-                                            }
-                                        />
-                                        <TerminationDetailDialog
-                                            termination={request}
-                                            tooltip="Lihat Detail"
-                                            trigger={
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                >
-                                                    <FileText className="h-4 w-4" />
-                                                </Button>
-                                            }
-                                        />
-                                        <CancelTerminationButton
-                                            termination={request}
-                                            onConfirm={handleCancelOffboarding}
+                                    <div>
+                                        <p className="text-[10px] text-slate-400">Tipe</p>
+                                        {typeBadge(request.type, true)}
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] text-slate-400">Tanggal Efektif</p>
+                                        <p className="text-[10px] text-slate-700">{request.effectiveDate ?? '-'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                                        <div
+                                            className="h-1.5 rounded-full bg-blue-900"
+                                            style={{ width: `${getDisplayProgress(request)}%` }}
                                         />
                                     </div>
-                                </TableCell>
-                            </TableRow>
+                                    <span className="text-[10px] text-slate-500">{getDisplayProgress(request)}%</span>
+                                </div>
+                                <div className="flex items-center gap-1 pt-1 border-t border-slate-100">
+                                    <ChecklistDialog
+                                        termination={request}
+                                        checklistTemplate={checklistTemplate}
+                                        tooltip="Checklist Offboarding"
+                                        trigger={
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 text-xs px-2"
+                                            >
+                                                <CheckSquare className="h-3 w-3" />
+                                            </Button>
+                                        }
+                                    />
+                                    <TerminationDetailDialog
+                                        termination={request}
+                                        tooltip="Lihat Detail"
+                                        trigger={
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 text-xs px-2"
+                                            >
+                                                <FileText className="h-3 w-3" />
+                                            </Button>
+                                        }
+                                    />
+                                    <CancelTerminationButton
+                                        termination={request}
+                                        onConfirm={handleCancelOffboarding}
+                                        mobile
+                                    />
+                                </div>
+                            </div>
                         ))}
-                    </TableBody>
-                </Table>
-            </div>
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>ID</TableHead>
+                                    <TableHead>Nama Karyawan</TableHead>
+                                    <TableHead>Divisi</TableHead>
+                                    <TableHead>Tipe</TableHead>
+                                    <TableHead>Tanggal Efektif</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Progress</TableHead>
+                                    <TableHead className="text-right">Aksi</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredTerminations.map((request) => (
+                                    <TableRow key={request.id}>
+                                        <TableCell>{request.reference}</TableCell>
+                                        <TableCell>
+                                            <div>
+                                                <p className="font-medium text-slate-900">
+                                                    {request.employeeName}
+                                                </p>
+                                                <p className="text-xs text-slate-500">
+                                                    {request.employeeCode}
+                                                </p>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>{request.division ?? '-'}</TableCell>
+                                        <TableCell>{typeBadge(request.type)}</TableCell>
+                                        <TableCell>{request.effectiveDate ?? '-'}</TableCell>
+                                        <TableCell>{statusBadge(request.status)}</TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-2 flex-1 rounded-full bg-slate-200">
+                                                    <div
+                                                        className="h-2 rounded-full bg-blue-900"
+                                                        style={{ width: `${getDisplayProgress(request)}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-xs text-slate-500">
+                                                    {getDisplayProgress(request)}%
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <ChecklistDialog
+                                                    termination={request}
+                                                    checklistTemplate={checklistTemplate}
+                                                    tooltip="Checklist Offboarding"
+                                                    trigger={
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                        >
+                                                            <CheckSquare className="h-4 w-4" />
+                                                        </Button>
+                                                    }
+                                                />
+                                                <TerminationDetailDialog
+                                                    termination={request}
+                                                    tooltip="Lihat Detail"
+                                                    trigger={
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                        >
+                                                            <FileText className="h-4 w-4" />
+                                                        </Button>
+                                                    }
+                                                />
+                                                <CancelTerminationButton
+                                                    termination={request}
+                                                    onConfirm={handleCancelOffboarding}
+                                                />
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </>
+            )}
         </>
     );
 }
