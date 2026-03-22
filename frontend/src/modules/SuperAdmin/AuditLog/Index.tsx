@@ -73,10 +73,15 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const initialRender = useRef(true);
+    const isSyncingFiltersFromServer = useRef(false);
+    const isPaginating = useRef(false);
 
     useEffect(() => {
         if (initialRender.current) {
             initialRender.current = false;
+            return;
+        }
+        if (isSyncingFiltersFromServer.current || isPaginating.current) {
             return;
         }
         if (debounceRef.current) {
@@ -107,17 +112,31 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
     }, [search, module, action, dateFrom, dateTo]);
 
     useEffect(() => {
+        isSyncingFiltersFromServer.current = true;
         setSearch(filters.search ?? '');
         setModule(filters.module || 'all');
         setAction(filters.action || 'all');
         setDateFrom(filters.date_from ?? '');
         setDateTo(filters.date_to ?? '');
+        const frame = window.requestAnimationFrame(() => {
+            isSyncingFiltersFromServer.current = false;
+        });
+        return () => {
+            window.cancelAnimationFrame(frame);
+        };
     }, [filters.search, filters.module, filters.action, filters.date_from, filters.date_to]);
 
     const page = auditLogs.current_page || 1;
     const lastPage = auditLogs.last_page || 1;
 
     const visitPage = (targetPage: number) => {
+        if (targetPage < 1 || targetPage > lastPage || targetPage === page) {
+            return;
+        }
+        if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+        }
+        isPaginating.current = true;
         router.visit('/super-admin/audit-log', {
             method: 'get',
             data: {
@@ -132,6 +151,9 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
             preserveScroll: true,
             replace: true,
             only: ['auditLogs', 'filters', 'moduleOptions', 'actionOptions'],
+            onFinish: () => {
+                isPaginating.current = false;
+            },
         });
     };
 
@@ -240,9 +262,10 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                             Belum ada data log aktivitas.
                         </div>
                     )}
-                    {auditLogs.data.map((item) => {
+                    {auditLogs.data.map((item, index) => {
                         const changes = extractChanges(item.old_values, item.new_values);
                         const viewed = isViewed(item);
+                        const rowNumber = (page - 1) * (auditLogs.per_page || 20) + index + 1;
                         return (
                             <div
                                 key={`mobile-${item.id}`}
@@ -253,6 +276,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                             >
                                 <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                     <div className="min-w-0">
+                                        <p className="text-[10px] text-slate-400">No. {rowNumber}</p>
                                         <p className="text-xs text-slate-500">{item.created_at}</p>
                                         <p className="text-sm font-semibold text-slate-900">{item.user_name ?? '-'}</p>
                                         <p className="text-xs text-slate-500">{item.user_email ?? '-'}</p>
@@ -298,6 +322,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                     <Table className="min-w-[900px]">
                         <TableHeader className="bg-slate-50">
                             <TableRow>
+                                <TableHead className="whitespace-nowrap w-12">No</TableHead>
                                 <TableHead className="whitespace-nowrap">Waktu</TableHead>
                                 <TableHead className="whitespace-nowrap">Aktor</TableHead>
                                 <TableHead className="whitespace-nowrap">Modul</TableHead>
@@ -310,16 +335,20 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                         <TableBody>
                             {auditLogs.data.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                                    <TableCell colSpan={8} className="py-8 text-center text-sm text-slate-500">
                                         Belum ada data log aktivitas.
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {auditLogs.data.map((item) => {
+                            {auditLogs.data.map((item, index) => {
                                 const changes = extractChanges(item.old_values, item.new_values);
                                 const viewed = isViewed(item);
+                                const rowNumber = (page - 1) * (auditLogs.per_page || 20) + index + 1;
                                 return (
                                     <TableRow key={item.id} className={viewed ? '' : 'bg-amber-50/40'}>
+                                        <TableCell className="whitespace-nowrap text-xs text-slate-600">
+                                            {rowNumber}
+                                        </TableCell>
                                         <TableCell className="whitespace-nowrap text-xs text-slate-600">
                                             <p>{item.created_at}</p>
                                             {!viewed && (
