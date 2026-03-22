@@ -87,7 +87,7 @@ export default function DispositionDialog({
                 </div>
 
                 <Badge className="bg-blue-600 text-white">
-                  HR  Divisi Tujuan
+                  Disposisi ke Divisi Tujuan
                 </Badge>
               </div>
 
@@ -111,14 +111,40 @@ export default function DispositionDialog({
                           </div>
                           <div className="flex gap-2">
                             <PriorityBadge priority={letter.priority} />
-                            <Badge variant="outline">
-                              {letter.targetDivision ?? '-'}
-                            </Badge>
                           </div>
                         </div>
 
-                        <p className="mt-1 text-xs text-slate-500">
-                          {letter.senderName} - {letter.date}
+                        <div className="mt-2 grid gap-2 rounded-lg border border-slate-100 bg-slate-50 p-2 sm:grid-cols-3">
+                          <div className="rounded-md border border-slate-200 bg-white px-2 py-1.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                              Pengirim
+                            </p>
+                            <p className="text-xs font-semibold text-slate-900">
+                              {letter.senderName || '-'}
+                            </p>
+                          </div>
+
+                          <div className="rounded-md border border-slate-200 bg-white px-2 py-1.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                              Divisi Pengirim
+                            </p>
+                            <p className="text-xs font-semibold text-slate-900">
+                              {letter.senderDivision ?? '-'}
+                            </p>
+                          </div>
+
+                          <div className="rounded-md border border-slate-200 bg-white px-2 py-1.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                              Divisi Tujuan
+                            </p>
+                            <p className="text-xs font-semibold text-blue-700">
+                              {letter.targetDivision ?? '-'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <p className="mt-2 text-[11px] text-slate-500">
+                          Dikirim pada {letter.date}
                         </p>
 
                         {letter.attachment?.url && (
