@@ -1,0 +1,6 @@
+# Ignore local/editor and repo-meta folders at repository root
+/.github/
+/.vscode/
+
+# Ignore local analysis document at repository root
+/ANALISIS_PROYEK.md
