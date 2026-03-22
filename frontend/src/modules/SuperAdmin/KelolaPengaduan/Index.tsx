@@ -150,6 +150,9 @@ export default function KelolaPengaduanIndex(initialProps: ComplaintsPageProps) 
             <Head title="Kelola Pengaduan" />
 
             <ComplaintStats stats={stats} />
+            <div className="mt-6">
+                <ComplaintTrendChart trend={complaintTrend} />
+            </div>
 
             <div className="mt-8">
                 <div className="mt-6 space-y-6">
@@ -167,11 +170,10 @@ export default function KelolaPengaduanIndex(initialProps: ComplaintsPageProps) 
                         onCategoryChange={setCategory}
                     />
 
-                    <ComplaintTrendChart trend={complaintTrend} />
-
                     <ComplaintTable
                         complaints={complaints.data}
                         links={complaints.links}
+                        rowStart={complaints.meta?.from ?? 1}
                         onSelect={handleSelectComplaint}
                     />
                 </div>
