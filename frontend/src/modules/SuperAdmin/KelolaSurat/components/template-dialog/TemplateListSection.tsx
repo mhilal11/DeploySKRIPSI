@@ -18,9 +18,9 @@ import type { MouseEvent } from 'react';
 type TemplateListSectionProps = {
     loading: boolean;
     templates: Template[];
-    onToggle: (templateId: number) => void;
+    onToggle: (template: Template) => void;
     onEdit: (template: Template) => void;
-    onDelete: (templateId: number) => void;
+    onDelete: (template: Template) => void;
 };
 
 export function TemplateListSection({
@@ -100,7 +100,7 @@ export function TemplateListSection({
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 sm:h-8 sm:w-8"
-                                    onClick={() => onToggle(template.id)}
+                                    onClick={() => onToggle(template)}
                                     title={template.isActive ? 'Nonaktifkan' : 'Aktifkan'}
                                 >
                                     {template.isActive ? (
@@ -131,7 +131,7 @@ export function TemplateListSection({
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 text-red-600 sm:h-8 sm:w-8"
-                                    onClick={() => onDelete(template.id)}
+                                    onClick={() => onDelete(template)}
                                 >
                                     <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                                 </Button>
