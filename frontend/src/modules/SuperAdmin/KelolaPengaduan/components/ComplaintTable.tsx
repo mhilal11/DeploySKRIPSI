@@ -21,12 +21,14 @@ import { PaginationLink, ComplaintRecord } from '../types';
 interface ComplaintTableProps {
     complaints: ComplaintRecord[];
     links: PaginationLink[];
+    rowStart?: number;
     onSelect: (complaint: ComplaintRecord) => void;
 }
 
 export default function ComplaintTable({
     complaints,
     links,
+    rowStart = 1,
     onSelect,
 }: ComplaintTableProps) {
     return (
@@ -39,10 +41,11 @@ export default function ComplaintTable({
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
-                        {complaints.map((complaint) => (
+                        {complaints.map((complaint, index) => (
                             <div key={complaint.id} className="p-3 space-y-2" onClick={() => onSelect(complaint)}>
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] text-slate-400">No. {rowStart + index}</p>
                                         <p className="font-semibold text-xs text-slate-900">{complaint.code}</p>
                                         <p className="text-[10px] text-slate-500 truncate">{complaint.reporter}</p>
                                     </div>
@@ -69,6 +72,7 @@ export default function ComplaintTable({
                 <Table>
                     <TableHeader className="bg-slate-50">
                         <TableRow>
+                            <TableHead className="w-12">No</TableHead>
                             <TableHead className="uppercase">ID</TableHead>
                             <TableHead>Pelapor</TableHead>
                             <TableHead>Kategori</TableHead>
@@ -83,7 +87,7 @@ export default function ComplaintTable({
                         {complaints.length === 0 && (
                             <TableRow>
                                 <TableCell
-                                    colSpan={8}
+                                    colSpan={9}
                                     className="px-4 py-12 text-center text-slate-500"
                                 >
                                     Tidak ada pengaduan yang sesuai filter.
@@ -91,11 +95,14 @@ export default function ComplaintTable({
                             </TableRow>
                         )}
 
-                        {complaints.map((complaint) => (
+                        {complaints.map((complaint, index) => (
                             <TableRow
                                 key={complaint.id}
                                 className="hover:bg-slate-50/70 transition"
                             >
+                                <TableCell className="text-slate-600">
+                                    {rowStart + index}
+                                </TableCell>
                                 <TableCell className="font-semibold text-slate-900">
                                     {complaint.code}
                                 </TableCell>
