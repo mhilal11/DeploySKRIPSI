@@ -70,6 +70,8 @@ const EMPTY_OPTIONS: LettersPageProps['options'] = {
   divisions: [],
 };
 const SEEN_INBOX_LETTER_IDS_KEY = 'admin_staff_seen_inbox_letter_ids_v1';
+const UNSEEN_INBOX_LETTER_COUNT_KEY = 'admin_staff_unseen_inbox_count_v1';
+const UNSEEN_INBOX_UPDATED_EVENT = 'admin-staff:inbox-unseen-updated';
 
 function loadSeenInboxLetterIds(): number[] {
   if (typeof window === 'undefined') {
@@ -164,6 +166,20 @@ export default function AdminStaffLetters() {
       .filter((item) => !seen.has(item.id))
       .map((item) => item.id);
   }, [letters.inbox, seenInboxLetterIds]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const unseenCount = unseenInboxLetterIds.length;
+    window.localStorage.setItem(UNSEEN_INBOX_LETTER_COUNT_KEY, String(unseenCount));
+    window.dispatchEvent(
+      new CustomEvent(UNSEEN_INBOX_UPDATED_EVENT, {
+        detail: { count: unseenCount },
+      }),
+    );
+  }, [unseenInboxLetterIds]);
 
   const filteredLetters = useMemo(() => {
     const filterList = (items: LetterRecord[]) => {

@@ -47,6 +47,8 @@ const navItems: NavItem[] = [
         notificationKey: 'admin-staff.letters'
     },
 ];
+const UNSEEN_INBOX_LETTER_COUNT_KEY = 'admin_staff_unseen_inbox_count_v1';
+const UNSEEN_INBOX_UPDATED_EVENT = 'admin-staff:inbox-unseen-updated';
 
 export default function Navbar({ }: NavbarProps) {
     const { props: { auth, sidebarNotifications = {} } } = usePage<PageProps>();
@@ -55,6 +57,7 @@ export default function Navbar({ }: NavbarProps) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isVisible, setIsVisible] = useState(true);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [unseenInboxCount, setUnseenInboxCount] = useState(0);
     const lastScrollY = useRef(0);
     const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -66,6 +69,42 @@ export default function Navbar({ }: NavbarProps) {
         }
         return route().current(patterns);
     };
+
+    useEffect(() => {
+        const readUnseenCount = () => {
+            if (typeof window === 'undefined') {
+                return;
+            }
+            const raw = window.localStorage.getItem(UNSEEN_INBOX_LETTER_COUNT_KEY) ?? '0';
+            const parsed = Number.parseInt(raw, 10);
+            setUnseenInboxCount(Number.isNaN(parsed) || parsed < 0 ? 0 : parsed);
+        };
+
+        const handleUnseenUpdated = (event: Event) => {
+            const customEvent = event as CustomEvent<{ count?: number }>;
+            const nextCount = customEvent.detail?.count;
+            if (typeof nextCount === 'number' && Number.isFinite(nextCount) && nextCount >= 0) {
+                setUnseenInboxCount(nextCount);
+                return;
+            }
+            readUnseenCount();
+        };
+
+        const handleStorage = (event: StorageEvent) => {
+            if (!event.key || event.key === UNSEEN_INBOX_LETTER_COUNT_KEY) {
+                readUnseenCount();
+            }
+        };
+
+        readUnseenCount();
+        window.addEventListener(UNSEEN_INBOX_UPDATED_EVENT, handleUnseenUpdated as EventListener);
+        window.addEventListener('storage', handleStorage);
+
+        return () => {
+            window.removeEventListener(UNSEEN_INBOX_UPDATED_EVENT, handleUnseenUpdated as EventListener);
+            window.removeEventListener('storage', handleStorage);
+        };
+    }, []);
 
     useEffect(() => {
         const handleScroll = () => {
@@ -135,7 +174,10 @@ export default function Navbar({ }: NavbarProps) {
                         {navItems.map((item) => {
                             const Icon = item.icon;
                             const active = isActive(item.pattern);
-                            const notificationCount = sidebarNotifications?.[item.notificationKey ?? ''] ?? 0;
+                            const notificationCount =
+                                item.routeName === 'admin-staff.letters'
+                                    ? unseenInboxCount
+                                    : sidebarNotifications?.[item.notificationKey ?? ''] ?? 0;
 
                             return (
                                 <Link
@@ -240,7 +282,10 @@ export default function Navbar({ }: NavbarProps) {
                         {navItems.map((item) => {
                             const Icon = item.icon;
                             const active = isActive(item.pattern);
-                            const notificationCount = sidebarNotifications?.[item.notificationKey ?? ''] ?? 0;
+                            const notificationCount =
+                                item.routeName === 'admin-staff.letters'
+                                    ? unseenInboxCount
+                                    : sidebarNotifications?.[item.notificationKey ?? ''] ?? 0;
 
                             return (
                                 <Link
@@ -272,4 +317,3 @@ export default function Navbar({ }: NavbarProps) {
         </nav>
     );
 }
-
