@@ -135,10 +135,11 @@ export default function ActiveTerminationsTable({
                 <>
                     {/* Mobile Card View */}
                     <div className="block md:hidden space-y-3">
-                        {filteredTerminations.map((request) => (
+                        {filteredTerminations.map((request, index) => (
                             <div key={request.id} className="rounded-lg border p-3 space-y-2">
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
+                                        <p className="text-[10px] text-slate-400">No. {index + 1}</p>
                                         <p className="font-semibold text-xs text-slate-900 truncate">{request.employeeName}</p>
                                         <p className="text-[10px] text-slate-500">{request.employeeCode}</p>
                                     </div>
@@ -214,6 +215,7 @@ export default function ActiveTerminationsTable({
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead className="w-12">No</TableHead>
                                     <TableHead>ID</TableHead>
                                     <TableHead>Nama Karyawan</TableHead>
                                     <TableHead>Divisi</TableHead>
@@ -225,8 +227,9 @@ export default function ActiveTerminationsTable({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredTerminations.map((request) => (
+                                {filteredTerminations.map((request, index) => (
                                     <TableRow key={request.id}>
+                                        <TableCell className="text-slate-600">{index + 1}</TableCell>
                                         <TableCell>{request.reference}</TableCell>
                                         <TableCell>
                                             <div>
