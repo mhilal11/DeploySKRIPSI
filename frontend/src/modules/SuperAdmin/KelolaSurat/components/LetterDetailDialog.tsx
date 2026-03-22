@@ -57,7 +57,11 @@ export default function LetterDetailDialog({
                             <div className="text-right">
                                 <div className="flex items-center justify-end gap-1.5 text-slate-500 mb-1">
                                     <Calendar className="h-3.5 w-3.5" />
-                                    <span className="text-xs font-medium">{letter.date}</span>
+                                    <span className="text-xs font-medium">Tanggal Surat: {letter.date}</span>
+                                </div>
+                                <div className="flex items-center justify-end gap-1.5 text-emerald-600 mb-2">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    <span className="text-xs font-medium">Diterima: {letter.receivedAt ?? '-'}</span>
                                 </div>
                                 {getStatusBadge(letter.status)}
                             </div>

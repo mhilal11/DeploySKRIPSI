@@ -79,7 +79,7 @@ func ListSuratByFiltersPaged(db *sqlx.DB, filters SuratListFilters, limit, offse
 	}
 
 	baseQuery, args := buildSuratFilterQuery(filters)
-	query := "SELECT * FROM surat" + baseQuery + " ORDER BY tanggal_surat DESC, surat_id DESC LIMIT ? OFFSET ?"
+	query := "SELECT * FROM surat" + baseQuery + " ORDER BY COALESCE(updated_at, reply_at, disposed_at, tanggal_surat, created_at) DESC, surat_id DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 	rows := []models.Surat{}
 	err := db.Select(&rows, query, args...)

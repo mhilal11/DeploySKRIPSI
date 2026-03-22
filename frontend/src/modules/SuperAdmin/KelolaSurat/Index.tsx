@@ -72,6 +72,85 @@ const DEFAULT_OPTIONS: KelolaSuratPageProps['options'] = {
     divisions: [],
 };
 const EMPTY_PENDING_DISPOSITION: LetterRecord[] = [];
+const MONTH_INDEX: Record<string, number> = {
+    Jan: 0,
+    Feb: 1,
+    Mar: 2,
+    Apr: 3,
+    May: 4,
+    Jun: 5,
+    Jul: 6,
+    Aug: 7,
+    Sep: 8,
+    Oct: 9,
+    Nov: 10,
+    Dec: 11,
+};
+
+function parseDisplayDateToTimestamp(value?: string | null): number {
+    if (!value) {
+        return 0;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed === '-') {
+        return 0;
+    }
+
+    const nativeParsed = Date.parse(trimmed);
+    if (!Number.isNaN(nativeParsed)) {
+        return nativeParsed;
+    }
+
+    const match = trimmed.match(/^(\d{2})\s([A-Za-z]{3})\s(\d{4})(?:\s(\d{2}):(\d{2}))?$/);
+    if (!match) {
+        return 0;
+    }
+
+    const day = Number.parseInt(match[1], 10);
+    const month = MONTH_INDEX[match[2]];
+    const year = Number.parseInt(match[3], 10);
+    const hour = Number.parseInt(match[4] ?? '0', 10);
+    const minute = Number.parseInt(match[5] ?? '0', 10);
+
+    if (
+        Number.isNaN(day) ||
+        month === undefined ||
+        Number.isNaN(year) ||
+        Number.isNaN(hour) ||
+        Number.isNaN(minute)
+    ) {
+        return 0;
+    }
+
+    return new Date(year, month, day, hour, minute).getTime();
+}
+
+function getLetterActivityTimestamp(letter: LetterRecord): number {
+    const candidates = [
+        letter.updatedAt,
+        letter.replyAt,
+        letter.disposedAt,
+        letter.approvalDate,
+        letter.createdAt,
+        letter.date,
+    ];
+
+    return candidates.reduce((latest, value) => {
+        const parsed = parseDisplayDateToTimestamp(value);
+        return parsed > latest ? parsed : latest;
+    }, 0);
+}
+
+function sortLettersByLatestActivity(items: LetterRecord[]): LetterRecord[] {
+    return [...items].sort((a, b) => {
+        const diff = getLetterActivityTimestamp(b) - getLetterActivityTimestamp(a);
+        if (diff !== 0) {
+            return diff;
+        }
+        return b.id - a.id;
+    });
+}
 
 export default function KelolaSuratIndex() {
     const page = usePage<PageProps<KelolaSuratPageProps>>();
@@ -111,24 +190,32 @@ export default function KelolaSuratIndex() {
         letters: LettersCollection;
         pending: LetterRecord[];
         stats: KelolaSuratPageProps['stats'];
-    }>({
-        letters,
-        pending: pendingDisposition,
+    }>(() => ({
+        letters: {
+            inbox: sortLettersByLatestActivity(letters.inbox),
+            outbox: sortLettersByLatestActivity(letters.outbox),
+            archive: sortLettersByLatestActivity(letters.archive),
+        },
+        pending: sortLettersByLatestActivity(pendingDisposition),
         stats,
-    });
+    }));
 
     const [templateOpen, setTemplateOpen] = useState(false);
 
     useEffect(() => {
         setLiveData({
-            letters,
-            pending: pendingDisposition,
+            letters: {
+                inbox: sortLettersByLatestActivity(letters.inbox),
+                outbox: sortLettersByLatestActivity(letters.outbox),
+                archive: sortLettersByLatestActivity(letters.archive),
+            },
+            pending: sortLettersByLatestActivity(pendingDisposition),
             stats,
         });
     }, [letters, pendingDisposition, stats]);
 
     const sortLetters = useCallback((items: LetterRecord[]) => {
-        return [...items].sort((a, b) => b.id - a.id);
+        return sortLettersByLatestActivity(items);
     }, []);
 
     const resolveBucket = useCallback((letter: LetterRecord) => {

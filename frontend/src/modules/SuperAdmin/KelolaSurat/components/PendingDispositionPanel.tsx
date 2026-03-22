@@ -150,7 +150,7 @@ export default function PendingDispositionPanel({
                                     <TableHead className="hidden lg:table-cell">Prioritas</TableHead>
                                     <TableHead>Subjek</TableHead>
                                     <TableHead className="hidden xl:table-cell">Lampiran</TableHead>
-                                    <TableHead className="hidden lg:table-cell">Tanggal</TableHead>
+                                    <TableHead className="hidden lg:table-cell">Diterima</TableHead>
                                     <TableHead className="text-right">Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -228,7 +228,7 @@ export default function PendingDispositionPanel({
                                                     <span className="text-xs text-slate-400">-</span>
                                                 )}
                                             </TableCell>
-                                            <TableCell className="hidden lg:table-cell">{letter.date}</TableCell>
+                                            <TableCell className="hidden lg:table-cell whitespace-nowrap">{letter.receivedAt ?? letter.date}</TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-2">
                                                     {/* {letter.attachment?.url && (

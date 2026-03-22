@@ -207,6 +207,49 @@ func LookupDepartemenName(db *sqlx.DB, departemenID *int64, userID int64) string
 	return "Internal"
 }
 
+func resolveLetterReceivedAt(surat models.Surat) *time.Time {
+	if surat.CurrentRecipient == "hr" {
+		if surat.ReplyAt != nil && !surat.ReplyAt.IsZero() {
+			return surat.ReplyAt
+		}
+		if surat.CreatedAt != nil && !surat.CreatedAt.IsZero() {
+			return surat.CreatedAt
+		}
+		if surat.UpdatedAt != nil && !surat.UpdatedAt.IsZero() {
+			return surat.UpdatedAt
+		}
+	}
+
+	if surat.CurrentRecipient == "division" {
+		if surat.DisposedAt != nil && !surat.DisposedAt.IsZero() {
+			return surat.DisposedAt
+		}
+		if surat.CreatedAt != nil && !surat.CreatedAt.IsZero() {
+			return surat.CreatedAt
+		}
+		if surat.UpdatedAt != nil && !surat.UpdatedAt.IsZero() {
+			return surat.UpdatedAt
+		}
+	}
+
+	if surat.UpdatedAt != nil && !surat.UpdatedAt.IsZero() {
+		return surat.UpdatedAt
+	}
+	if surat.ReplyAt != nil && !surat.ReplyAt.IsZero() {
+		return surat.ReplyAt
+	}
+	if surat.DisposedAt != nil && !surat.DisposedAt.IsZero() {
+		return surat.DisposedAt
+	}
+	if surat.CreatedAt != nil && !surat.CreatedAt.IsZero() {
+		return surat.CreatedAt
+	}
+	if surat.TanggalSurat != nil && !surat.TanggalSurat.IsZero() {
+		return surat.TanggalSurat
+	}
+	return nil
+}
+
 func TransformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map[string]any {
 	result := make([]map[string]any, 0, len(letters))
 	for _, surat := range letters {
@@ -261,6 +304,7 @@ func TransformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 				"url":  attachmentLink,
 			}
 		}
+		receivedAt := FormatDateTime(resolveLetterReceivedAt(surat))
 
 		result = append(result, map[string]any{
 			"id":             surat.SuratID,
@@ -274,6 +318,7 @@ func TransformLetters(c *gin.Context, db *sqlx.DB, letters []models.Surat) []map
 			"subject":        surat.Perihal,
 			"category":       surat.Kategori,
 			"date":           FormatDate(surat.TanggalSurat),
+			"receivedAt":     receivedAt,
 			"status": func() string {
 				if surat.IsFinalized {
 					return "Disposisi Final"

@@ -54,6 +54,7 @@ export interface LetterRecord {
     category: string;
     priority: string;
     date: string;
+    receivedAt?: string | null;
     status: string;
     content: string;
     type: 'masuk' | 'keluar';
@@ -168,7 +169,7 @@ export default function LettersTable({
                             {!isInbox && <TableHead className="hidden xl:table-cell">Jenis Surat</TableHead>}
                             <TableHead className="hidden md:table-cell">Kategori</TableHead>
                             <TableHead className="hidden md:table-cell">Prioritas</TableHead>
-                            <TableHead className="hidden lg:table-cell">Tanggal</TableHead>
+                            <TableHead className="hidden lg:table-cell">Diterima</TableHead>
                             <TableHead className="hidden sm:table-cell">Status</TableHead>
                             <TableHead className="text-right">Aksi</TableHead>
                         </TableRow>
@@ -225,7 +226,7 @@ export default function LettersTable({
                                     <TableCell className="hidden md:table-cell">
                                         <PriorityBadge priority={letter.priority} />
                                     </TableCell>
-                                    <TableCell className="hidden lg:table-cell whitespace-nowrap">{letter.date}</TableCell>
+                                    <TableCell className="hidden lg:table-cell whitespace-nowrap">{letter.receivedAt ?? letter.date}</TableCell>
                                     <TableCell className="hidden sm:table-cell">
                                         {getStatusBadge(letter.status)}
                                         {hasReply && (
