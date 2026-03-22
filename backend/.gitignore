@@ -1,2 +1,32 @@
+# env files
 .env
+.env.*
+!.env.example
+
+# generated storage
 /storage/
+
+# build artifacts
+/bin/
+/tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# coverage
+coverage.out
+coverage/
+
+# logs
+*.log
+
+# editor
+/.vscode/
+/.idea/
+
+# OS artifacts
+.DS_Store
+Thumbs.db
