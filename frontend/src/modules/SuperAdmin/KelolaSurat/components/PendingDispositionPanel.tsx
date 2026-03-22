@@ -1,4 +1,4 @@
-﻿import { Download, Eye, FileText, Info, MailCheck, SendHorizontal } from 'lucide-react';
+﻿import { Download, Eye, FileText, Info, MailCheck, Search, SendHorizontal } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
 
 import { LetterRecord } from '@/modules/SuperAdmin/KelolaSurat/components/LettersTable';
@@ -7,6 +7,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Input } from '@/shared/components/ui/input';
 import { Separator } from '@/shared/components/ui/separator';
 import {
     Table,
@@ -46,14 +47,35 @@ export default function PendingDispositionPanel({
     onSelectAll,
     onClearSelection,
 }: PendingDispositionPanelProps) {
+    const [searchQuery, setSearchQuery] = useState('');
+
     // Filter by priority if set
     const filteredByPriority = useMemo(() => {
         if (!priorityFilter) return pendingDisposition;
         return pendingDisposition.filter(letter => letter.priority === priorityFilter);
     }, [pendingDisposition, priorityFilter]);
+    const filteredPendingDisposition = useMemo(() => {
+        const normalized = searchQuery.trim().toLowerCase();
+        if (!normalized) return filteredByPriority;
+
+        return filteredByPriority.filter((letter) => {
+            const haystack = [
+                letter.letterNumber,
+                letter.subject,
+                letter.senderName,
+                letter.senderDivision,
+                letter.targetDivision,
+                letter.recipientName,
+            ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+            return haystack.includes(normalized);
+        });
+    }, [filteredByPriority, searchQuery]);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
-    const totalPages = Math.ceil(filteredByPriority.length / itemsPerPage);
+    const totalPages = Math.ceil(filteredPendingDisposition.length / itemsPerPage);
 
     useEffect(() => {
         if (currentPage > totalPages && totalPages > 0) {
@@ -65,8 +87,8 @@ export default function PendingDispositionPanel({
 
     const paginatedItems = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage;
-        return filteredByPriority.slice(start, start + itemsPerPage);
-    }, [filteredByPriority, currentPage]);
+        return filteredPendingDisposition.slice(start, start + itemsPerPage);
+    }, [filteredPendingDisposition, currentPage]);
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page);
@@ -123,6 +145,20 @@ export default function PendingDispositionPanel({
                         Disposisi Terpilih
                     </Button> */}
                 </div>
+                <div className="w-full md:max-w-md">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                            value={searchQuery}
+                            onChange={(event) => {
+                                setSearchQuery(event.target.value);
+                                setCurrentPage(1);
+                            }}
+                            placeholder="Cari daftar disposisi surat..."
+                            className="pl-9"
+                        />
+                    </div>
+                </div>
             </div>
 
             {pendingDisposition.length === 0 ? (
@@ -130,6 +166,14 @@ export default function PendingDispositionPanel({
                     <MailCheck className="h-8 w-8 md:h-10 md:w-10 text-blue-400" />
                     <p className="text-sm md:text-base font-semibold text-slate-900">Semua surat sudah dialihkan</p>
                     <p className="text-xs md:text-sm text-slate-500">Tidak ada surat yang menunggu disposisi saat ini.</p>
+                </div>
+            ) : filteredPendingDisposition.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3 px-3 md:px-6 py-12 md:py-16 text-center">
+                    <Search className="h-8 w-8 md:h-10 md:w-10 text-slate-300" />
+                    <p className="text-sm md:text-base font-semibold text-slate-900">Tidak ada surat yang cocok</p>
+                    <p className="text-xs md:text-sm text-slate-500">
+                        Coba ubah kata kunci pencarian atau filter prioritas.
+                    </p>
                 </div>
             ) : (
                 <>
@@ -144,7 +188,8 @@ export default function PendingDispositionPanel({
                                             aria-label="Pilih semua surat"
                                         />
                                     </TableHead>
-                                    <TableHead>Nomor</TableHead>
+                                    <TableHead className="w-14 text-center">No</TableHead>
+                                    <TableHead>Nomor Surat</TableHead>
                                     <TableHead className="hidden sm:table-cell">Pengirim</TableHead>
                                     <TableHead className="hidden md:table-cell">Divisi Tujuan</TableHead>
                                     <TableHead className="hidden lg:table-cell">Prioritas</TableHead>
@@ -155,28 +200,32 @@ export default function PendingDispositionPanel({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {paginatedItems.map((letter) => {
+                                {paginatedItems.map((letter, index) => {
                                     const isSelected = selectedIds.includes(letter.id);
                                     const latestReply =
                                         letter.replyHistory && letter.replyHistory.length > 0
                                             ? letter.replyHistory[letter.replyHistory.length - 1]
                                             : undefined;
                                     const replyPreview = latestReply?.note ?? letter.replyNote ?? null;
+                                    const rowNumber = (currentPage - 1) * itemsPerPage + index + 1;
 
                                     return (
                                         <TableRow
                                             key={letter.id}
                                             data-state={isSelected ? 'selected' : undefined}
                                             className={cn('text-xs md:text-sm', isSelected && 'bg-blue-50/70')}
-                                        >
-                                            <TableCell>
-                                                <Checkbox
-                                                    checked={isSelected}
-                                                    onCheckedChange={(value) =>
+                                            >
+                                                <TableCell>
+                                                    <Checkbox
+                                                        checked={isSelected}
+                                                        onCheckedChange={(value) =>
                                                         onToggleSelect(letter.id, value === true)
                                                     }
                                                     aria-label={`Pilih surat ${letter.letterNumber}`}
                                                 />
+                                            </TableCell>
+                                            <TableCell className="text-center font-medium text-slate-600 whitespace-nowrap">
+                                                {rowNumber}
                                             </TableCell>
                                             <TableCell className="font-semibold text-slate-900 whitespace-nowrap">
                                                 {letter.letterNumber}
@@ -271,7 +320,7 @@ export default function PendingDispositionPanel({
                     {totalPages > 1 && (
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-3 md:px-6 py-4 border-t border-slate-100">
                             <p className="text-xs text-slate-500">
-                                Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, pendingDisposition.length)} dari {pendingDisposition.length} surat
+                                Menampilkan {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, filteredPendingDisposition.length)} dari {filteredPendingDisposition.length} surat
                             </p>
                             <div className="flex items-center gap-1">
                                 <Button
@@ -319,7 +368,7 @@ export default function PendingDispositionPanel({
                                 variant="ghost"
                                 size="sm"
                                 className="text-slate-600 hover:text-slate-900"
-                                disabled={pendingDisposition.length === 0}
+                                disabled={filteredPendingDisposition.length === 0}
                                 onClick={() => (isAllSelected ? onClearSelection() : onSelectAll())}
                             >
                                 {isAllSelected ? 'Batalkan Pilihan' : 'Pilih Semua'}
