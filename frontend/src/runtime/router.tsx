@@ -82,6 +82,7 @@ function buildPageCacheKey(apiEndpoint: string | null | undefined, search: strin
 
 interface RenderedPageSnapshot {
   routeKey: string;
+  routeName: string;
   component: React.ComponentType<any> | React.LazyExoticComponent<React.ComponentType<any>>;
   props: any;
 }
@@ -108,7 +109,7 @@ function PageShell({
   const initialCachedProps = getCachedPageData(cacheKey);
   const [pageProps, setPageProps] = useState<any>(initialCachedProps);
   const [renderedPage, setRenderedPage] = useState<RenderedPageSnapshot | null>(
-    initialCachedProps ? { routeKey, component: Component, props: initialCachedProps } : null,
+    initialCachedProps ? { routeKey, routeName: name, component: Component, props: initialCachedProps } : null,
   );
   const [transitionFallbackPage, setTransitionFallbackPage] = useState<RenderedPageSnapshot | null>(null);
   const renderedPageRef = useRef<RenderedPageSnapshot | null>(renderedPage);
@@ -127,9 +128,13 @@ function PageShell({
   useEffect(() => {
     let active = true;
     const currentRendered = renderedPageRef.current;
-    if (!disableTransitionFallback && currentRendered && currentRendered.routeKey !== routeKey) {
+    const canUseCurrentAsFallback =
+      currentRendered &&
+      !DISABLE_TRANSITION_FALLBACK_ROUTES.has(currentRendered.routeName);
+
+    if (!disableTransitionFallback && canUseCurrentAsFallback && currentRendered.routeKey !== routeKey) {
       setTransitionFallbackPage(currentRendered);
-    } else if (disableTransitionFallback) {
+    } else {
       setTransitionFallbackPage(null);
     }
 
@@ -137,7 +142,7 @@ function PageShell({
       if (!apiEndpoint) {
         const resolvedLoaderProps = loaderProps ?? {};
         setPageProps(resolvedLoaderProps);
-        setRenderedPage({ routeKey, component: Component, props: resolvedLoaderProps });
+        setRenderedPage({ routeKey, routeName: name, component: Component, props: resolvedLoaderProps });
         if (loaderProps) {
           setProps(loaderProps);
         }
@@ -146,14 +151,14 @@ function PageShell({
         return;
       }
 
-      if (cacheKey) {
-        const cached = getCachedPageData(cacheKey);
-        if (cached && typeof cached === 'object') {
-          setPageProps(cached);
-          setRenderedPage({ routeKey, component: Component, props: cached });
-          setProps(cached);
-          setLoaded(true);
-          setLoadError(null);
+        if (cacheKey) {
+          const cached = getCachedPageData(cacheKey);
+          if (cached && typeof cached === 'object') {
+            setPageProps(cached);
+            setRenderedPage({ routeKey, routeName: name, component: Component, props: cached });
+            setProps(cached);
+            setLoaded(true);
+            setLoadError(null);
         } else {
           setPageProps(null);
           setLoadError(null);
@@ -186,12 +191,15 @@ function PageShell({
             setCachedPageData(cacheKey, data);
           }
           setPageProps(data);
-          setRenderedPage({ routeKey, component: Component, props: data });
+          setRenderedPage({ routeKey, routeName: name, component: Component, props: data });
           setProps(data);
         }
         setLoadError(null);
         setLoaded(true);
       } catch (error) {
+        if (!active) {
+          return;
+        }
         const status = (error as any)?.response?.status;
         if (status === 401) {
           router.replace('/login');
@@ -211,6 +219,7 @@ function PageShell({
       active = false;
     };
   }, [
+    name,
     routeKey,
     apiEndpoint,
     cacheKey,
@@ -235,7 +244,13 @@ function PageShell({
     const immediateFallback = disableTransitionFallback
       ? null
       : transitionFallbackPage ||
-        (renderedPage && renderedPage.routeKey !== routeKey ? renderedPage : null);
+        (
+          renderedPage &&
+          renderedPage.routeKey !== routeKey &&
+          !DISABLE_TRANSITION_FALLBACK_ROUTES.has(renderedPage.routeName)
+            ? renderedPage
+            : null
+        );
 
     if (immediateFallback) {
       const FallbackComponent = immediateFallback.component as React.ComponentType<any>;
