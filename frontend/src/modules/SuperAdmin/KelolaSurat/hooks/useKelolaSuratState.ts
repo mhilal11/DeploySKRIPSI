@@ -220,6 +220,10 @@ export function useKelolaSuratState({
             toast.error('Tambahkan catatan penolakan sebelum menolak surat.');
             return;
         }
+        if (mode === 'final' && !(dispositionForm.data.disposition_note || '').trim()) {
+            toast.error('Tambahkan catatan sebelum disposisi final.');
+            return;
+        }
 
         let routeName: string;
         if (mode === 'reject') {

@@ -253,7 +253,11 @@ func SuperAdminLettersBulkDisposition(c *gin.Context) {
 	if len(ids) == 0 {
 		ids = c.PostFormArray("letter_ids")
 	}
-	note := c.PostForm("disposition_note")
+	note := strings.TrimSpace(c.PostForm("disposition_note"))
+	if note == "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"disposition_note": "Catatan disposisi wajib diisi untuk disposisi final."})
+		return
+	}
 	validationErrors := handlers.FieldErrors{}
 	handlers.ValidateFieldLength(validationErrors, "disposition_note", "Catatan disposisi", note, 3000)
 	if len(validationErrors) > 0 {
