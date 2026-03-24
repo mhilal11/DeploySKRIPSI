@@ -51,12 +51,12 @@ export function LetterDetailDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-h-[85vh] max-w-3xl overflow-hidden border-0 bg-white p-0"
+        className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-3xl overflow-hidden border-0 bg-white p-0 sm:w-full"
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
       >
-        <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4">
+        <DialogHeader className="space-y-1 border-b border-slate-100 px-4 py-4 sm:px-6">
           <DialogTitle>Detail Surat</DialogTitle>
           <DialogDescription>
             Ringkasan informasi surat masuk/keluar beserta lampiran yang disertakan.
@@ -64,8 +64,8 @@ export function LetterDetailDialog({
         </DialogHeader>
         <div className="max-h-[calc(85vh-4.5rem)] overflow-y-auto">
           {letter ? (
-            <div className="px-6 pb-8 pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="px-4 pb-6 pt-4 sm:px-6 sm:pb-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{letter.subject}</p>
                 </div>
@@ -99,7 +99,7 @@ export function LetterDetailDialog({
                 onValueChange={(value) => onDetailTabChange(value as 'detail' | 'replies' | 'tracking')}
                 className="mt-5 space-y-4"
               >
-                <TabsList className="grid w-full grid-cols-3 gap-3 bg-transparent p-0">
+                <TabsList className="grid h-auto w-full grid-cols-1 gap-2 bg-transparent p-0 sm:grid-cols-3 sm:gap-3">
                   <TabsTrigger
                     value="detail"
                     className="rounded-lg border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 data-[state=active]:border-blue-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md"
@@ -134,7 +134,7 @@ export function LetterDetailDialog({
                           </h3>
                         </div>
                       </div>
-                      <div className="grid gap-4 p-5 text-sm md:grid-cols-3">
+                      <div className="grid gap-4 p-4 text-sm sm:p-5 md:grid-cols-2 xl:grid-cols-3">
                         <InfoTile label="Nomor Surat" value={letter.letterNumber} />
                         <InfoTile label="Tanggal Surat" value={letter.date} />
                         <InfoTile label="Tanggal Diterima" value={letter.receivedAt ?? '-'} />
@@ -162,7 +162,7 @@ export function LetterDetailDialog({
                           </h3>
                         </div>
                       </div>
-                      <div className="p-5 space-y-4">
+                      <div className="space-y-4 p-4 sm:p-5">
                         <div>
                           <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-2">
                             Subjek
@@ -222,10 +222,10 @@ export function LetterDetailDialog({
                             <h3 className="text-sm font-semibold text-slate-900">Lampiran</h3>
                           </div>
                         </div>
-                        <div className="p-5">
-                          <div className="flex items-center justify-between gap-4 flex-wrap">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-blue-600 flex-shrink-0">
+                        <div className="p-4 sm:p-5">
+                          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
                                 <FileText className="h-5 w-5" />
                               </div>
                               <div className="min-w-0 flex-1">
@@ -235,19 +235,19 @@ export function LetterDetailDialog({
                                 <p className="text-xs text-slate-500">Dokumen surat terlampir</p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
                               <Button
                                 asChild
                                 size="sm"
                                 variant="outline"
-                                className="border-blue-300 hover:bg-blue-50"
+                                className="w-full border-blue-300 hover:bg-blue-50 sm:w-auto"
                               >
                                 <a href={letter.attachmentUrl} target="_blank" rel="noreferrer">
                                   <Eye className="mr-2 h-4 w-4" />
                                   Lihat
                                 </a>
                               </Button>
-                              <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
+                              <Button asChild size="sm" className="w-full bg-blue-600 hover:bg-blue-700 sm:w-auto">
                                 <a
                                   href={letter.attachmentUrl}
                                   target="_blank"
@@ -274,10 +274,10 @@ export function LetterDetailDialog({
                             </h3>
                           </div>
                         </div>
-                        <div className="p-5">
-                          <div className="flex items-center justify-between gap-4 flex-wrap">
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 flex-shrink-0">
+                        <div className="p-4 sm:p-5">
+                          <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
                                 <FileText className="h-5 w-5" />
                               </div>
                               <div className="min-w-0 flex-1">
@@ -287,11 +287,7 @@ export function LetterDetailDialog({
                                 <p className="text-xs text-emerald-600">Dokumen disposisi resmi</p>
                               </div>
                             </div>
-                            <Button
-                              asChild
-                              size="sm"
-                              className="bg-emerald-600 hover:bg-emerald-700 flex-shrink-0"
-                            >
+                            <Button asChild size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 sm:w-auto">
                               <a href={letter.dispositionDocumentUrl} download>
                                 <Download className="mr-2 h-4 w-4" />
                                 Unduh
@@ -347,7 +343,7 @@ export function LetterDetailDialog({
                             </h3>
                           </div>
                         </div>
-                        <div className="p-5">
+                        <div className="p-4 sm:p-5">
                           <div className="space-y-3">
                             {history.map((entry, index) => (
                               <Card
@@ -355,8 +351,8 @@ export function LetterDetailDialog({
                                 className="border-emerald-200/60 bg-white shadow-sm hover:shadow-md transition-shadow"
                               >
                                 <div className="p-4">
-                                  <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                                    <div className="flex-1 min-w-0">
+                                  <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+                                    <div className="min-w-0 flex-1">
                                       <div className="flex items-center gap-2 mb-1">
                                         <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                                           <Users className="h-4 w-4 text-emerald-600" />
@@ -388,18 +384,13 @@ export function LetterDetailDialog({
                                   </p>
                                   {entry.attachment?.url && (
                                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                                      <Button
-                                        asChild
-                                        size="sm"
-                                        variant="outline"
-                                        className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                                      >
+                                      <Button asChild size="sm" variant="outline" className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 sm:w-auto">
                                         <a href={entry.attachment.url} target="_blank" rel="noreferrer">
                                           <Eye className="mr-2 h-3.5 w-3.5" />
                                           Lihat Lampiran
                                         </a>
                                       </Button>
-                                      <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                                      <Button asChild size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 sm:w-auto">
                                         <a href={entry.attachment.url} download>
                                           <Download className="mr-2 h-3.5 w-3.5" />
                                           Unduh Lampiran
@@ -423,7 +414,7 @@ export function LetterDetailDialog({
               </Tabs>
             </div>
           ) : (
-            <div className="px-6 py-12 text-center text-sm text-slate-500">
+            <div className="px-4 py-12 text-center text-sm text-slate-500 sm:px-6">
               Pilih surat untuk melihat detail.
             </div>
           )}

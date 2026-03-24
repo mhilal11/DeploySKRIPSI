@@ -103,7 +103,105 @@ export function LettersTable({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="space-y-3 md:hidden">
+        {paginatedLetters.map((letter) => {
+          const latestReply =
+            letter.replyHistory && letter.replyHistory.length > 0
+              ? letter.replyHistory[letter.replyHistory.length - 1]
+              : undefined;
+          const hasReply = Boolean(latestReply || letter.replyNote);
+          const isNewlyReceived = variant === 'inbox' && newIdSet.has(letter.id);
+
+          return (
+            <div
+              key={letter.id}
+              className={`rounded-xl border p-4 shadow-sm ${
+                isNewlyReceived ? 'border-blue-200 bg-blue-50/60' : 'border-slate-200 bg-white'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">{letter.subject}</p>
+                  <p className="mt-1 text-xs text-slate-500">{letter.letterNumber}</p>
+                </div>
+                {letter.hasAttachment && <FileText className="h-4 w-4 shrink-0 text-slate-400" />}
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                <div className="min-w-0">
+                  <p className="text-slate-500">Pengirim</p>
+                  <p className="truncate font-medium text-slate-900">{letter.sender}</p>
+                  <p className="truncate text-slate-500">{letter.from}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Kategori</p>
+                  <span className="mt-1 inline-flex rounded-md border px-2 py-0.5 text-xs">
+                    {letter.category}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-slate-500">Prioritas</p>
+                  <div className="mt-1">
+                    <PriorityBadge priority={letter.priority} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-slate-500">Status</p>
+                  <div className="mt-1">
+                    <StatusBadge status={letter.status} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 space-y-1 text-xs text-slate-500">
+                <p>Diterima: <span className="text-slate-700">{letter.receivedAt ?? '-'}</span></p>
+                <p>Dibuat: <span className="text-slate-700">{letter.date}</span></p>
+                {isNewlyReceived && (
+                  <p className="font-medium text-blue-600">Surat baru diterima</p>
+                )}
+                {hasReply && (
+                  <p className="font-medium text-emerald-600">Balasan dikirim</p>
+                )}
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 min-w-[120px] border-blue-200 text-blue-700 hover:bg-blue-50"
+                  onClick={() => onViewDetail(letter)}
+                >
+                  <Eye className="mr-2 h-4 w-4" />
+                  Detail
+                </Button>
+
+                {onArchive && variant !== 'archive' && (
+                  <ArchiveConfirmButton
+                    letter={letter}
+                    onConfirm={onArchive}
+                    disabled={archiveProcessing}
+                    isProcessing={archiveProcessing && archivingId === letter.id}
+                    buttonClassName="flex-1 min-w-[120px] justify-center"
+                    buttonSize="sm"
+                    showLabel
+                  />
+                )}
+                {onUnarchive && variant === 'archive' && (
+                  <UnarchiveConfirmButton
+                    letter={letter}
+                    onConfirm={onUnarchive}
+                    disabled={unarchiveProcessing}
+                    isProcessing={unarchiveProcessing && unarchivingId === letter.id}
+                    buttonClassName="flex-1 min-w-[140px] justify-center"
+                  />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="hidden rounded-md border md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -279,11 +377,17 @@ function ArchiveConfirmButton({
   onConfirm,
   disabled,
   isProcessing,
+  buttonClassName,
+  buttonSize = 'icon',
+  showLabel = false,
 }: {
   letter: LetterRecord;
   onConfirm: (letter: LetterRecord) => void;
   disabled?: boolean;
   isProcessing?: boolean;
+  buttonClassName?: string;
+  buttonSize?: 'icon' | 'sm';
+  showLabel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const canArchive = ['Didisposisi', 'Disposisi Final', 'Ditolak HR'].includes(letter.status);
@@ -295,15 +399,18 @@ function ArchiveConfirmButton({
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+              size={buttonSize}
+              className={`text-rose-600 hover:bg-rose-50 hover:text-rose-700 ${buttonSize === 'icon' ? 'h-8 w-8' : ''} ${buttonClassName ?? ''}`}
               disabled={disabled || letter.status === 'Diarsipkan'}
               onClick={() => setOpen(true)}
             >
               {isProcessing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Archive className="h-4 w-4" />
+                <>
+                  <Archive className="h-4 w-4" />
+                  {showLabel && <span className="ml-2">Arsipkan</span>}
+                </>
               )}
             </Button>
           </TooltipTrigger>
@@ -345,11 +452,13 @@ function UnarchiveConfirmButton({
   onConfirm,
   disabled,
   isProcessing,
+  buttonClassName,
 }: {
   letter: LetterRecord;
   onConfirm: (letter: LetterRecord) => void;
   disabled?: boolean;
   isProcessing?: boolean;
+  buttonClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const canUnarchive = letter.status === 'Diarsipkan';
@@ -360,7 +469,7 @@ function UnarchiveConfirmButton({
         <Button
           variant="ghost"
           size="sm"
-          className="text-amber-700 hover:text-amber-800"
+          className={`text-amber-700 hover:text-amber-800 ${buttonClassName ?? ''}`}
           disabled={disabled || !canUnarchive}
         >
           {isProcessing ? (

@@ -73,6 +73,10 @@ const SEEN_INBOX_LETTER_IDS_KEY = 'admin_staff_seen_inbox_letter_ids_v1';
 const UNSEEN_INBOX_LETTER_COUNT_KEY = 'admin_staff_unseen_inbox_count_v1';
 const UNSEEN_INBOX_UPDATED_EVENT = 'admin-staff:inbox-unseen-updated';
 
+function canArchiveLetterStatus(status: string) {
+  return ['Didisposisi', 'Disposisi Final', 'Ditolak HR'].includes(status);
+}
+
 function loadSeenInboxLetterIds(): number[] {
   if (typeof window === 'undefined') {
     return [];
@@ -236,7 +240,8 @@ export default function AdminStaffLetters() {
       return;
     }
 
-    if (letter.status !== 'Didisposisi') {
+    if (!canArchiveLetterStatus(letter.status)) {
+      toast.error('Surat ini belum bisa diarsipkan.');
       return;
     }
 
@@ -384,7 +389,7 @@ export default function AdminStaffLetters() {
 
       <StatsCards stats={stats} />
 
-      <Card className="p-6">
+      <Card className="overflow-hidden p-4 sm:p-6">
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex-1">
             <div className="relative">
@@ -397,7 +402,7 @@ export default function AdminStaffLetters() {
               />
             </div>
           </div>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
             <div className="w-full md:w-52">
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="bg-white">
@@ -429,29 +434,31 @@ export default function AdminStaffLetters() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabValue)}>
-          <TabsList className="mb-5 h-auto gap-2 bg-transparent p-0">
-            <TabsTrigger
-              value="inbox"
-              className="rounded-lg border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 data-[state=active]:border-blue-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md"
-            >
-              <Inbox className="mr-2 h-4 w-4" />
-              Inbox
-            </TabsTrigger>
-            <TabsTrigger
-              value="outbox"
-              className="rounded-lg border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 data-[state=active]:border-blue-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md"
-            >
-              <Send className="mr-2 h-4 w-4" />
-              Outbox
-            </TabsTrigger>
-            <TabsTrigger
-              value="archive"
-              className="rounded-lg border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 data-[state=active]:border-blue-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md"
-            >
-              <Archive className="mr-2 h-4 w-4" />
-              Arsip
-            </TabsTrigger>
-          </TabsList>
+          <div className="mb-5 overflow-x-auto pb-1">
+            <TabsList className="grid h-auto min-w-[320px] grid-cols-3 gap-2 bg-transparent p-0">
+              <TabsTrigger
+                value="inbox"
+                className="rounded-lg border-2 border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 sm:px-5 sm:text-sm data-[state=active]:border-blue-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+              >
+                <Inbox className="mr-2 h-4 w-4" />
+                Inbox
+              </TabsTrigger>
+              <TabsTrigger
+                value="outbox"
+                className="rounded-lg border-2 border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 sm:px-5 sm:text-sm data-[state=active]:border-blue-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Outbox
+              </TabsTrigger>
+              <TabsTrigger
+                value="archive"
+                className="rounded-lg border-2 border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-blue-300 hover:bg-blue-50 hover:text-blue-900 sm:px-5 sm:text-sm data-[state=active]:border-blue-600 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-md"
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                Arsip
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="inbox">
             <LettersTable

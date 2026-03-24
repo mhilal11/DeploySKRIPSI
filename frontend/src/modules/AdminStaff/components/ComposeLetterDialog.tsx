@@ -134,12 +134,12 @@ export default function ComposeLetterDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogTrigger asChild>
-                <Button className="bg-blue-900 hover:bg-blue-800 text-white">
+                <Button className="w-full bg-blue-900 text-white hover:bg-blue-800 md:w-auto">
                     {triggerLabel}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[90vh] w-full max-w-3xl overflow-hidden border-0 bg-white p-0">
-                <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4">
+            <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-3xl overflow-hidden border-0 bg-white p-0 sm:w-full">
+                <DialogHeader className="space-y-1 border-b border-slate-100 px-4 py-4 sm:px-6">
                     <DialogTitle>Buat Surat Baru</DialogTitle>
                     <DialogDescription>
                         Lengkapi detail surat keluar sebelum mengirimkan ke divisi tujuan.
@@ -147,7 +147,7 @@ export default function ComposeLetterDialog({
                 </DialogHeader>
 
                 <form
-                    className="max-h-[calc(90vh-5rem)] space-y-5 overflow-y-auto px-6 pb-6 pt-4"
+                    className="max-h-[calc(90vh-5rem)] space-y-5 overflow-y-auto px-4 pb-6 pt-4 sm:px-6"
                     onSubmit={(event) => {
                         event.preventDefault();
                         onSubmit();
@@ -380,15 +380,15 @@ export default function ComposeLetterDialog({
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2 pt-2">
+                    <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center">
                         <Button
                             type="submit"
-                            className="bg-blue-900 hover:bg-blue-800 text-white"
+                            className="w-full bg-blue-900 text-white hover:bg-blue-800 sm:w-auto"
                             disabled={processing}
                         >
                             {processing ? 'Mengirim...' : 'Kirim Surat'}
                         </Button>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
                             Batal
                         </Button>
                     </div>

@@ -322,12 +322,15 @@ func AdminStaffLettersArchive(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "Surat sudah berada di arsip."})
 		return
 	}
-	if surat.StatusPersetujuan != "Didisposisi" {
+	if !canArchiveLetterStatus(surat.StatusPersetujuan) {
 		handlers.JSONError(c, http.StatusBadRequest, "Hanya surat yang sudah didisposisi yang dapat diarsipkan.")
 		return
 	}
 
-	_ = dbrepo.ArchiveSuratByID(db, suratID)
+	if err := dbrepo.ArchiveSuratByID(db, suratID); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memindahkan surat ke arsip.")
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "Surat berhasil dipindahkan ke arsip."})
 }
 
@@ -371,8 +374,20 @@ func AdminStaffLettersUnarchive(c *gin.Context) {
 		return
 	}
 
-	_ = dbrepo.UnarchiveSuratByID(db, suratID)
+	if err := dbrepo.UnarchiveSuratByID(db, suratID); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal mengembalikan surat dari arsip.")
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "Surat dikembalikan ke daftar aktif."})
+}
+
+func canArchiveLetterStatus(status string) bool {
+	switch strings.TrimSpace(status) {
+	case "Didisposisi", "Disposisi Final", "Ditolak HR":
+		return true
+	default:
+		return false
+	}
 }
 
 func parseSuratID(c *gin.Context) (int64, bool) {

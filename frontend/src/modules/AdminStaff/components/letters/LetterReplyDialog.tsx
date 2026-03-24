@@ -41,8 +41,8 @@ export function LetterReplyDialog({
 }: LetterReplyDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl border-0 bg-white p-0 overflow-hidden">
-        <DialogHeader className="bg-gradient-to-r from-blue-50 to-slate-50 px-6 py-4 border-b border-slate-200">
+      <DialogContent className="max-h-[90vh] w-[calc(100vw-1rem)] max-w-2xl overflow-hidden border-0 bg-white p-0 sm:w-full">
+        <DialogHeader className="border-b border-slate-200 bg-gradient-to-r from-blue-50 to-slate-50 px-4 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
               <MessageSquare className="h-5 w-5 text-blue-600" />
@@ -58,7 +58,7 @@ export function LetterReplyDialog({
           </div>
         </DialogHeader>
 
-        <div className="px-6 py-5">
+        <div className="max-h-[calc(90vh-5rem)] overflow-y-auto px-4 py-5 sm:px-6">
           <Card className="mb-5 border-blue-200 bg-blue-50/50">
             <div className="p-4">
               <div className="flex items-start gap-3">
@@ -158,20 +158,20 @@ export function LetterReplyDialog({
 
             <Separator />
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
                 disabled={processing}
-                className="border-slate-300 hover:bg-slate-50"
+                className="w-full border-slate-300 hover:bg-slate-50 sm:w-auto"
               >
                 Batal
               </Button>
               <Button
                 type="submit"
                 disabled={processing}
-                className="bg-blue-600 hover:bg-blue-700 shadow-sm"
+                className="w-full bg-blue-600 shadow-sm hover:bg-blue-700 sm:w-auto"
               >
                 {processing ? (
                   <>
