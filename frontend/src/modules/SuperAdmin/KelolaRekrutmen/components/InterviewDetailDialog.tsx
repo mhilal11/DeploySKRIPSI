@@ -41,7 +41,7 @@ export default function InterviewDetailDialog({
 
     return (
         <Dialog open={!!applicant} onOpenChange={() => onClose()}>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-6 transition-all duration-200">
+            <DialogContent className="max-h-[90vh] w-[96vw] overflow-y-auto border-0 p-4 transition-all duration-200 sm:w-full sm:max-w-[500px] sm:p-6">
                 <DialogHeader className="mb-2">
                     <DialogTitle className="text-xl font-bold tracking-tight text-slate-900">
                         Detail Jadwal Interview
@@ -50,8 +50,8 @@ export default function InterviewDetailDialog({
 
                 <div className="space-y-6">
                     {/* Applicant Info - Integrated Card */}
-                    <div className="bg-slate-50/80 rounded-xl p-4 border border-slate-100">
-                        <div className="flex justify-between items-start">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                                 <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Informasi Pelamar</h3>
                                 <p className="text-base font-semibold text-slate-900">{applicant.name}</p>
@@ -69,7 +69,7 @@ export default function InterviewDetailDialog({
                             <h3 className="text-sm font-semibold text-slate-900">Jadwal & Lokasi</h3>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                             {/* Date */}
                             <div className="space-y-1.5">
                                 <div className="flex items-center gap-2 text-slate-500">
@@ -147,11 +147,11 @@ export default function InterviewDetailDialog({
                     </div>
                 </div>
 
-                <DialogFooter className="mt-8">
+                <DialogFooter className="mt-8 flex-col gap-2 sm:flex-row sm:justify-end">
                     <Button
                         onClick={onClose}
                         variant="default"
-                        className="bg-slate-900 hover:bg-slate-800 text-white min-w-[100px]"
+                        className="w-full min-w-[100px] bg-slate-900 text-white hover:bg-slate-800 sm:w-auto"
                     >
                         Tutup
                     </Button>

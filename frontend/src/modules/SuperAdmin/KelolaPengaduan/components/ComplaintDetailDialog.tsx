@@ -121,8 +121,8 @@ export default function ComplaintDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl overflow-hidden border-0 bg-white p-0">
-                <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4">
+            <DialogContent className="max-h-[90vh] w-[96vw] overflow-hidden border-0 bg-white p-0 sm:w-full sm:max-w-4xl">
+                <DialogHeader className="space-y-1 border-b border-slate-100 px-4 py-4 sm:px-6">
                     <DialogTitle>Detail Pengaduan</DialogTitle>
                     <DialogDescription>
                         Pantau konteks laporan karyawan dan perbarui status penanganan.
@@ -135,11 +135,11 @@ export default function ComplaintDetailDialog({
                 </DialogHeader>
 
                 {!complaint ? (
-                    <div className="max-h-[calc(85vh-4.5rem)] overflow-y-auto px-6 py-12 text-center text-sm text-slate-500">
+                    <div className="max-h-[calc(85vh-4.5rem)] overflow-y-auto px-4 py-12 text-center text-sm text-slate-500 sm:px-6">
                         Pilih pengaduan pada tabel untuk melihat detail lengkap.
                     </div>
                 ) : (
-                    <div className="max-h-[calc(85vh-4.5rem)] space-y-6 overflow-y-auto px-6 pb-6 pt-4">
+                    <div className="max-h-[calc(85vh-4.5rem)] space-y-6 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
                         <section className="grid gap-4 md:grid-cols-3">
                             <SummaryCard label="Status">
                                 <StatusBadge status={statusValue} label={statusLabel} />
@@ -217,8 +217,8 @@ export default function ComplaintDetailDialog({
                                         </p>
                                     </div>
                                     {complaint.attachment?.url && (
-                                        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-3 text-sm">
-                                            <div>
+                                        <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                                            <div className="min-w-0">
                                                 <p className="text-xs uppercase tracking-wide text-slate-500">
                                                     Lampiran
                                                 </p>
@@ -230,7 +230,7 @@ export default function ComplaintDetailDialog({
                                                 asChild
                                                 size="sm"
                                                 variant="outline"
-                                                className="border-blue-200 text-blue-900 hover:bg-blue-50"
+                                                className="w-full border-blue-200 text-blue-900 hover:bg-blue-50 sm:w-auto"
                                             >
                                                 <a
                                                     href={complaint.attachment.url}
@@ -335,14 +335,14 @@ export default function ComplaintDetailDialog({
                             <Button
                                 type="button"
                                 variant="outline"
-                                className="sm:min-w-[90px]"
+                                className="w-full sm:min-w-[90px] sm:w-auto"
                                 onClick={() => onOpenChange(false)}
                             >
                                 Tutup
                             </Button>
                             <Button
                                 type="button"
-                                className="bg-blue-900 hover:bg-blue-800 sm:min-w-[120px] text-white"
+                                className="w-full bg-blue-900 text-white hover:bg-blue-800 sm:min-w-[120px] sm:w-auto"
                                 disabled={form.processing}
                                 onClick={handleSubmit}
                             >

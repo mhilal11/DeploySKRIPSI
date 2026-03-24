@@ -47,8 +47,8 @@ export default function AccountDetailDialog({
     }
 
     return (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 px-4">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 px-4 py-6">
+            <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
                 <div className="mb-4">
                     <h2 className="text-lg font-semibold text-blue-900">
                         Account Details
@@ -100,11 +100,11 @@ export default function AccountDetailDialog({
                     />
                 </div>
 
-                <div className="mt-6 flex justify-end gap-3">
+                <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <button
-                                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
                             >
                                 {user.status === 'Active' ? 'Nonaktifkan' : 'Aktifkan'}
                             </button>
@@ -131,7 +131,7 @@ export default function AccountDetailDialog({
                         </AlertDialogContent>
                     </AlertDialog>
                     <button
-                        className="rounded-lg bg-blue-900 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                        className="w-full rounded-lg bg-blue-900 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 sm:w-auto"
                         onClick={() => onOpenChange(false)}
                     >
                         Tutup
@@ -150,9 +150,9 @@ function InfoRow({
     value: React.ReactNode;
 }) {
     return (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 sm:gap-2">
             <span className="text-slate-500">{label}</span>
-            <span className="col-span-2 font-medium text-slate-900">
+            <span className="font-medium text-slate-900 sm:col-span-2">
                 {value ?? '-'}
             </span>
         </div>

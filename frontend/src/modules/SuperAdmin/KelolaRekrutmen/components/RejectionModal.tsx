@@ -51,7 +51,7 @@ export default function RejectionModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-lg p-8 gap-8">
+            <DialogContent className="w-[96vw] gap-6 border-0 p-4 sm:w-full sm:max-w-lg sm:gap-8 sm:p-8">
                 <DialogHeader>
                     <div className="flex items-center gap-4 mb-2">
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-100 ring-4 ring-red-50">
@@ -138,13 +138,13 @@ export default function RejectionModal({
                     </div>
                 </div>
 
-                <DialogFooter className="gap-3 sm:gap-0">
+                <DialogFooter className="flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                     <Button
                         type="button"
                         variant="ghost"
                         onClick={handleClose}
                         disabled={isSubmitting}
-                        className="text-slate-500 hover:text-slate-900 h-11 px-6"
+                        className="h-11 w-full px-6 text-slate-500 hover:text-slate-900 sm:w-auto"
                     >
                         Batal
                     </Button>
@@ -152,7 +152,7 @@ export default function RejectionModal({
                         type="button"
                         onClick={handleSubmit}
                         disabled={isSubmitting}
-                        className="bg-red-600 hover:bg-red-700 text-white shadow-sm h-11 px-6"
+                        className="h-11 w-full bg-red-600 px-6 text-white shadow-sm hover:bg-red-700 sm:w-auto"
                     >
                         {isSubmitting ? 'Memproses...' : 'Konfirmasi Penolakan'}
                     </Button>

@@ -29,7 +29,7 @@ export default function AcceptanceModal({
 }: AcceptanceModalProps) {
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-lg p-8 gap-8">
+            <DialogContent className="w-[96vw] gap-6 border-0 p-4 sm:w-full sm:max-w-lg sm:gap-8 sm:p-8">
                 <DialogHeader>
                     <div className="flex items-center gap-4 mb-2">
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-100 ring-4 ring-green-50">
@@ -81,7 +81,7 @@ export default function AcceptanceModal({
                         </div>
                     )}
 
-                    <div className="rounded-lg bg-blue-50 border border-blue-100 p-4">
+                    <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
                         <div className="flex gap-3">
                             <div className="shrink-0 mt-0.5">
                                 <span className="flex h-2 w-2 rounded-full bg-blue-600 mt-2" />
@@ -93,13 +93,13 @@ export default function AcceptanceModal({
                     </div>
                 </div>
 
-                <DialogFooter className="gap-3 sm:gap-0">
+                <DialogFooter className="flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                     <Button
                         type="button"
                         variant="ghost"
                         onClick={onClose}
                         disabled={isSubmitting}
-                        className="text-slate-500 hover:text-slate-900 h-11 px-6"
+                        className="h-11 w-full px-6 text-slate-500 hover:text-slate-900 sm:w-auto"
                     >
                         Batal
                     </Button>
@@ -107,7 +107,7 @@ export default function AcceptanceModal({
                         type="button"
                         onClick={onConfirm}
                         disabled={isSubmitting}
-                        className="bg-green-600 hover:bg-green-700 text-white shadow-sm h-11 px-6"
+                        className="h-11 w-full bg-green-600 px-6 text-white shadow-sm hover:bg-green-700 sm:w-auto"
                     >
                         {isSubmitting ? 'Memproses...' : 'Konfirmasi Terima'}
                     </Button>

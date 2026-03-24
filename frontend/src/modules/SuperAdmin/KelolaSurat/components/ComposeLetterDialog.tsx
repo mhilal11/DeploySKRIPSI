@@ -134,12 +134,12 @@ export default function ComposeLetterDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogTrigger asChild>
-                <Button className="bg-blue-900 text-white hover:bg-blue-800">
+                <Button className="w-full bg-blue-900 text-white hover:bg-blue-800 sm:w-auto">
                     {triggerLabel}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[90vh] w-full max-w-3xl overflow-hidden border-0 bg-white p-0">
-                <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4">
+            <DialogContent className="max-h-[90vh] w-[96vw] overflow-hidden border-0 bg-white p-0 sm:w-full sm:max-w-3xl">
+                <DialogHeader className="space-y-1 border-b border-slate-100 px-4 py-4 sm:px-6">
                     <DialogTitle>Buat Surat Baru</DialogTitle>
                     <DialogDescription>
                         Atur detail surat dinas dan kirimkan ke divisi tujuan secara terstruktur.
@@ -147,7 +147,7 @@ export default function ComposeLetterDialog({
                 </DialogHeader>
 
                 <form
-                    className="max-h-[calc(90vh-5rem)] space-y-5 overflow-y-auto px-6 pb-6 pt-4"
+                    className="max-h-[calc(90vh-5rem)] space-y-5 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6"
                     onSubmit={(event) => {
                         event.preventDefault();
                         onSubmit();
@@ -356,8 +356,8 @@ export default function ComposeLetterDialog({
                             onChange={handleAttachmentChange}
                         />
                         {data.lampiran && (
-                            <div className="mt-3 flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3 text-sm">
-                                <div>
+                            <div className="mt-3 flex flex-col gap-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                                <div className="min-w-0">
                                     <p className="font-medium text-slate-900">
                                         {data.lampiran.name}
                                     </p>
@@ -367,7 +367,7 @@ export default function ComposeLetterDialog({
                                 </div>
                                 <button
                                     type="button"
-                                    className="text-red-500"
+                                    className="self-end text-red-500 sm:self-auto"
                                     onClick={() => setData('lampiran', null)}
                                 >
                                     <X className="h-4 w-4" />
@@ -379,15 +379,15 @@ export default function ComposeLetterDialog({
                         )}
                     </div>
 
-                    <div className="flex items-center gap-2 pt-2">
+                    <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center">
                         <Button
                             type="submit"
-                            className="bg-blue-900 hover:bg-blue-800 text-white"
+                            className="w-full bg-blue-900 text-white hover:bg-blue-800 sm:w-auto"
                             disabled={processing}
                         >
                             {processing ? 'Mengirim...' : 'Kirim Surat'}
                         </Button>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                        <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
                             Batal
                         </Button>
                     </div>

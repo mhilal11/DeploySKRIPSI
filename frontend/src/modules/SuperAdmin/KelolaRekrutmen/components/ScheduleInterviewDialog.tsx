@@ -290,7 +290,7 @@ export default function ScheduleInterviewDialog({
             open={open}
             onOpenChange={onOpenChange}
         >
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto p-6 transition-all duration-200">
+            <DialogContent className="max-h-[90vh] w-[96vw] overflow-y-auto border-0 p-4 transition-all duration-200 sm:w-full sm:max-w-[500px] sm:p-6">
                 <DialogHeader className="mb-6 space-y-3">
                     <div className="flex items-center justify-between">
                         <DialogTitle className="text-xl font-bold tracking-tight text-slate-900">
@@ -306,7 +306,7 @@ export default function ScheduleInterviewDialog({
 
                     {/* SECTION 1: WAKTU */}
                     <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="grid gap-2">
                                 <Label htmlFor="date" className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                     <Calendar className="w-3.5 h-3.5" />
@@ -345,7 +345,7 @@ export default function ScheduleInterviewDialog({
                         </div>
 
                         {/* Wrapper Waktu Mulai & Selesai agar sejajar */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="grid gap-2">
                                 <Label htmlFor="time" className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                                     <Clock className="w-3.5 h-3.5" />
@@ -482,19 +482,19 @@ export default function ScheduleInterviewDialog({
                     </div>
 
 
-                    <DialogFooter className="pt-2">
+                    <DialogFooter className="flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
                         <Button
                             type="button"
                             variant="outline"
                             onClick={() => onOpenChange(false)}
-                            className="h-10 px-8"
+                            className="h-10 w-full px-8 sm:w-auto"
                         >
                             Batal
                         </Button>
                         <Button
                             type="submit"
                             disabled={processing}
-                            className="h-10 px-8 bg-blue-600 hover:bg-blue-700 text-white min-w-[140px]"
+                            className="h-10 w-full min-w-[140px] bg-blue-600 px-8 text-white hover:bg-blue-700 sm:w-auto"
                         >
                             {processing ? (
                                 <Loader2 className="h-4 w-4 animate-spin mr-2" />

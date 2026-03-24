@@ -56,14 +56,14 @@ export default function ApplicantDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-xl border-0 bg-white p-0">
-                <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4">
+            <DialogContent className="max-h-[90vh] w-[96vw] overflow-hidden border-0 bg-white p-0 sm:w-full sm:max-w-xl">
+                <DialogHeader className="space-y-1 border-b border-slate-100 px-4 py-4 sm:px-6">
                     <DialogTitle>Detail Pelamar</DialogTitle>
                     <DialogDescription>
                         Informasi singkat kandidat untuk memudahkan proses screening lanjutan.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="px-6 pb-6 pt-4">
+                <div className="max-h-[calc(90vh-8rem)] overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
                     <div className="mb-6 grid gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-2">
                         <Detail label="ID Lamaran" value={formatApplicationId(applicant.id)} />
                         <Detail label="Nama" value={applicant.name} />
@@ -76,17 +76,17 @@ export default function ApplicantDetailDialog({
                     </div>
                 </div>
 
-                <DialogFooter className="border-t border-slate-100 p-4 flex gap-2">
+                <DialogFooter className="flex flex-col-reverse gap-2 border-t border-slate-100 p-4 sm:flex-row">
                     {/* Tombol Lihat Dokumen */}
                     <Button 
                         variant="secondary" 
                         onClick={handleViewDocument}
-                        className="flex items-center"
+                        className="flex w-full items-center sm:w-auto"
                     >
                         <FileText className="h-4 w-4 mr-2" />
                         Lihat Dokumen
                     </Button>
-                    <Button onClick={() => onOpenChange(false)}>Tutup</Button>
+                    <Button className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>Tutup</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

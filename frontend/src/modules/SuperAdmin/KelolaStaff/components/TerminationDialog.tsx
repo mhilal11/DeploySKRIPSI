@@ -113,20 +113,20 @@ export default function TerminationDialog({
                 }}
             >
                 <DialogTrigger asChild>
-                    <Button className="bg-blue-900 text-white hover:bg-blue-800">
+                    <Button className="w-full bg-blue-900 text-white hover:bg-blue-800 sm:w-auto">
                         <UserMinus className="mr-2 h-4 w-4" />
                         Input Termination
                     </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl border-0 bg-white p-0">
-                    <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4">
+                <DialogContent className="max-h-[90vh] w-[96vw] overflow-hidden border-0 bg-white p-0 sm:w-full sm:max-w-2xl">
+                    <DialogHeader className="space-y-1 border-b border-slate-100 px-4 py-4 sm:px-6">
                         <DialogTitle>Input Termination Baru</DialogTitle>
                         <DialogDescription>
                             Pastikan data karyawan lengkap sebelum mengajukan proses offboarding.
                         </DialogDescription>
                     </DialogHeader>
                     <form
-                        className="space-y-5 px-6 pb-6 pt-4"
+                        className="space-y-5 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6"
                         onSubmit={(event) => {
                             event.preventDefault();
                             handleSubmit();
@@ -146,7 +146,7 @@ export default function TerminationDialog({
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            className="border-blue-200 text-blue-900 hover:bg-blue-50"
+                                            className="w-full border-blue-200 text-blue-900 hover:bg-blue-50 md:w-auto"
                                             onClick={() => setPickerOpen(true)}
                                         >
                                             <Users className="mr-2 h-4 w-4" />
@@ -242,14 +242,14 @@ export default function TerminationDialog({
             </Dialog>
 
             <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-                <DialogContent className="max-w-3xl border border-slate-200 bg-white p-0">
-                    <DialogHeader className="space-y-1 border-b border-slate-100 px-6 py-4">
+                <DialogContent className="max-h-[90vh] w-[96vw] overflow-hidden border border-slate-200 bg-white p-0 sm:w-full sm:max-w-3xl">
+                    <DialogHeader className="space-y-1 border-b border-slate-100 px-4 py-4 sm:px-6">
                         <DialogTitle>Pilih Staff</DialogTitle>
                         <DialogDescription>
                             Pilih karyawan staff aktif untuk mengisi ID karyawan secara otomatis.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 px-6 py-4">
+                    <div className="space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
                         <div className="relative">
                             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                             <Input
@@ -289,10 +289,11 @@ export default function TerminationDialog({
                             )}
                         </div>
                     </div>
-                    <DialogFooter className="border-t border-slate-100 px-6 py-4">
+                    <DialogFooter className="border-t border-slate-100 px-4 py-4 sm:px-6">
                         <Button
                             type="button"
                             variant="outline"
+                            className="w-full sm:w-auto"
                             onClick={() => setPickerOpen(false)}
                         >
                             Tutup

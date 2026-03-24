@@ -34,11 +34,11 @@ export default function ApplicantProfileDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto border-0 bg-white p-0">
+            <DialogContent className="max-h-[90vh] w-[96vw] overflow-y-auto border-0 bg-white p-0 sm:w-full sm:max-w-5xl">
                 <DialogHeader className="sr-only">
                     <DialogTitle>Profil Pelamar - {applicant.name}</DialogTitle>
                 </DialogHeader>
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                     <ApplicantProfileView
                         applicant={applicant}
                         onAccept={onAccept}

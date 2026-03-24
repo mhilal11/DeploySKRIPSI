@@ -328,8 +328,8 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
 
     return (
         <Dialog open={Boolean(division)} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-2xl p-6">
-                <DialogHeader>
+            <DialogContent className="max-h-[90vh] w-[96vw] overflow-hidden border-0 bg-white p-0 sm:w-full sm:max-w-2xl">
+                <DialogHeader className="space-y-1 border-b border-slate-100 px-4 py-4 sm:px-6">
                     <DialogTitle>{form.data.job_id ? 'Edit Lowongan' : 'Publikasikan Lowongan'}</DialogTitle>
                     <DialogDescription>
                         Lengkapi detail rekrutmen untuk divisi {division?.name}.
@@ -337,8 +337,8 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                 </DialogHeader>
 
                 {division && (
-                    <form onSubmit={handleSubmit} className="space-y-6 mt-4">
-                        <div className="max-h-[65vh] space-y-6 overflow-y-auto pr-1">
+                    <form onSubmit={handleSubmit} className="space-y-6 px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
+                        <div className="max-h-[calc(90vh-11rem)] space-y-6 overflow-y-auto pr-1">
                             <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
                                 Kapasitas {division.current_staff}/{division.capacity}  Slot tersedia {division.available_slots}
                                 {division.available_slots === 0 && (
@@ -459,11 +459,11 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                             />
                         </div>
 
-                        <DialogFooter className="flex justify-end gap-2 pt-2">
-                            <Button type="button" className="bg-red-600 text-white hover:bg-red-700" onClick={onClose}>
+                        <DialogFooter className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                            <Button type="button" className="w-full bg-red-600 text-white hover:bg-red-700 sm:w-auto" onClick={onClose}>
                                 Batalkan
                             </Button>
-                            <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700" disabled={form.processing}>
+                            <Button type="submit" className="w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto" disabled={form.processing}>
                                 Simpan Lowongan
                             </Button>
                         </DialogFooter>
