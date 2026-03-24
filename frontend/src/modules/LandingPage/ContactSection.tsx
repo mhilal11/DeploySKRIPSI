@@ -43,7 +43,7 @@ export function ContactSection() {
                 placeholder="Masukkan email Anda"
                 className="bg-white/15 border-white/30 text-white placeholder:text-white/60 focus:border-cyan-400/50 backdrop-blur-sm rounded-[16px]"
               />
-              <Button className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white whitespace-nowrap backdrop-blur-sm border border-cyan-400/30 rounded-[16px] shadow-[0_4px_16px_rgba(34,211,238,0.4)]">
+              <Button className="w-full whitespace-nowrap rounded-[16px] border border-cyan-400/30 bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_4px_16px_rgba(34,211,238,0.4)] backdrop-blur-sm hover:from-cyan-600 hover:to-blue-700 sm:w-auto">
                 Berlangganan
               </Button>
             </div>
@@ -129,7 +129,7 @@ export function ContactSection() {
               </li>
               <li className="flex items-center gap-3">
                 <Mail className="w-5 h-5 text-cyan-400 flex-shrink-0" />
-                <span className="text-white/80 text-sm">info@lintasdataprima.com</span>
+                <span className="break-all text-sm text-white/80">info@lintasdataprima.com</span>
               </li>
             </ul>
           </div>

@@ -137,12 +137,12 @@ export function CareersSection({ jobs }: CareersSectionProps) {
             </p>
           </div>
 
-          <div data-aos="fade-left" className="relative">
-            <div className="rounded-[28px] overflow-hidden shadow-[0_8px_32px_rgba(139,92,246,0.4)] border border-white/30 backdrop-blur-sm">
+          <div data-aos="fade-left" className="relative mx-auto w-full max-w-[32rem] lg:max-w-none">
+            <div className="overflow-hidden rounded-[28px] border border-white/30 shadow-[0_8px_32px_rgba(139,92,246,0.4)] backdrop-blur-sm">
               <ImageWithFallback
                 src="https://images.unsplash.com/photo-1748346918817-0b1b6b2f9bab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBvZmZpY2UlMjB0ZWFtfGVufDF8fHx8MTc2Mjg2NTQ2OHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
                 alt="Tim Kami"
-                className="w-full h-auto"
+                className="h-auto w-full"
               />
               <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/40 to-cyan-500/20" />
             </div>
@@ -204,7 +204,7 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                   key={`${job.id ?? job.division}-${index}`}
                   data-aos="fade-up"
                   data-aos-delay={index * 50}
-                  className={`relative group bg-white/15 backdrop-blur-[30px] border border-white/30 rounded-[24px] p-6 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(34,211,238,0.4)] hover:border-cyan-400/50 ${canApply ? 'hover:-translate-y-1 cursor-pointer' : 'opacity-95'
+                  className={`relative group bg-white/15 backdrop-blur-[30px] border border-white/30 rounded-[24px] p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(34,211,238,0.4)] hover:border-cyan-400/50 ${canApply ? 'hover:-translate-y-1 cursor-pointer' : 'opacity-95'
                     }`}
                 >
                   {canApply && (
@@ -216,9 +216,9 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                     />
                   )}
                   <div className="relative z-0 space-y-4">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/20 text-cyan-300 rounded-full text-sm border border-cyan-400/40">
-                      <span>{job.division}</span>
-                      {slots && <span className="text-xs text-cyan-200">{slots}</span>}
+                    <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-cyan-400/40 bg-cyan-500/20 px-3 py-1 text-sm text-cyan-300">
+                      <span className="break-words">{job.division}</span>
+                      {slots && <span className="text-xs text-cyan-200 break-words">{slots}</span>}
                     </div>
 
                     <div>
@@ -258,7 +258,7 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                         </p>
                         <div className="space-y-1">
                           {requirements.map((requirement, requirementIndex) => (
-                            <p key={`${job.id ?? job.division}-req-${requirementIndex}`} className="text-xs text-white/75">
+                            <p key={`${job.id ?? job.division}-req-${requirementIndex}`} className="break-words text-xs text-white/75">
                               {requirementIndex + 1}. {requirement}
                             </p>
                           ))}
@@ -270,27 +270,27 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                       <p className="text-sm text-cyan-200">Kriteria Kelayakan</p>
                       <div className="flex flex-wrap gap-2">
                         {ageRangeText && (
-                          <span className="rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
+                          <span className="max-w-full break-words rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
                             Umur: {ageRangeText}
                           </span>
                         )}
                         {gender && (
-                          <span className="rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
+                          <span className="max-w-full break-words rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
                             Gender: {gender}
                           </span>
                         )}
                         {minEducation && (
-                          <span className="rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
+                          <span className="max-w-full break-words rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
                             Min Pendidikan: {minEducation}
                           </span>
                         )}
                         {minExperience !== null && (
-                          <span className="rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
+                          <span className="max-w-full break-words rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
                             Min Pengalaman: {minExperience} tahun
                           </span>
                         )}
                         {programStudiesText && (
-                          <span className="rounded-full border border-cyan-300/30 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-100">
+                          <span className="max-w-full break-words rounded-full border border-cyan-300/30 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-100">
                             Prodi: {programStudiesText}
                           </span>
                         )}
@@ -298,7 +298,7 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                       {additionalCriteriaEntries.length > 0 && (
                         <div className="space-y-1 border-t border-white/10 pt-2">
                           {additionalCriteriaEntries.map(([key, value]) => (
-                            <p key={`${job.id ?? job.division}-criteria-${key}`} className="text-[11px] text-white/65">
+                            <p key={`${job.id ?? job.division}-criteria-${key}`} className="break-words text-[11px] text-white/65">
                               {key}: {typeof value === 'string' ? value : JSON.stringify(value)}
                             </p>
                           ))}

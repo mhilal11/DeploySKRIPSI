@@ -1,7 +1,7 @@
 import { Menu, X } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MouseEvent, useState } from 'react';
+import { MouseEvent, useEffect, useState } from 'react';
 
 import { Button } from '@/shared/components/ui/button';
 import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
@@ -32,6 +32,21 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
     { label: 'Karir', href: '#careers' },
     { label: 'Kontak', href: '#contact' },
   ];
+
+  useEffect(() => {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    if (isSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isSidebarOpen]);
 
   const handleMenuClick = (
     e: MouseEvent<HTMLAnchorElement>,
@@ -151,7 +166,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
 
       {/* Sidebar mobile */}
       <div
-        className={`fixed top-0 right-0 bottom-0 w-72 bg-white/10 backdrop-blur-[40px] shadow-[0_8px_32px_rgba(139,92,246,0.3)] z-50 lg:hidden border-l border-white/20 transition-transform duration-300 ease-out ${
+        className={`fixed top-0 right-0 bottom-0 w-[min(18rem,100vw)] bg-white/10 backdrop-blur-[40px] shadow-[0_8px_32px_rgba(139,92,246,0.3)] z-50 lg:hidden border-l border-white/20 transition-transform duration-300 ease-out ${
           isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
