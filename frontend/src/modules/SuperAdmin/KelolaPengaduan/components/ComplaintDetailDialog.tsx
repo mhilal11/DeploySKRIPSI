@@ -70,11 +70,28 @@ export default function ComplaintDetailDialog({
                     description: `Pengaduan ${complaint.code} telah disimpan.`,
                 });
                 void router.reload({
-                    only: ['complaints', 'stats', 'sidebarNotifications'],
+                    only: [
+                        'complaints',
+                        'stats',
+                        'complaintTrend',
+                        'categoryOptions',
+                        'sidebarNotifications',
+                    ],
                     preserveState: true,
                     preserveScroll: true,
                     replace: true,
                     onSuccess: () => onOpenChange(false),
+                });
+            },
+            onError: (errors) => {
+                const firstError = Object.values(errors ?? {}).find(
+                    (value) => typeof value === 'string' && value.trim().length > 0,
+                );
+                toast.error('Gagal memperbarui pengaduan', {
+                    description:
+                        typeof firstError === 'string'
+                            ? firstError
+                            : 'Perubahan belum tersimpan. Coba lagi.',
                 });
             },
         });

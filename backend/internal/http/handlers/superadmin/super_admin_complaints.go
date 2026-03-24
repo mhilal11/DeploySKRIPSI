@@ -4,7 +4,10 @@ import (
 	"hris-backend/internal/http/handlers"
 	dbrepo "hris-backend/internal/repository"
 
+	"math"
 	"net/http"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -76,12 +79,23 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		Priority: normalizeComplaintPriority(filters["priority"]),
 		Category: filters["category"],
 	}
-	complaints, _ := repo.ListComplaintsByFiltersPaged(filterConfig, pagination.Limit, pagination.Offset)
-	totalComplaints, _ := repo.CountComplaintsByFilters(filterConfig)
-	allComplaints, _ := dbrepo.ListComplaintsByFilters(db, filterConfig)
+	complaints, err := repo.ListComplaintsByFiltersPaged(filterConfig, pagination.Limit, pagination.Offset)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat daftar pengaduan")
+		return
+	}
+	totalComplaints, err := repo.CountComplaintsByFilters(filterConfig)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menghitung daftar pengaduan")
+		return
+	}
+	allComplaints, err := dbrepo.ListComplaintsByFilters(db, filterConfig)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat ringkasan pengaduan")
+		return
+	}
 
 	data := make([]map[string]any, 0, len(complaints))
-	categoryOptions := map[string]bool{}
 	for _, complaint := range complaints {
 		status := normalizeComplaintStatus(complaint.Status)
 		if status == "" {
@@ -90,10 +104,6 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		priority := normalizeComplaintPriority(complaint.Priority)
 		if priority == "" {
 			priority = models.ComplaintPriorityMedium
-		}
-
-		if complaint.Category != "" {
-			categoryOptions[complaint.Category] = true
 		}
 		reporterName := "Anonim"
 		reporterEmail := ""
@@ -144,18 +154,26 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 	}
 	newFilter := filterConfig
 	newFilter.Status = models.ComplaintStatusNew
-	stats["new"], _ = repo.CountComplaintsByFilters(newFilter)
+	stats["new"], err = repo.CountComplaintsByFilters(newFilter)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menghitung pengaduan baru")
+		return
+	}
 	inProgressFilter := filterConfig
 	inProgressFilter.Status = models.ComplaintStatusInProgress
-	stats["in_progress"], _ = repo.CountComplaintsByFilters(inProgressFilter)
+	stats["in_progress"], err = repo.CountComplaintsByFilters(inProgressFilter)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menghitung pengaduan diproses")
+		return
+	}
 	resolvedFilter := filterConfig
 	resolvedFilter.Status = models.ComplaintStatusResolved
-	stats["resolved"], _ = repo.CountComplaintsByFilters(resolvedFilter)
-
-	categories := []string{}
-	for k := range categoryOptions {
-		categories = append(categories, k)
+	stats["resolved"], err = repo.CountComplaintsByFilters(resolvedFilter)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menghitung pengaduan selesai")
+		return
 	}
+	categories := collectComplaintCategories(allComplaints)
 
 	statusOptions := []map[string]string{}
 	for value, label := range models.ComplaintStatusLabels {
@@ -166,6 +184,11 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 	for value, label := range models.ComplaintPriorityLabels {
 		priorityOptions = append(priorityOptions, map[string]string{"value": value, "label": label})
 	}
+	sort.Slice(statusOptions, func(i, j int) bool { return statusOptions[i]["label"] < statusOptions[j]["label"] })
+	sort.Slice(priorityOptions, func(i, j int) bool { return priorityOptions[i]["label"] < priorityOptions[j]["label"] })
+
+	paginationMeta := buildComplaintPaginationMeta(pagination.Page, pagination.Limit, totalComplaints)
+	paginationLinks := buildComplaintPaginationLinks(c, pagination.Page, pagination.Limit, totalComplaints)
 
 	c.JSON(http.StatusOK, gin.H{
 		"filters": filters,
@@ -176,7 +199,8 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		},
 		"complaints": gin.H{
 			"data":  data,
-			"links": []any{},
+			"links": paginationLinks,
+			"meta":  paginationMeta,
 		},
 		"pagination":           handlers.BuildPaginationMeta(pagination.Page, pagination.Limit, totalComplaints),
 		"statusOptions":        statusOptions,
@@ -350,16 +374,135 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 		resolvedAt = &now
 	}
 
-	_ = repo.UpdateComplaint(dbrepo.ComplaintUpdateInput{
+	if err := repo.UpdateComplaint(dbrepo.ComplaintUpdateInput{
 		ID:              complaintID,
 		Status:          status,
 		Priority:        priority,
 		ResolutionNotes: resolution,
 		HandledByID:     user.ID,
 		ResolvedAt:      resolvedAt,
-	})
+	}); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Pengaduan gagal diperbarui")
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Pengaduan berhasil diperbarui."})
+}
+
+func collectComplaintCategories(rows []models.Complaint) []string {
+	seen := map[string]bool{}
+	categories := make([]string, 0, len(rows))
+	for _, row := range rows {
+		category := strings.TrimSpace(row.Category)
+		if category == "" || seen[category] {
+			continue
+		}
+		seen[category] = true
+		categories = append(categories, category)
+	}
+	sort.Strings(categories)
+	return categories
+}
+
+func buildComplaintPaginationMeta(page, limit, total int) map[string]any {
+	if page < 1 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
+	lastPage := 1
+	if total > 0 {
+		lastPage = int(math.Ceil(float64(total) / float64(limit)))
+		if lastPage < 1 {
+			lastPage = 1
+		}
+	}
+	if page > lastPage {
+		page = lastPage
+	}
+
+	var from any
+	var to any
+	if total > 0 {
+		fromValue := ((page - 1) * limit) + 1
+		toValue := fromValue + limit - 1
+		if toValue > total {
+			toValue = total
+		}
+		from = fromValue
+		to = toValue
+	}
+
+	return map[string]any{
+		"current_page": page,
+		"last_page":    lastPage,
+		"per_page":     limit,
+		"total":        total,
+		"from":         from,
+		"to":           to,
+	}
+}
+
+func buildComplaintPaginationLinks(c *gin.Context, page, limit, total int) []map[string]any {
+	if page < 1 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
+	lastPage := 1
+	if total > 0 {
+		lastPage = int(math.Ceil(float64(total) / float64(limit)))
+		if lastPage < 1 {
+			lastPage = 1
+		}
+	}
+	if page > lastPage {
+		page = lastPage
+	}
+
+	links := make([]map[string]any, 0, lastPage+2)
+	links = append(links, map[string]any{
+		"url":    complaintPageURL(c, page-1, lastPage),
+		"label":  "&laquo; Previous",
+		"active": false,
+	})
+	for currentPage := 1; currentPage <= lastPage; currentPage++ {
+		links = append(links, map[string]any{
+			"url":    complaintPageURL(c, currentPage, lastPage),
+			"label":  strconv.Itoa(currentPage),
+			"active": currentPage == page,
+		})
+	}
+	links = append(links, map[string]any{
+		"url":    complaintPageURL(c, page+1, lastPage),
+		"label":  "Next &raquo;",
+		"active": false,
+	})
+	return links
+}
+
+func complaintPageURL(c *gin.Context, page, lastPage int) any {
+	if page < 1 || page > lastPage {
+		return nil
+	}
+	query := url.Values{}
+	for key, values := range c.Request.URL.Query() {
+		query[key] = append([]string(nil), values...)
+	}
+	if page <= 1 {
+		query.Del("page")
+	} else {
+		query.Set("page", strconv.Itoa(page))
+	}
+	encoded := query.Encode()
+	if encoded == "" {
+		return c.Request.URL.Path
+	}
+	return c.Request.URL.Path + "?" + encoded
 }
 
 func normalizeComplaintStatus(raw string) string {

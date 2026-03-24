@@ -65,9 +65,9 @@ type DashboardPageProps = PageProps<{
 }>;
 
 export default function Dashboard({
-    applicationsStatus,
-    applications,
-    stats,
+    applicationsStatus = [],
+    applications = [],
+    stats = { totalApplications: 0, latestStatus: null },
     isProfileComplete = true,
     showProfileReminder = false,
 }: DashboardPageProps) {
@@ -85,15 +85,22 @@ export default function Dashboard({
         setProfileReminderOpen(showProfileReminder);
     }, [showProfileReminder]);
 
+    const safeApplicationsStatus = Array.isArray(applicationsStatus) ? applicationsStatus : [];
+    const safeApplications = Array.isArray(applications) ? applications : [];
+    const safeStats =
+        stats && typeof stats === 'object'
+            ? stats
+            : { totalApplications: 0, latestStatus: null };
+
     // Calculate Stats
-    const totalApplications = applicationsStatus.length;
-    const inProgress = applicationsStatus.filter(
+    const totalApplications = safeApplicationsStatus.length;
+    const inProgress = safeApplicationsStatus.filter(
         (app) => !['Rejected', 'Hired'].includes(app.status)
     ).length;
-    const rejected = applicationsStatus.filter(
+    const rejected = safeApplicationsStatus.filter(
         (app) => app.status === 'Rejected'
     ).length;
-    const hired = applicationsStatus.filter(
+    const hired = safeApplicationsStatus.filter(
         (app) => app.status === 'Hired'
     ).length;
 
@@ -141,7 +148,7 @@ export default function Dashboard({
 
                 {/* Application Status Section */}
                 <ApplicationStatusSection
-                    applicationsStatus={applicationsStatus}
+                    applicationsStatus={safeApplicationsStatus}
                     totalApplications={totalApplications}
                     inProgress={inProgress}
                     rejected={rejected}
@@ -155,7 +162,7 @@ export default function Dashboard({
                 {/* Documents Section */}
                 <div className="mt-6">
                     <DocumentsCard
-                        applications={applications}
+                        applications={safeApplications}
                         onNewApplication={navigateToApplications}
                     />
                 </div>
@@ -165,7 +172,7 @@ export default function Dashboard({
                         {
                             tone: 'warning',
                             message:
-                                stats.totalApplications === 0
+                                safeStats.totalApplications === 0
                                     ? 'Ajukan lamaran pertama Anda untuk memulai proses rekrutmen.'
                                     : 'Pantau perkembangan lamaran Anda secara berkala.',
                         },
@@ -177,8 +184,8 @@ export default function Dashboard({
                         {
                             tone: 'success',
                             message:
-                                stats.latestStatus
-                                    ? `Status lamaran terbaru Anda: ${stats.latestStatus}.`
+                                safeStats.latestStatus
+                                    ? `Status lamaran terbaru Anda: ${safeStats.latestStatus}.`
                                     : 'Setelah mengirim lamaran, status terbaru akan ditampilkan di sini.',
                         },
                     ]}
@@ -250,7 +257,6 @@ export default function Dashboard({
         </>
     );
 }
-
 
 
 
