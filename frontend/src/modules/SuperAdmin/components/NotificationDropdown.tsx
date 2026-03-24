@@ -9,6 +9,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/shared/components/ui/button';
 import {
@@ -68,9 +69,11 @@ export default function NotificationDropdown({
   const [currentPage, setCurrentPage] = useState(1);
   const [lastPage, setLastPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchNotifications = async (page: number) => {
     setLoading(true);
+    setLoadError(null);
 
     try {
       const { data } = await api.get<PaginatedResponse>(
@@ -80,17 +83,25 @@ export default function NotificationDropdown({
         }
       );
 
-      console.log('Notification response:', data);
-
       setNotifications(data.data);
       setCurrentPage(data.current_page ?? page);
-      setLastPage(data.last_page);
+      setLastPage(data.last_page ?? 1);
     } catch (error) {
-      console.error('Failed to fetch notifications:', error);
+      let message = 'Gagal memuat notifikasi.';
       if (isAxiosError(error)) {
-        console.error('Response data:', error.response?.data);
-        console.error('Response status:', error.response?.status);
+        const payload = error.response?.data as
+          | { message?: string; errors?: Record<string, string> }
+          | undefined;
+        message =
+          payload?.errors?._form ||
+          payload?.message ||
+          message;
       }
+      setLoadError(message);
+      toast.error(message);
+      setNotifications([]);
+      setCurrentPage(1);
+      setLastPage(1);
     } finally {
       setLoading(false);
     }
@@ -138,6 +149,18 @@ export default function NotificationDropdown({
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+              </div>
+            ) : loadError ? (
+              <div className="flex flex-col items-center justify-center py-8 px-3 text-center">
+                <div className="w-12 h-12 rounded-full bg-rose-50 flex items-center justify-center mb-2">
+                  <Mail className="w-6 h-6 text-rose-400" />
+                </div>
+                <p className="text-xs text-slate-700 font-medium">
+                  Notifikasi belum bisa dimuat
+                </p>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {loadError}
+                </p>
               </div>
             ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 px-3">

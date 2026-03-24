@@ -92,10 +92,9 @@ export default function StaffResignation() {
         if (hasSubmitted || !form.data.confirmation) return;
 
         const trimmedReason = form.data.reason.trim();
-        const trimmedSuggestion = form.data.suggestion.trim();
 
-        if (!form.data.effective_date || !trimmedReason || !trimmedSuggestion) {
-            setClientError("Semua field wajib diisi.");
+        if (!form.data.effective_date || !trimmedReason) {
+            setClientError("Tanggal efektif dan alasan resign wajib diisi.");
             return;
         }
 
@@ -285,7 +284,6 @@ export default function StaffResignation() {
                                         <Textarea
                                             rows={3}
                                             value={form.data.suggestion}
-                                            required
                                             onChange={(e) =>
                                                 form.setData(
                                                     "suggestion",
@@ -318,8 +316,7 @@ export default function StaffResignation() {
                                                 form.processing ||
                                                 !form.data.confirmation ||
                                                 !form.data.effective_date ||
-                                                !form.data.reason.trim() ||
-                                                !form.data.suggestion.trim()
+                                                !form.data.reason.trim()
                                             }
                                             className="bg-blue-900 text-white hover:bg-blue-800"
                                         >

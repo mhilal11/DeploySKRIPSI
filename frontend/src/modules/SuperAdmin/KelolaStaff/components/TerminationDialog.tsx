@@ -84,7 +84,19 @@ export default function TerminationDialog({
                     replace: true,
                 });
             },
-            onError: () => toast.error('Gagal menyimpan data, periksa input Anda'),
+            onError: (errors) => {
+                const firstError =
+                    errors?.employee_code ||
+                    errors?.type ||
+                    errors?.effective_date ||
+                    errors?.reason ||
+                    errors?._form;
+                toast.error(
+                    typeof firstError === 'string'
+                        ? firstError
+                        : 'Gagal menyimpan data, periksa input Anda.',
+                );
+            },
         });
     };
 

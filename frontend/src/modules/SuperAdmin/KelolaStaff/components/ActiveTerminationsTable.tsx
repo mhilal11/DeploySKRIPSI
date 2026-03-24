@@ -72,8 +72,13 @@ export default function ActiveTerminationsTable({
                         replace: true,
                     });
                 },
-                onError: () => {
-                    toast.error('Gagal membatalkan offboarding');
+                onError: (errors) => {
+                    const firstError = errors?._form;
+                    toast.error(
+                        typeof firstError === 'string'
+                            ? firstError
+                            : 'Gagal membatalkan offboarding',
+                    );
                 },
             }
         );

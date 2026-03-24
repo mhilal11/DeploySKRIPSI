@@ -1,5 +1,5 @@
 ﻿import { CheckCircle } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -32,7 +32,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/shared/components/ui/tooltip";
-import { router, useForm } from '@/shared/lib/inertia';
+import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
+import { useForm, usePageManager } from '@/shared/lib/inertia';
 
 import { TerminationRecord } from '../types';
 
@@ -51,6 +52,7 @@ export default function ChecklistDialog({
     tooltip,
 }: ChecklistDialogProps) {
     const [open, setOpen] = useState(false);
+    const { mergeProps } = usePageManager();
     const defaultChecklist = useMemo(
         () =>
             checklistTemplate.reduce<Record<string, boolean>>(
@@ -68,6 +70,19 @@ export default function ChecklistDialog({
         notes: termination.notes ?? '',
         progress: termination.progress ?? 0,
     });
+    const { setData, clearErrors } = form;
+
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
+        setData({
+            checklist: defaultChecklist,
+            notes: termination.notes ?? '',
+            progress: termination.progress ?? 0,
+        });
+        clearErrors();
+    }, [clearErrors, defaultChecklist, open, setData, termination.notes, termination.progress]);
 
     const totalItems = checklistTemplate.length || 1;
     const computeProgress = (checklist: Record<string, boolean>) => {
@@ -89,43 +104,79 @@ export default function ChecklistDialog({
     const completedItems = Object.values(form.data.checklist).filter(Boolean).length;
     const allChecklistCompleted = completedItems === totalItems;
 
+    const refreshChecklistData = async () => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        try {
+            const { data } = await api.get(
+                apiUrl(window.location.pathname + window.location.search),
+            );
+            mergeProps(data, [
+                'stats',
+                'terminations',
+                'inactiveEmployees',
+                'staffOptions',
+                'checklistTemplate',
+                'sidebarNotifications',
+            ]);
+        } catch (error) {
+            let message = 'Data offboarding terbaru gagal dimuat ulang.';
+            if (isAxiosError(error)) {
+                const payload = error.response?.data as
+                    | { message?: string; errors?: Record<string, string> }
+                    | undefined;
+                message =
+                    payload?.errors?._form ||
+                    payload?.message ||
+                    message;
+            }
+            toast.error(message);
+        }
+    };
+
     const handleSubmit = (
         statusOverride?: TerminationRecord['status'],
         options: {
             closeAfterSuccess?: boolean;
             progressOverride?: number;
+            checklistOverride?: Record<string, boolean>;
         } = {}
     ) => {
-        const computedNextStatus = computeStatus(form.data.checklist);
+        const nextChecklist = options.checklistOverride ?? form.data.checklist;
+        const computedNextStatus = computeStatus(nextChecklist);
         const resolvedStatus = statusOverride ?? computedNextStatus;
         const nextProgress =
             typeof options.progressOverride === 'number'
                 ? options.progressOverride
                 : resolvedStatus === 'Selesai'
                     ? 100
-                    : computeProgress(form.data.checklist);
+                    : computeProgress(nextChecklist);
 
         form.transform((data) => ({
             ...data,
+            checklist: nextChecklist,
             status: resolvedStatus,
             progress: nextProgress,
         }));
 
         form.patch(route('super-admin.staff.update', termination.id), {
             preserveScroll: true,
-            onSuccess: () => {
-                toast.success('Progress checklist tersimpan.');
-                void router.reload({
-                    only: ['stats', 'terminations', 'sidebarNotifications'],
-                    preserveScroll: true,
-                    replace: true,
-                });
+            onSuccess: async () => {
                 if (options.closeAfterSuccess) {
                     setOpen(false);
                 }
+                toast.success('Progress checklist tersimpan.');
+                await refreshChecklistData();
             },
-            onError: () => {
-                toast.error('Gagal menyimpan progress checklist.');
+            onError: (errors) => {
+                const firstError = errors?.notes || errors?._form;
+                toast.error(
+                    typeof firstError === 'string'
+                        ? firstError
+                        : 'Gagal menyimpan progress checklist.',
+                );
             },
             onFinish: () => {
                 form.transform((data) => data);
@@ -142,15 +193,9 @@ export default function ChecklistDialog({
         handleSubmit('Selesai', {
             closeAfterSuccess: true,
             progressOverride: 100,
+            checklistOverride: allTrue,
         });
     };
-
-    const triggerWithOnClick = React.cloneElement(trigger as React.ReactElement, {
-        onClick: (e: React.MouseEvent) => {
-            setOpen(true);
-            (trigger as React.ReactElement).props.onClick?.(e);
-        },
-    });
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -158,7 +203,9 @@ export default function ChecklistDialog({
                 <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            {triggerWithOnClick}
+                            <DialogTrigger asChild>
+                                {trigger}
+                            </DialogTrigger>
                         </TooltipTrigger>
                         <TooltipContent>
                             <p>{tooltip}</p>
@@ -166,7 +213,9 @@ export default function ChecklistDialog({
                     </Tooltip>
                 </TooltipProvider>
             ) : (
-                triggerWithOnClick
+                <DialogTrigger asChild>
+                    {trigger}
+                </DialogTrigger>
             )}
 
             <DialogContent className="w-[92vw] max-w-lg sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto border-0 bg-white p-0 rounded-xl">

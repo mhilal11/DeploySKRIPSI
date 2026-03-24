@@ -70,7 +70,10 @@ export default function KelolaDivisiIndex({
         }
     }, [flash?.success, flash?.error]);
 
-    const refreshData = useCallback(async (preferredActiveDivisionId?: string) => {
+    const refreshData = useCallback(async (
+        preferredActiveDivisionId?: string,
+        staleDataMessage = 'Data terbaru divisi gagal dimuat ulang.',
+    ) => {
         try {
             const response = await api.get(apiUrl('/super-admin/kelola-divisi'));
             if (response.data) {
@@ -91,9 +94,13 @@ export default function KelolaDivisiIndex({
                     }
                     return nextDivisions.length ? nextDivisions[0].id.toString() : '';
                 });
+                return true;
             }
+            toast.error(staleDataMessage);
+            return false;
         } catch {
-            // silently ignore refresh errors
+            toast.error(staleDataMessage);
+            return false;
         }
     }, []);
 
@@ -127,13 +134,16 @@ export default function KelolaDivisiIndex({
 
         createForm.post('/super-admin/kelola-divisi', {
             preserveScroll: true,
-            onSuccess: (responseData: any) => {
+            onSuccess: async (responseData: any) => {
                 const newDivisionId = responseData?.division?.id ? String(responseData.division.id) : undefined;
                 setIsCreateDialogOpen(false);
                 createForm.reset();
                 createForm.clearErrors();
                 toast.success(responseData?.flash?.success || 'Divisi berhasil ditambahkan.');
-                refreshData(newDivisionId);
+                await refreshData(
+                    newDivisionId,
+                    'Divisi berhasil ditambahkan, tetapi daftar terbaru gagal dimuat ulang.',
+                );
             },
             onError: (errors: Record<string, string>) => {
                 toast.error(
@@ -193,7 +203,10 @@ export default function KelolaDivisiIndex({
             toast.success(
                 response.data?.flash?.success || 'Lowongan pekerjaan berhasil dibuka kembali.',
             );
-            await refreshData(division.id.toString());
+            await refreshData(
+                division.id.toString(),
+                'Status lowongan berubah, tetapi data divisi terbaru gagal dimuat ulang.',
+            );
         } catch (error) {
             if (isAxiosError(error)) {
                 const payload = error.response?.data as any;
@@ -216,12 +229,15 @@ export default function KelolaDivisiIndex({
         editForm.patch(route('super-admin.divisions.update', editDivision.id), {
             preserveScroll: true,
             forceFormData: true,
-            onSuccess: (responseData: any) => {
+            onSuccess: async (responseData: any) => {
                 setEditDivision(null);
                 editForm.reset();
                 editForm.clearErrors();
                 toast.success(responseData?.flash?.success || 'Divisi berhasil diperbarui.');
-                refreshData();
+                await refreshData(
+                    undefined,
+                    'Perubahan divisi tersimpan, tetapi data terbaru gagal dimuat ulang.',
+                );
             },
             onError: (errors: Record<string, string>) => {
                 toast.error(
@@ -254,12 +270,15 @@ export default function KelolaDivisiIndex({
 
         jobForm.post(route('super-admin.divisions.open-job', jobDivision.id), {
             preserveScroll: true,
-            onSuccess: (responseData: any) => {
+            onSuccess: async (responseData: any) => {
                 setJobDivision(null);
                 jobForm.reset();
                 jobForm.clearErrors();
                 toast.success(responseData?.flash?.success || 'Lowongan pekerjaan berhasil dipublikasikan.');
-                refreshData();
+                await refreshData(
+                    undefined,
+                    'Lowongan tersimpan, tetapi data divisi terbaru gagal dimuat ulang.',
+                );
             },
             onError: (errors: Record<string, string>) => {
                 toast.error(
@@ -278,9 +297,19 @@ export default function KelolaDivisiIndex({
         const targetRoute = jobId ? `${baseRoute}?job_id=${jobId}` : baseRoute;
         jobForm.delete(targetRoute, {
             preserveScroll: true,
-            onSuccess: (responseData: any) => {
+            onSuccess: async (responseData: any) => {
                 toast.success(responseData?.flash?.success || 'Lowongan pekerjaan telah ditutup.');
-                refreshData();
+                await refreshData(
+                    undefined,
+                    'Lowongan ditutup, tetapi data divisi terbaru gagal dimuat ulang.',
+                );
+            },
+            onError: (errors: Record<string, string>) => {
+                toast.error(
+                    errors?.job_id ||
+                        errors?._form ||
+                        'Gagal menutup lowongan.',
+                );
             },
         });
     };
@@ -292,7 +321,10 @@ export default function KelolaDivisiIndex({
         try {
             const response = await api.delete(apiUrl(`/super-admin/kelola-divisi/${division.id}`));
             toast.success(response.data?.flash?.success || 'Divisi berhasil dihapus.');
-            await refreshData();
+            await refreshData(
+                undefined,
+                'Divisi berhasil dihapus, tetapi daftar terbaru gagal dimuat ulang.',
+            );
         } catch (error) {
             if (isAxiosError(error)) {
                 const payload = error.response?.data as any;

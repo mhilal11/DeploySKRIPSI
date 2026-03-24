@@ -166,18 +166,48 @@ func SuperAdminStaffStore(c *gin.Context) {
 		Reason        string `form:"reason" json:"reason"`
 		Suggestion    string `form:"suggestion" json:"suggestion"`
 	}
-	_ = c.ShouldBind(&payload)
+	if err := c.ShouldBind(&payload); err != nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"_form": "Data pengajuan termination tidak valid."})
+		return
+	}
 
 	employeeCode := strings.TrimSpace(payload.EmployeeCode)
+	terminationType := strings.TrimSpace(payload.Type)
+	effectiveDate := strings.TrimSpace(payload.EffectiveDate)
+	reason := strings.TrimSpace(payload.Reason)
+	suggestion := strings.TrimSpace(payload.Suggestion)
+
+	validationErrors := handlers.FieldErrors{}
 	if employeeCode == "" {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"employee_code": "ID Karyawan wajib diisi."})
+		validationErrors["employee_code"] = "ID Karyawan wajib diisi."
+	}
+	if terminationType == "" {
+		validationErrors["type"] = "Tipe termination wajib dipilih."
+	}
+	if effectiveDate == "" {
+		validationErrors["effective_date"] = "Tanggal efektif wajib diisi."
+	}
+	if reason == "" {
+		validationErrors["reason"] = "Alasan wajib diisi."
+	}
+	handlers.ValidateFieldLength(validationErrors, "employee_code", "ID karyawan", employeeCode, 64)
+	handlers.ValidateFieldLength(validationErrors, "type", "Tipe termination", terminationType, 32)
+	handlers.ValidateFieldLength(validationErrors, "effective_date", "Tanggal efektif", effectiveDate, 30)
+	handlers.ValidateFieldLength(validationErrors, "reason", "Alasan", reason, 3000)
+	handlers.ValidateFieldLength(validationErrors, "suggestion", "Saran", suggestion, 3000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
 		return
 	}
 
 	db := middleware.GetDB(c)
 
 	employee, err := dbrepo.GetUserByEmployeeCode(db, employeeCode)
-	if err != nil || employee == nil {
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat data karyawan")
+		return
+	}
+	if employee == nil {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"employee_code": "Karyawan tidak ditemukan."})
 		return
 	}
@@ -187,11 +217,15 @@ func SuperAdminStaffStore(c *gin.Context) {
 		return
 	}
 
-	reference, _ := services.GenerateTerminationReference(db)
+	reference, err := services.GenerateTerminationReference(db)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuat nomor referensi termination")
+		return
+	}
 
 	now := time.Now()
 	position := employee.Role
-	_ = dbrepo.InsertStaffTermination(db, dbrepo.StaffTerminationCreateInput{
+	if err := dbrepo.InsertStaffTermination(db, dbrepo.StaffTerminationCreateInput{
 		Reference:     reference,
 		UserID:        employee.ID,
 		RequestedBy:   user.ID,
@@ -199,16 +233,19 @@ func SuperAdminStaffStore(c *gin.Context) {
 		EmployeeName:  employee.Name,
 		Division:      employee.Division,
 		Position:      &position,
-		Type:          payload.Type,
-		Reason:        payload.Reason,
-		Suggestion:    payload.Suggestion,
+		Type:          terminationType,
+		Reason:        reason,
+		Suggestion:    suggestion,
 		RequestDate:   now,
-		EffectiveDate: payload.EffectiveDate,
+		EffectiveDate: effectiveDate,
 		Status:        "Diajukan",
 		Progress:      0,
 		CreatedAt:     now,
 		UpdatedAt:     now,
-	})
+	}); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Pengajuan termination gagal dibuat")
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Pengajuan termination berhasil dibuat."})
 }
@@ -229,18 +266,31 @@ func SuperAdminStaffUpdate(c *gin.Context) {
 		Notes     string          `form:"notes" json:"notes"`
 		Checklist map[string]bool `form:"checklist" json:"checklist"`
 	}
-	_ = c.ShouldBind(&payload)
+	if err := c.ShouldBind(&payload); err != nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"_form": "Data progress offboarding tidak valid."})
+		return
+	}
 
-	notes := payload.Notes
+	notes := strings.TrimSpace(payload.Notes)
 	incomingChecklist := payload.Checklist
 	if incomingChecklist == nil {
 		incomingChecklist = map[string]bool{}
+	}
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "notes", "Catatan HR", notes, 4000)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
 	}
 
 	db := middleware.GetDB(c)
 
 	termination, err := dbrepo.GetStaffTerminationByID(db, id)
-	if err != nil || termination == nil {
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat pengajuan offboarding")
+		return
+	}
+	if termination == nil {
 		handlers.JSONError(c, http.StatusNotFound, "Pengajuan tidak ditemukan")
 		return
 	}
@@ -275,7 +325,7 @@ func SuperAdminStaffUpdate(c *gin.Context) {
 		progress = 100
 	}
 
-	_ = dbrepo.UpdateStaffTerminationAndDeactivateIfCompleted(
+	if err := dbrepo.UpdateStaffTerminationAndDeactivateIfCompleted(
 		db,
 		id,
 		effectiveStatus,
@@ -284,7 +334,10 @@ func SuperAdminStaffUpdate(c *gin.Context) {
 		progress,
 		termination.UserID,
 		time.Now(),
-	)
+	); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Progress offboarding gagal diperbarui")
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Progress offboarding berhasil diperbarui."})
 }
@@ -302,7 +355,10 @@ func SuperAdminStaffDelete(c *gin.Context) {
 		return
 	}
 	db := middleware.GetDB(c)
-	_ = dbrepo.DeleteStaffTerminationByID(db, id)
+	if err := dbrepo.DeleteStaffTerminationByID(db, id); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Offboarding gagal dibatalkan")
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Offboarding berhasil dibatalkan."})
 }
@@ -310,6 +366,10 @@ func SuperAdminStaffDelete(c *gin.Context) {
 func transformTerminations(list []models.StaffTermination) []dto.StaffTermination {
 	out := []dto.StaffTermination{}
 	for _, t := range list {
+		checklist := map[string]bool{}
+		if len(t.Checklist) > 0 {
+			_ = json.Unmarshal(t.Checklist, &checklist)
+		}
 		out = append(out, dto.StaffTermination{
 			ID:            t.ID,
 			Reference:     t.Reference,
@@ -321,7 +381,7 @@ func transformTerminations(list []models.StaffTermination) []dto.StaffTerminatio
 			Reason:        t.Reason,
 			Suggestion:    t.Suggestion,
 			Notes:         t.Notes,
-			Checklist:     t.Checklist,
+			Checklist:     checklist,
 			Status:        t.Status,
 			Progress:      t.Progress,
 			RequestDate:   handlers.FormatDate(t.RequestDate),
