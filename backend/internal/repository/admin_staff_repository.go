@@ -205,6 +205,27 @@ func ListDivisionArchiveLettersAll(db *sqlx.DB, division *string, userID int64) 
 	return rows, wrapRepoErr("list division archive letters all", err)
 }
 
+func ListDivisionDashboardLettersAll(db *sqlx.DB, division *string, userID int64) ([]models.Surat, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	rows := []models.Surat{}
+	err := db.Select(
+		&rows,
+		`SELECT * FROM surat
+		WHERE user_id = ?
+			OR target_division = ?
+			OR penerima = ?
+			OR previous_division = ?
+		ORDER BY COALESCE(updated_at, disposed_at, created_at, tanggal_surat) DESC, surat_id DESC`,
+		userID,
+		division,
+		division,
+		division,
+	)
+	return rows, wrapRepoErr("list division dashboard letters all", err)
+}
+
 func ListDivisionArchiveLettersPaged(db *sqlx.DB, division *string, userID int64, limit, offset int) ([]models.Surat, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")

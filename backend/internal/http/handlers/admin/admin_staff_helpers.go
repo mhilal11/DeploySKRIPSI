@@ -7,6 +7,7 @@ import (
 	dbrepo "hris-backend/internal/repository"
 	"hris-backend/internal/services"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
@@ -20,6 +21,106 @@ func countPending(letters []models.Surat) int {
 		}
 	}
 	return count
+}
+
+func buildMailFlowSeries(letters []models.Surat, division *string, userID int64, now time.Time) []map[string]any {
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	series := make([]map[string]any, 0, 6)
+	indexByMonth := make(map[string]int, 6)
+	for offset := 5; offset >= 0; offset-- {
+		monthTime := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).AddDate(0, -offset, 0)
+		monthKey := monthTime.Format("2006-01")
+		indexByMonth[monthKey] = len(series)
+		series = append(series, map[string]any{
+			"month":    monthKey,
+			"label":    monthTime.Format("Jan 2006"),
+			"incoming": 0,
+			"outgoing": 0,
+			"archived": 0,
+		})
+	}
+
+	for _, surat := range letters {
+		if userID > 0 && surat.UserID == userID {
+			addMailFlowCount(series, indexByMonth, outgoingEventTime(surat), "outgoing")
+		}
+
+		if letterInvolvesDivision(surat, division) {
+			addMailFlowCount(series, indexByMonth, incomingEventTime(surat), "incoming")
+			if strings.EqualFold(strings.TrimSpace(surat.StatusPersetujuan), "Diarsipkan") {
+				addMailFlowCount(series, indexByMonth, archivedEventTime(surat), "archived")
+			}
+		}
+	}
+
+	return series
+}
+
+func addMailFlowCount(series []map[string]any, indexByMonth map[string]int, eventTime *time.Time, key string) {
+	if eventTime == nil {
+		return
+	}
+	monthKey := eventTime.Format("2006-01")
+	index, ok := indexByMonth[monthKey]
+	if !ok {
+		return
+	}
+
+	currentValue, _ := series[index][key].(int)
+	series[index][key] = currentValue + 1
+}
+
+func letterInvolvesDivision(surat models.Surat, division *string) bool {
+	if division == nil {
+		return false
+	}
+
+	currentDivision := strings.TrimSpace(*division)
+	if currentDivision == "" {
+		return false
+	}
+
+	if surat.TargetDivision != nil && strings.EqualFold(strings.TrimSpace(*surat.TargetDivision), currentDivision) {
+		return true
+	}
+	if strings.EqualFold(strings.TrimSpace(surat.Penerima), currentDivision) {
+		return true
+	}
+	if surat.PreviousDivision != nil && strings.EqualFold(strings.TrimSpace(*surat.PreviousDivision), currentDivision) {
+		return true
+	}
+
+	return false
+}
+
+func incomingEventTime(surat models.Surat) *time.Time {
+	if surat.DisposedAt != nil {
+		return surat.DisposedAt
+	}
+	if surat.CreatedAt != nil {
+		return surat.CreatedAt
+	}
+	return surat.TanggalSurat
+}
+
+func outgoingEventTime(surat models.Surat) *time.Time {
+	if surat.CreatedAt != nil {
+		return surat.CreatedAt
+	}
+	return surat.TanggalSurat
+}
+
+func archivedEventTime(surat models.Surat) *time.Time {
+	if surat.UpdatedAt != nil {
+		return surat.UpdatedAt
+	}
+	if surat.TanggalPersetujuan != nil {
+		return surat.TanggalPersetujuan
+	}
+	return surat.TanggalSurat
 }
 
 func recentRecruitments(db *sqlx.DB) []dto.RecruitmentSummary {

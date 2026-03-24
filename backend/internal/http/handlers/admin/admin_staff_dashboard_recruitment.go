@@ -7,6 +7,7 @@ import (
 	"hris-backend/internal/models"
 	dbrepo "hris-backend/internal/repository"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,15 +29,19 @@ func AdminStaffDashboard(c *gin.Context) {
 	inboxCount, _ := dbrepo.CountDivisionInboxLetters(db, user.Division)
 	outboxCount, _ := dbrepo.CountUserOutboxLetters(db, user.ID)
 	pendingCount, _ := dbrepo.CountDivisionPendingLetters(db, user.Division)
+	archivedCount, _ := dbrepo.CountDivisionArchiveLetters(db, user.Division, user.ID)
 
 	stats := map[string]int{
-		"inbox":   inboxCount,
-		"outbox":  outboxCount,
-		"pending": pendingCount,
+		"inbox":    inboxCount,
+		"outbox":   outboxCount,
+		"pending":  pendingCount,
+		"archived": archivedCount,
 	}
 
 	incoming, _ := dbrepo.ListDivisionIncomingLetters(db, user.Division, 5)
 	outgoing, _ := dbrepo.ListUserOutgoingLetters(db, user.ID, 5)
+	flowLetters, _ := dbrepo.ListDivisionDashboardLettersAll(db, user.Division, user.ID)
+	mailFlow := buildMailFlowSeries(flowLetters, user.Division, user.ID, time.Now())
 
 	incomingPayload := make([]map[string]any, 0, len(incoming))
 	for _, surat := range incoming {
@@ -64,20 +69,11 @@ func AdminStaffDashboard(c *gin.Context) {
 		})
 	}
 
-	announcements, _ := dbrepo.ListInternalAnnouncements(db, 3)
-	announcementsPayload := make([]map[string]any, 0, len(announcements))
-	for _, surat := range announcements {
-		announcementsPayload = append(announcementsPayload, map[string]any{
-			"title": surat.Perihal,
-			"date":  handlers.FormatDate(surat.TanggalSurat),
-		})
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"stats":         stats,
+		"mailFlow":      mailFlow,
 		"incomingMails": incomingPayload,
 		"outgoingMails": outgoingPayload,
-		"announcements": announcementsPayload,
 	})
 }
 
