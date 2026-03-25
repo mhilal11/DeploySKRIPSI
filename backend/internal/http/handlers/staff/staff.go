@@ -3,6 +3,7 @@ package staff
 import (
 	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
+	pelamarhandlers "hris-backend/internal/http/handlers/pelamar"
 	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
@@ -90,6 +91,7 @@ func (r *sqlStaffRepository) InsertStaffTermination(input dbrepo.StaffTerminatio
 
 func RegisterStaffRoutes(rg *gin.RouterGroup) {
 	rg.GET("/staff/dashboard", StaffDashboard)
+	rg.GET("/staff/references/education", pelamarhandlers.StaffEducationReferences)
 	rg.GET("/staff/keluhan-dan-saran", StaffComplaintsIndex)
 	rg.POST("/staff/keluhan-dan-saran", StaffComplaintsStore)
 	rg.GET("/staff/pengajuan-resign", StaffResignationIndex)

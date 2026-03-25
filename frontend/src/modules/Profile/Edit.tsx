@@ -7,9 +7,35 @@ import { PageProps } from '@/shared/types';
 
 import UpdatePasswordForm from './Partials/UpdatePasswordForm';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm';
+import UpdateStaffProfileInformationForm from './Partials/UpdateStaffProfileInformationForm';
 
 export default function Edit() {
-    const { props } = usePage<PageProps<{ mustVerifyEmail: boolean; status?: string }>>();
+    const { props } = usePage<PageProps<{
+        mustVerifyEmail: boolean;
+        status?: string;
+        staffProfile?: {
+            phone?: string | null;
+            date_of_birth?: string | null;
+            gender?: string | null;
+            religion?: string | null;
+            address?: string | null;
+            domicile_address?: string | null;
+            city?: string | null;
+            province?: string | null;
+            education_level?: string | null;
+            educations?: Array<{
+                institution: string;
+                degree: string;
+                field_of_study: string;
+                start_year: string;
+                end_year: string;
+                gpa: string;
+            }>;
+        };
+        religionOptions?: string[];
+        genderOptions?: string[];
+        educationLevelOptions?: string[];
+    }>>();
     const user = props?.auth?.user;
     const isStaff = user?.role === 'Staff';
 
@@ -55,9 +81,13 @@ export default function Edit() {
 
                         <div className="space-y-6 lg:col-span-2">
                             <Card className="p-6">
-                                <UpdateProfileInformationForm className="max-w-none" />
-                                <div className="my-6 border-t border-slate-200" />
-                                <UpdatePasswordForm className="max-w-none" />
+                                <UpdateStaffProfileInformationForm
+                                    className="max-w-none"
+                                    profile={props.staffProfile}
+                                    religionOptions={props.religionOptions ?? []}
+                                    genderOptions={props.genderOptions ?? []}
+                                    educationLevelOptions={props.educationLevelOptions ?? []}
+                                />
                             </Card>
                         </div>
                     </div>

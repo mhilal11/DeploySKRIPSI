@@ -53,6 +53,20 @@ type UserRoleStats struct {
 	Pelamar    int
 }
 
+type UpsertStaffProfileDetailsInput struct {
+	UserID          int64
+	Phone           string
+	DateOfBirth     *time.Time
+	Religion        string
+	Gender          string
+	Address         string
+	DomicileAddress string
+	City            string
+	Province        string
+	EducationLevel  string
+	Educations      models.JSON
+}
+
 func ListUsers(db *sqlx.DB, filters UserListFilters, page, perPage int) ([]models.User, int, error) {
 	if db == nil {
 		return nil, 0, errors.New("database tidak tersedia")
@@ -292,6 +306,44 @@ func UpsertStaffProfile(db *sqlx.DB, userID int64, religion, gender, educationLe
 			updated_at = NOW()
 	`, userID, nullableString(religion), nullableString(gender), nullableString(educationLevel))
 	return wrapRepoErr("upsert staff profile", err)
+}
+
+func UpsertStaffProfileDetails(db *sqlx.DB, input UpsertStaffProfileDetailsInput) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	_, err := db.Exec(`
+		INSERT INTO staff_profiles (
+			user_id, phone, date_of_birth, religion, gender, address, domicile_address, city, province,
+			education_level, educations, created_at, updated_at
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+		ON DUPLICATE KEY UPDATE
+			phone = VALUES(phone),
+			date_of_birth = VALUES(date_of_birth),
+			religion = VALUES(religion),
+			gender = VALUES(gender),
+			address = VALUES(address),
+			domicile_address = VALUES(domicile_address),
+			city = VALUES(city),
+			province = VALUES(province),
+			education_level = VALUES(education_level),
+			educations = VALUES(educations),
+			updated_at = NOW()
+	`,
+		input.UserID,
+		nullableString(input.Phone),
+		input.DateOfBirth,
+		nullableString(input.Religion),
+		nullableString(input.Gender),
+		nullableString(input.Address),
+		nullableString(input.DomicileAddress),
+		nullableString(input.City),
+		nullableString(input.Province),
+		nullableString(input.EducationLevel),
+		input.Educations,
+	)
+	return wrapRepoErr("upsert staff profile details", err)
 }
 
 func DeleteStaffProfileByUserID(db *sqlx.DB, userID int64) error {

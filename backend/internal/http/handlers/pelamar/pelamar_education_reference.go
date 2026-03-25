@@ -88,6 +88,15 @@ func SuperAdminEducationReferences(c *gin.Context) {
 	respondEducationReferences(c)
 }
 
+func StaffEducationReferences(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || user.Role != models.RoleStaff {
+		handlers.JSONError(c, 403, "Forbidden")
+		return
+	}
+	respondEducationReferences(c)
+}
+
 func respondEducationReferences(c *gin.Context) {
 	cfg := middleware.GetConfig(c)
 	db := middleware.GetDB(c)
