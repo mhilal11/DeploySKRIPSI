@@ -180,6 +180,7 @@ func SuperAdminDashboard(c *gin.Context) {
 			"applications":  applications,
 		})
 	}
+	recruitmentFunnel := buildRecruitmentFunnelData(db, currentMonthStart, now)
 
 	c.JSON(http.StatusOK, gin.H{
 		"stats":                stats,
@@ -191,6 +192,7 @@ func SuperAdminDashboard(c *gin.Context) {
 		"genderData":           genderData,
 		"educationData":        educationData,
 		"divisionApplicants":   divisionApplicants,
+		"recruitmentFunnel":    recruitmentFunnel,
 		"sidebarNotifications": handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
@@ -398,6 +400,60 @@ func recentAdminHrActivities(db *sqlx.DB) []map[string]any {
 	}
 
 	return activities
+}
+
+func buildRecruitmentFunnelData(db *sqlx.DB, start, end time.Time) []map[string]any {
+	appliedCount, _ := dbrepo.CountApplicationsBySubmittedBetween(db, start, end)
+	screeningCount := countApplicationsByStatusesBetween(db, start, end, []string{"Screening", "Interview", "Offering", "Hired"})
+	interviewCount := countApplicationsByStatusesBetween(db, start, end, []string{"Interview", "Offering", "Hired"})
+	offeringCount := countApplicationsByStatusesBetween(db, start, end, []string{"Offering", "Hired"})
+	hiredCount := countApplicationsByStatusesBetween(db, start, end, []string{"Hired"})
+
+	stageLabels := []string{"Lamaran Masuk", "Tahap Screening", "Tahap Interview", "Tahap Offering", "Diterima"}
+	stageKeys := []string{"applied", "screening", "interview", "offering", "hired"}
+	stageColors := []string{"#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6", "#16a34a"}
+	stageCounts := []int{appliedCount, screeningCount, interviewCount, offeringCount, hiredCount}
+
+	for i := 1; i < len(stageCounts); i++ {
+		if stageCounts[i] > stageCounts[i-1] {
+			stageCounts[i] = stageCounts[i-1]
+		}
+	}
+
+	funnelData := make([]map[string]any, 0, len(stageCounts))
+	for i, count := range stageCounts {
+		conversion := 100
+		dropOff := 0
+		if i > 0 {
+			prev := stageCounts[i-1]
+			dropOff = prev - count
+			if prev > 0 {
+				conversion = int((float64(count)/float64(prev))*100 + 0.5)
+			} else {
+				conversion = 0
+			}
+		}
+
+		funnelData = append(funnelData, map[string]any{
+			"key":        stageKeys[i],
+			"label":      stageLabels[i],
+			"value":      count,
+			"conversion": conversion,
+			"dropOff":    dropOff,
+			"color":      stageColors[i],
+		})
+	}
+
+	return funnelData
+}
+
+func countApplicationsByStatusesBetween(db *sqlx.DB, start, end time.Time, statuses []string) int {
+	total := 0
+	for _, status := range statuses {
+		count, _ := dbrepo.CountApplicationsByStatusSubmittedBetween(db, status, start, end)
+		total += count
+	}
+	return total
 }
 
 func ptr(v string) *string { return &v }

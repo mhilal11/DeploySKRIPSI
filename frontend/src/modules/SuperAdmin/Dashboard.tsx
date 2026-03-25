@@ -24,6 +24,7 @@ export default function Dashboard({
     stats,
     statChanges,
     activityData,
+    recruitmentFunnel,
     staffStats,
     religionData,
     genderData,
@@ -33,6 +34,7 @@ export default function Dashboard({
     const safeStats = stats ?? EMPTY_STATS;
     const safeStatChanges = statChanges ?? EMPTY_STATS;
     const safeActivityData = activityData ?? [];
+    const safeRecruitmentFunnel = recruitmentFunnel ?? [];
     const safeStaffStats = staffStats ?? EMPTY_STAFF_STATS;
     const safeReligionData = religionData ?? [];
     const safeGenderData = genderData ?? [];
@@ -68,7 +70,10 @@ export default function Dashboard({
                 formatNumber={formatNumber}
             />
 
-            <ActivityTrendSection activityData={safeActivityData} />
+            <ActivityTrendSection
+                activityData={safeActivityData}
+                recruitmentFunnel={safeRecruitmentFunnel}
+            />
         </SuperAdminLayout>
     );
 }
