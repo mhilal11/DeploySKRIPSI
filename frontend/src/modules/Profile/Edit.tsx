@@ -1,3 +1,5 @@
+import Image from 'next/image';
+
 import StaffLayout from '@/modules/Staff/components/Layout';
 import StaffShell from '@/modules/Staff/components/StaffShell';
 import { Card } from '@/shared/components/ui/card';
@@ -23,6 +25,7 @@ export default function Edit() {
             city?: string | null;
             province?: string | null;
             education_level?: string | null;
+            profile_photo_url?: string | null;
             educations?: Array<{
                 institution: string;
                 degree: string;
@@ -37,6 +40,7 @@ export default function Edit() {
         educationLevelOptions?: string[];
     }>>();
     const user = props?.auth?.user;
+    const profilePhotoUrl = props?.staffProfile?.profile_photo_url ?? props?.auth?.profilePhotoUrl ?? null;
     const isStaff = user?.role === 'Staff';
 
     if (isStaff) {
@@ -50,8 +54,19 @@ export default function Edit() {
                     <div className="grid gap-6 lg:grid-cols-3">
                         <Card className="p-6 lg:col-span-1">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-lg font-semibold text-blue-700">
-                                    {(user?.name?.[0] ?? 'U').toUpperCase()}
+                                <div className="relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-lg font-semibold text-blue-700">
+                                    {profilePhotoUrl ? (
+                                        <Image
+                                            src={profilePhotoUrl}
+                                            alt="Foto profil staff"
+                                            width={48}
+                                            height={48}
+                                            unoptimized
+                                            className="h-full w-full object-cover"
+                                        />
+                                    ) : (
+                                        (user?.name?.[0] ?? 'U').toUpperCase()
+                                    )}
                                 </div>
                                 <div>
                                     <p className="text-base font-semibold text-slate-900">{user?.name ?? 'User'}</p>

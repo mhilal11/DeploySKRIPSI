@@ -1,7 +1,18 @@
 import { Transition } from '@headlessui/react';
-import { FormEventHandler, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import { ChangeEvent, FormEventHandler, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/shared/components/ui/alert-dialog';
 import { AutocompleteInput, AutocompleteOption } from '@/shared/components/ui/autocomplete-input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import {
@@ -27,9 +38,11 @@ type StaffProfilePayload = {
     province?: string | null;
     education_level?: string | null;
     educations?: Edu[] | null;
+    profile_photo_url?: string | null;
 };
 type Data = {
     section?: string;
+    remove_profile_photo: boolean;
     name: string;
     email: string;
     phone: string;
@@ -42,6 +55,7 @@ type Data = {
     province: string;
     education_level: string;
     educations: Edu[];
+    profile_photo: File | null;
 };
 type PersonalSectionData = Pick<
     Data,
@@ -104,9 +118,13 @@ export default function UpdateStaffProfileInformationForm({
     const [institutionQuery, setInstitutionQuery] = useState('');
     const [programQuery, setProgramQuery] = useState('');
     const [referenceError, setReferenceError] = useState<string | null>(null);
+    const [photoPreview, setPhotoPreview] = useState<string | null>(profile?.profile_photo_url ?? null);
+    const [photoChanged, setPhotoChanged] = useState(false);
+    const [confirmDeletePhotoOpen, setConfirmDeletePhotoOpen] = useState(false);
 
     const { data, setData, patch, transform, errors, processing, recentlySuccessful, clearErrors } = useForm<Data>({
         section: '',
+        remove_profile_photo: false,
         name: user?.name ?? '',
         email: user?.email ?? '',
         phone: digitsOnly(profile?.phone ?? ''),
@@ -119,12 +137,14 @@ export default function UpdateStaffProfileInformationForm({
         province: profile?.province ?? '',
         education_level: profile?.education_level ?? '',
         educations: normalizeEducations(profile?.educations),
+        profile_photo: null,
     });
 
     useEffect(() => {
         setData((prev) => ({
             ...prev,
             section: '',
+            remove_profile_photo: false,
             name: user?.name ?? '',
             email: user?.email ?? '',
             phone: digitsOnly(profile?.phone ?? ''),
@@ -137,11 +157,17 @@ export default function UpdateStaffProfileInformationForm({
             province: profile?.province ?? '',
             education_level: profile?.education_level ?? '',
             educations: normalizeEducations(profile?.educations),
+            profile_photo: null,
         }));
         setClientErrors({});
         setIsEditing({ personal: false, education: false });
         setSnapshots({ personal: null, education: null });
     }, [setData, user?.name, user?.email, profile]);
+
+    useEffect(() => {
+        setPhotoPreview(profile?.profile_photo_url ?? null);
+        setPhotoChanged(false);
+    }, [profile?.profile_photo_url]);
 
     useEffect(() => {
         void fetchEducationRefs(institutionQuery, setInstitutionOptions, setReferenceError);
@@ -224,6 +250,8 @@ export default function UpdateStaffProfileInformationForm({
         transform((payload) => ({
             ...payload,
             section,
+            profile_photo: null,
+            remove_profile_photo: false,
         }));
         patch(route('profile.update'), {
             preserveScroll: true,
@@ -250,8 +278,156 @@ export default function UpdateStaffProfileInformationForm({
         });
     };
 
+    const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) {
+            return;
+        }
+        if (!file.type.startsWith('image/')) {
+            toast.error('File harus berupa gambar.');
+            return;
+        }
+        setData('remove_profile_photo', false);
+        setData('profile_photo', file);
+        setPhotoPreview(URL.createObjectURL(file));
+        setPhotoChanged(true);
+    };
+
+    const handlePhotoCancel = () => {
+        setData('remove_profile_photo', false);
+        setData('profile_photo', null);
+        setPhotoPreview(profile?.profile_photo_url ?? null);
+        setPhotoChanged(false);
+    };
+
+    const handlePhotoSave = () => {
+        if (!data.profile_photo) {
+            toast.error('Silakan pilih foto terlebih dahulu.');
+            return;
+        }
+        transform((payload) => ({
+            section: 'photo',
+            profile_photo: payload.profile_photo,
+            remove_profile_photo: false,
+        }));
+        patch(route('profile.update'), {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: (response) => {
+                const nextPhotoURL =
+                    typeof response?.profile_photo_url === 'string'
+                        ? response.profile_photo_url
+                        : photoPreview;
+                setPhotoPreview(nextPhotoURL);
+                setData('remove_profile_photo', false);
+                setData('profile_photo', null);
+                setPhotoChanged(false);
+                toast.success('Foto profil berhasil disimpan.');
+            },
+            onError: () => {
+                toast.error('Gagal menyimpan foto profil.');
+            },
+        });
+    };
+
+    const handlePhotoDelete = () => {
+        if (!photoPreview || photoChanged) {
+            return;
+        }
+        setConfirmDeletePhotoOpen(true);
+    };
+
+    const confirmPhotoDelete = () => {
+        transform(() => ({
+            section: 'photo',
+            remove_profile_photo: true,
+        }));
+        patch(route('profile.update'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setConfirmDeletePhotoOpen(false);
+                setData('remove_profile_photo', false);
+                setData('profile_photo', null);
+                setPhotoPreview(null);
+                setPhotoChanged(false);
+                toast.success('Foto profil berhasil dihapus.');
+            },
+            onError: () => {
+                setConfirmDeletePhotoOpen(false);
+                setData('remove_profile_photo', false);
+                toast.error('Gagal menghapus foto profil.');
+            },
+        });
+    };
+
     return (
         <section className={className}>
+            <div className="mb-4 rounded-xl border border-slate-200 p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <div className="relative h-20 w-20 overflow-hidden rounded-full border-2 border-blue-900 bg-slate-100">
+                        {photoPreview ? (
+                            <Image
+                                src={photoPreview}
+                                alt="Foto profil staff"
+                                width={80}
+                                height={80}
+                                unoptimized
+                                className="h-full w-full object-cover"
+                            />
+                        ) : (
+                            <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-slate-500">
+                                {(data.name?.[0] ?? 'S').toUpperCase()}
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-sm font-semibold text-slate-900">Foto Profil Staff</p>
+                        <p className="text-xs text-slate-500">Gunakan foto terbaru agar identitas akun staff lebih jelas.</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <label className="cursor-pointer rounded border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                            Pilih Foto
+                            <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handlePhotoChange}
+                                disabled={processing}
+                            />
+                        </label>
+                        {photoChanged && (
+                            <>
+                                <button
+                                    type="button"
+                                    className="rounded border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                    onClick={handlePhotoCancel}
+                                    disabled={processing}
+                                >
+                                    Batal
+                                </button>
+                                <button
+                                    type="button"
+                                    className="rounded bg-blue-900 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+                                    onClick={handlePhotoSave}
+                                    disabled={processing}
+                                >
+                                    Simpan Foto
+                                </button>
+                            </>
+                        )}
+                        {!photoChanged && photoPreview && (
+                            <button
+                                type="button"
+                                className="rounded border border-rose-300 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                                onClick={handlePhotoDelete}
+                                disabled={processing}
+                            >
+                                Hapus Foto
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
             <Tabs value={tab} onValueChange={(value) => setTab(value as StaffTab)} className="space-y-4">
                 <TabsList className="grid h-auto w-full grid-cols-1 gap-1 bg-slate-100 p-1 sm:grid-cols-3">
                     <TabsTrigger value="personal">Data Pribadi</TabsTrigger>
@@ -346,6 +522,27 @@ export default function UpdateStaffProfileInformationForm({
                     <UpdatePasswordForm className="max-w-none" />
                 </TabsContent>
             </Tabs>
+
+            <AlertDialog open={confirmDeletePhotoOpen} onOpenChange={setConfirmDeletePhotoOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Hapus Foto Profil?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Foto profil akan dihapus dan avatar akan kembali ke tampilan default.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={processing}>Batal</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmPhotoDelete}
+                            disabled={processing}
+                            className="bg-rose-600 text-white hover:bg-rose-700"
+                        >
+                            Ya, Hapus Foto
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </section>
     );
 }

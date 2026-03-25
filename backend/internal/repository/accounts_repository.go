@@ -54,17 +54,18 @@ type UserRoleStats struct {
 }
 
 type UpsertStaffProfileDetailsInput struct {
-	UserID          int64
-	Phone           string
-	DateOfBirth     *time.Time
-	Religion        string
-	Gender          string
-	Address         string
-	DomicileAddress string
-	City            string
-	Province        string
-	EducationLevel  string
-	Educations      models.JSON
+	UserID           int64
+	Phone            string
+	DateOfBirth      *time.Time
+	Religion         string
+	Gender           string
+	Address          string
+	DomicileAddress  string
+	City             string
+	Province         string
+	EducationLevel   string
+	Educations       models.JSON
+	ProfilePhotoPath *string
 }
 
 func ListUsers(db *sqlx.DB, filters UserListFilters, page, perPage int) ([]models.User, int, error) {
@@ -315,9 +316,9 @@ func UpsertStaffProfileDetails(db *sqlx.DB, input UpsertStaffProfileDetailsInput
 	_, err := db.Exec(`
 		INSERT INTO staff_profiles (
 			user_id, phone, date_of_birth, religion, gender, address, domicile_address, city, province,
-			education_level, educations, created_at, updated_at
+			education_level, educations, profile_photo_path, created_at, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
 		ON DUPLICATE KEY UPDATE
 			phone = VALUES(phone),
 			date_of_birth = VALUES(date_of_birth),
@@ -329,6 +330,7 @@ func UpsertStaffProfileDetails(db *sqlx.DB, input UpsertStaffProfileDetailsInput
 			province = VALUES(province),
 			education_level = VALUES(education_level),
 			educations = VALUES(educations),
+			profile_photo_path = VALUES(profile_photo_path),
 			updated_at = NOW()
 	`,
 		input.UserID,
@@ -342,6 +344,7 @@ func UpsertStaffProfileDetails(db *sqlx.DB, input UpsertStaffProfileDetailsInput
 		nullableString(input.Province),
 		nullableString(input.EducationLevel),
 		input.Educations,
+		nullableStringPtr(input.ProfilePhotoPath),
 	)
 	return wrapRepoErr("upsert staff profile details", err)
 }

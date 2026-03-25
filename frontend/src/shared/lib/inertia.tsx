@@ -25,6 +25,41 @@ const baseProps = {
   sidebarNotifications: {},
 };
 
+function resolveProfilePhotoUrl(payload: any): string | null | undefined {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+  const direct = payload.profilePhotoUrl ?? payload.profile_photo_url;
+  if (typeof direct === 'string') {
+    return direct;
+  }
+  if (direct === null) {
+    return null;
+  }
+  const user = payload.user;
+  if (user && typeof user === 'object') {
+    const fromUser = user.profilePhotoUrl ?? user.profile_photo_url;
+    if (typeof fromUser === 'string') {
+      return fromUser;
+    }
+    if (fromUser === null) {
+      return null;
+    }
+  }
+  return undefined;
+}
+
+function resolveStaffProfilePhotoUrl(payload: any): string | null | undefined {
+  const fromStaffProfile = payload?.staffProfile?.profile_photo_url;
+  if (typeof fromStaffProfile === 'string') {
+    return fromStaffProfile;
+  }
+  if (fromStaffProfile === null) {
+    return null;
+  }
+  return undefined;
+}
+
 export function PageProvider({ children }: { children: React.ReactNode }) {
   const [props, setPropsState] = useState<any>(baseProps);
   const [routeName, setRouteNameState] = useState('');
@@ -46,12 +81,18 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
     setCurrentRouteName(routeName);
   }, [routeName]);
 
-  const setAuthUser = useCallback((user: any | null) => {
+  const setAuthUser = useCallback((user: any | null, profilePhotoUrl?: string | null) => {
     setPropsState((prev: any) => ({
       ...prev,
       auth: {
         ...prev.auth,
         user: user ?? null,
+        profilePhotoUrl:
+          profilePhotoUrl !== undefined
+            ? profilePhotoUrl
+            : user === null
+              ? null
+              : prev.auth?.profilePhotoUrl ?? null,
       },
     }));
   }, []);
@@ -64,6 +105,11 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
         ...baseProps.auth,
         ...prev.auth,
         ...next?.auth,
+        profilePhotoUrl:
+          resolveProfilePhotoUrl(next?.auth) ??
+          resolveStaffProfilePhotoUrl(next) ??
+          prev.auth?.profilePhotoUrl ??
+          baseProps.auth.profilePhotoUrl,
       },
       sidebarNotifications:
         next?.sidebarNotifications ?? prev.sidebarNotifications ?? baseProps.sidebarNotifications,
@@ -106,6 +152,11 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
         auth: {
           ...prev.auth,
           ...next.auth,
+          profilePhotoUrl:
+            resolveProfilePhotoUrl(next?.auth) ??
+            resolveStaffProfilePhotoUrl(next) ??
+            prev.auth?.profilePhotoUrl ??
+            baseProps.auth.profilePhotoUrl,
         },
         flash: next.flash ?? prev.flash,
       };
@@ -140,7 +191,7 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         if (data && data.user) {
-          setAuthUser(data.user);
+          setAuthUser(data.user, resolveProfilePhotoUrl(data));
         }
       } catch {
         // ignore

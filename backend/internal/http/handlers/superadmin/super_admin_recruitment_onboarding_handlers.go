@@ -204,14 +204,28 @@ func SuperAdminOnboardingConvertToStaff(c *gin.Context) {
 
 	profile := handlers.GetApplicantProfile(db, userModel.ID)
 	if profile != nil {
-		educationLevel := "Lainnya"
+		educationLevel := ""
 		educations := handlers.DecodeJSONArray(profile.Educations)
 		if len(educations) > 0 {
 			if degree, ok := educations[0]["degree"].(string); ok && degree != "" {
 				educationLevel = degree
 			}
 		}
-		if err := dbrepo.UpsertStaffProfileFromApplicant(db, userModel.ID, profile.Religion, profile.Gender, educationLevel); err != nil {
+		if err := dbrepo.UpsertStaffProfileFromApplicant(
+			db,
+			userModel.ID,
+			profile.Phone,
+			profile.DateOfBirth,
+			profile.Religion,
+			profile.Gender,
+			profile.Address,
+			profile.DomicileAddress,
+			profile.City,
+			profile.Province,
+			educationLevel,
+			profile.Educations,
+			profile.ProfilePhotoPath,
+		); err != nil {
 			handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyimpan profil staff")
 			return
 		}

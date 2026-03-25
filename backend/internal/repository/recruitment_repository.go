@@ -386,15 +386,57 @@ func SetStaffAssignmentSelection(db *sqlx.DB, userID int64, selectedApplicationI
 	return nil
 }
 
-func UpsertStaffProfileFromApplicant(db *sqlx.DB, userID int64, religion, gender *string, educationLevel string) error {
+func UpsertStaffProfileFromApplicant(
+	db *sqlx.DB,
+	userID int64,
+	phone *string,
+	dateOfBirth *time.Time,
+	religion *string,
+	gender *string,
+	address *string,
+	domicileAddress *string,
+	city *string,
+	province *string,
+	educationLevel string,
+	educations models.JSON,
+	profilePhotoPath *string,
+) error {
 	if db == nil {
 		return errors.New("database tidak tersedia")
 	}
 	_, err := db.Exec(`
-		INSERT INTO staff_profiles (user_id, religion, gender, education_level, created_at, updated_at)
-		VALUES (?, ?, ?, ?, NOW(), NOW())
-		ON DUPLICATE KEY UPDATE religion=VALUES(religion), gender=VALUES(gender), education_level=VALUES(education_level), updated_at=NOW()
-	`, userID, recruitNullableStringPtr(religion), recruitNullableStringPtr(gender), recruitNullableString(educationLevel))
+		INSERT INTO staff_profiles (
+			user_id, phone, date_of_birth, religion, gender, address, domicile_address,
+			city, province, education_level, educations, profile_photo_path, created_at, updated_at
+		)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+		ON DUPLICATE KEY UPDATE
+			phone = VALUES(phone),
+			date_of_birth = VALUES(date_of_birth),
+			religion = VALUES(religion),
+			gender = VALUES(gender),
+			address = VALUES(address),
+			domicile_address = VALUES(domicile_address),
+			city = VALUES(city),
+			province = VALUES(province),
+			education_level = VALUES(education_level),
+			educations = VALUES(educations),
+			profile_photo_path = VALUES(profile_photo_path),
+			updated_at = NOW()
+	`,
+		userID,
+		recruitNullableStringPtr(phone),
+		dateOfBirth,
+		recruitNullableStringPtr(religion),
+		recruitNullableStringPtr(gender),
+		recruitNullableStringPtr(address),
+		recruitNullableStringPtr(domicileAddress),
+		recruitNullableStringPtr(city),
+		recruitNullableStringPtr(province),
+		recruitNullableString(educationLevel),
+		educations,
+		recruitNullableStringPtr(profilePhotoPath),
+	)
 	return wrapRepoErr("upsert staff profile from applicant", err)
 }
 

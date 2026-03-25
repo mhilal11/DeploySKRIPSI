@@ -47,7 +47,7 @@ export interface PageContextValue {
   mergeProps: (next: any, only?: string[]) => void;
   setRouteName: (name: string) => void;
   authLoaded: boolean;
-  setAuthUser: (user: any | null) => void;
+  setAuthUser: (user: any | null, profilePhotoUrl?: string | null) => void;
   setSidebarNotifications: (next: Record<string, number>) => void;
 }
 
@@ -57,5 +57,5 @@ export interface RouterStore {
   mergeProps: (next: any, only?: string[]) => void;
   getProps: () => any;
   setRouteName: (name: string) => void;
-  setAuthUser: (user: any | null) => void;
+  setAuthUser: (user: any | null, profilePhotoUrl?: string | null) => void;
 }

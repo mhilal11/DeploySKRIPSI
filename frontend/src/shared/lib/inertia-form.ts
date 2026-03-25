@@ -55,6 +55,30 @@ function containsFile(data: any): boolean {
   return Object.values(data).some(containsFile);
 }
 
+function resolveProfilePhotoUrl(payload: any): string | null | undefined {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+  const direct = payload.profilePhotoUrl ?? payload.profile_photo_url;
+  if (typeof direct === 'string') {
+    return direct;
+  }
+  if (direct === null) {
+    return null;
+  }
+  const user = payload.user;
+  if (user && typeof user === 'object') {
+    const fromUser = user.profilePhotoUrl ?? user.profile_photo_url;
+    if (typeof fromUser === 'string') {
+      return fromUser;
+    }
+    if (fromUser === null) {
+      return null;
+    }
+  }
+  return undefined;
+}
+
 export function useForm<T extends Record<string, any>>(initialData: T): InertiaFormProps<T> {
   const [data, setDataState] = useState<T>(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -129,8 +153,10 @@ export function useForm<T extends Record<string, any>>(initialData: T): InertiaF
       });
 
       const responseData = response.data;
-      if (responseData?.user && ctx?.setAuthUser) {
-        ctx.setAuthUser(responseData.user);
+      const nextProfilePhotoUrl = resolveProfilePhotoUrl(responseData);
+      if (ctx?.setAuthUser && (responseData?.user || nextProfilePhotoUrl !== undefined)) {
+        const currentUser = responseData?.user ?? ctx?.props?.auth?.user ?? null;
+        ctx.setAuthUser(currentUser, nextProfilePhotoUrl);
       }
       if (responseData?.flash) {
         ctx?.mergeProps({ flash: responseData.flash });

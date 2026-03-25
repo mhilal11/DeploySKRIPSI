@@ -26,19 +26,20 @@ func RegisterProfileRoutes(rg *gin.RouterGroup) {
 }
 
 type profileUpdateRequest struct {
-	Section         string                `form:"section" json:"section"`
-	Name            string                `form:"name" json:"name"`
-	Email           string                `form:"email" json:"email"`
-	Phone           string                `form:"phone" json:"phone"`
-	DateOfBirth     string                `form:"date_of_birth" json:"date_of_birth"`
-	Gender          string                `form:"gender" json:"gender"`
-	Religion        string                `form:"religion" json:"religion"`
-	Address         string                `form:"address" json:"address"`
-	DomicileAddress string                `form:"domicile_address" json:"domicile_address"`
-	City            string                `form:"city" json:"city"`
-	Province        string                `form:"province" json:"province"`
-	EducationLevel  string                `form:"education_level" json:"education_level"`
-	Educations      []staffEducationInput `form:"educations" json:"educations"`
+	Section            string                `form:"section" json:"section"`
+	RemoveProfilePhoto bool                  `form:"remove_profile_photo" json:"remove_profile_photo"`
+	Name               string                `form:"name" json:"name"`
+	Email              string                `form:"email" json:"email"`
+	Phone              string                `form:"phone" json:"phone"`
+	DateOfBirth        string                `form:"date_of_birth" json:"date_of_birth"`
+	Gender             string                `form:"gender" json:"gender"`
+	Religion           string                `form:"religion" json:"religion"`
+	Address            string                `form:"address" json:"address"`
+	DomicileAddress    string                `form:"domicile_address" json:"domicile_address"`
+	City               string                `form:"city" json:"city"`
+	Province           string                `form:"province" json:"province"`
+	EducationLevel     string                `form:"education_level" json:"education_level"`
+	Educations         []staffEducationInput `form:"educations" json:"educations"`
 }
 
 type staffEducationInput struct {
@@ -81,16 +82,17 @@ func GetProfile(c *gin.Context) {
 		}
 
 		staffProfile := gin.H{
-			"phone":            "",
-			"date_of_birth":    "",
-			"gender":           "",
-			"religion":         "",
-			"address":          "",
-			"domicile_address": "",
-			"city":             "",
-			"province":         "",
-			"education_level":  "",
-			"educations":       []map[string]any{},
+			"phone":             "",
+			"date_of_birth":     "",
+			"gender":            "",
+			"religion":          "",
+			"address":           "",
+			"domicile_address":  "",
+			"city":              "",
+			"province":          "",
+			"education_level":   "",
+			"educations":        []map[string]any{},
+			"profile_photo_url": nil,
 		}
 		if profile != nil {
 			staffProfile["phone"] = handlers.FirstString(profile.Phone, "")
@@ -103,6 +105,7 @@ func GetProfile(c *gin.Context) {
 			staffProfile["province"] = handlers.FirstString(profile.Province, "")
 			staffProfile["education_level"] = handlers.FirstString(profile.EducationLevel, "")
 			staffProfile["educations"] = handlers.DecodeJSONArray(profile.Educations)
+			staffProfile["profile_photo_url"] = handlers.AttachmentURL(c, profile.ProfilePhotoPath)
 		}
 
 		payload["staffProfile"] = staffProfile
@@ -144,12 +147,17 @@ func UpdateProfile(c *gin.Context) {
 	if user.Role == models.RoleStaff {
 		req.Phone = normalizePhoneNumber(req.Phone)
 	}
+	removePhotoRequested := req.RemoveProfilePhoto
+	if !removePhotoRequested {
+		removePhotoRequested = parseTruthyBoolean(c.PostForm("remove_profile_photo"))
+	}
 
 	updatePersonal := req.Section == "all" || req.Section == "personal"
 	updateEducation := req.Section == "all" || req.Section == "education"
+	updatePhoto := req.Section == "photo"
 
 	fieldErrors := handlers.FieldErrors{}
-	if !updatePersonal && !updateEducation {
+	if !updatePersonal && !updateEducation && !updatePhoto {
 		fieldErrors["section"] = "Section tidak valid."
 		handlers.ValidationErrors(c, fieldErrors)
 		return
@@ -268,6 +276,7 @@ func UpdateProfile(c *gin.Context) {
 		city := req.City
 		province := req.Province
 		educationLevel := req.EducationLevel
+		profilePhotoPath := (*string)(nil)
 		var educations models.JSON
 		if updateEducation {
 			educationsJSON, _ := json.Marshal(normalizedEducations)
@@ -283,28 +292,57 @@ func UpdateProfile(c *gin.Context) {
 			domicileAddress = handlers.FirstString(existingProfile.DomicileAddress, "")
 			city = handlers.FirstString(existingProfile.City, "")
 			province = handlers.FirstString(existingProfile.Province, "")
+			profilePhotoPath = existingProfile.ProfilePhotoPath
 		}
 		if !updateEducation && existingProfile != nil {
 			educationLevel = handlers.FirstString(existingProfile.EducationLevel, "")
 			educations = existingProfile.Educations
 		}
+		if updatePhoto || updatePersonal {
+			if _, fileErr := c.FormFile("profile_photo"); fileErr == nil {
+				path, _, saveErr := handlers.SaveUploadedFile(c, "profile_photo", "staff-profiles")
+				if saveErr != nil {
+					handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyimpan foto profil")
+					return
+				}
+				profilePhotoPath = &path
+			}
+		}
+		if updatePhoto && removePhotoRequested {
+			profilePhotoPath = nil
+		}
+		if updatePhoto {
+			if profilePhotoPath == nil && !removePhotoRequested {
+				fieldErrors["profile_photo"] = "Silakan pilih foto atau hapus foto saat ini."
+			}
+		}
+		if len(fieldErrors) > 0 {
+			handlers.ValidationErrors(c, fieldErrors)
+			return
+		}
 
 		if err := dbrepo.UpsertStaffProfileDetails(db, dbrepo.UpsertStaffProfileDetailsInput{
-			UserID:          user.ID,
-			Phone:           phone,
-			DateOfBirth:     dateOfBirth,
-			Religion:        religion,
-			Gender:          gender,
-			Address:         address,
-			DomicileAddress: domicileAddress,
-			City:            city,
-			Province:        province,
-			EducationLevel:  educationLevel,
-			Educations:      educations,
+			UserID:           user.ID,
+			Phone:            phone,
+			DateOfBirth:      dateOfBirth,
+			Religion:         religion,
+			Gender:           gender,
+			Address:          address,
+			DomicileAddress:  domicileAddress,
+			City:             city,
+			Province:         province,
+			EducationLevel:   educationLevel,
+			Educations:       educations,
+			ProfilePhotoPath: profilePhotoPath,
 		}); err != nil {
 			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui profil staff")
 			return
 		}
+		c.JSON(http.StatusOK, gin.H{
+			"status":            "saved",
+			"profile_photo_url": handlers.AttachmentURL(c, profilePhotoPath),
+		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "saved"})
@@ -471,6 +509,15 @@ func parseYearNumber(value string) (int, bool) {
 		return 0, false
 	}
 	return parsed, true
+}
+
+func parseTruthyBoolean(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "ya", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func UpdatePassword(c *gin.Context) {

@@ -179,7 +179,22 @@ func GetMe(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"user": nil})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": dto.UserFromModel(user)})
+	db := middleware.GetDB(c)
+	var profilePhotoURL *string
+	switch user.Role {
+	case models.RolePelamar:
+		if profile := handlers.GetApplicantProfile(db, user.ID); profile != nil {
+			profilePhotoURL = handlers.AttachmentURL(c, profile.ProfilePhotoPath)
+		}
+	case models.RoleStaff:
+		if profile, err := dbrepo.GetStaffProfileByUserID(db, user.ID); err == nil && profile != nil {
+			profilePhotoURL = handlers.AttachmentURL(c, profile.ProfilePhotoPath)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"user":              dto.UserFromModel(user),
+		"profile_photo_url": profilePhotoURL,
+	})
 }
 
 func Login(c *gin.Context) {
