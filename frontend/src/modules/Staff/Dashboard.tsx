@@ -46,18 +46,108 @@ const EMPTY_TERMINATION: DashboardPageProps['termination'] = {
     history: [],
 };
 
-const iconMap: Record<DashboardStats['icon'], JSX.Element> = {
-    alert: <AlertCircle className="h-4 w-4 text-blue-900" />,
-    message: <MessageSquare className="h-4 w-4 text-blue-900" />,
-    file: <FileText className="h-4 w-4 text-blue-900" />,
-    briefcase: <Briefcase className="h-4 w-4 text-blue-900" />,
+const statVisualMap: Record<DashboardStats['icon'], { icon: JSX.Element; accent: string }> = {
+    alert: {
+        icon: <AlertCircle className="h-4 w-4" />,
+        accent: 'bg-blue-100 text-blue-900',
+    },
+    message: {
+        icon: <MessageSquare className="h-4 w-4" />,
+        accent: 'bg-green-100 text-green-900',
+    },
+    file: {
+        icon: <FileText className="h-4 w-4" />,
+        accent: 'bg-orange-100 text-orange-900',
+    },
+    briefcase: {
+        icon: <Briefcase className="h-4 w-4" />,
+        accent: 'bg-purple-100 text-purple-900',
+    },
 };
+const ALLOWED_ICONS: ReadonlyArray<DashboardStats['icon']> = ['alert', 'message', 'file', 'briefcase'];
 
 export default function StaffDashboard() {
     const { props } = usePage<PageProps<Partial<DashboardPageProps>>>();
-    const stats = props.stats ?? EMPTY_STATS;
-    const recentComplaints = props.recentComplaints ?? EMPTY_COMPLAINTS;
-    const termination = props.termination ?? EMPTY_TERMINATION;
+    const stats = Array.isArray(props.stats)
+        ? props.stats.filter(
+            (item): item is DashboardStats =>
+                Boolean(item) &&
+                typeof item.label === 'string' &&
+                typeof item.value === 'number' &&
+                typeof item.icon === 'string' &&
+                ALLOWED_ICONS.includes(item.icon as DashboardStats['icon']),
+        )
+        : EMPTY_STATS;
+    const recentComplaints = Array.isArray(props.recentComplaints)
+        ? props.recentComplaints
+        : EMPTY_COMPLAINTS;
+    const terminationRaw =
+        props.termination && typeof props.termination === 'object'
+            ? props.termination
+            : EMPTY_TERMINATION;
+    const termination: DashboardPageProps['termination'] = {
+        active: terminationRaw.active ?? null,
+        history: Array.isArray(terminationRaw.history) ? terminationRaw.history : [],
+    };
+    const statsByIcon = stats.reduce<Record<DashboardStats['icon'], number>>(
+        (acc, item) => {
+            acc[item.icon] = item.value;
+            return acc;
+        },
+        { alert: 0, message: 0, file: 0, briefcase: 0 },
+    );
+    const activeComplaints = statsByIcon.alert;
+    const totalComplaints = statsByIcon.message;
+    const regulationsCount = statsByIcon.file;
+    const resignationCount = statsByIcon.briefcase;
+    const resolvedComplaints = Math.max(0, totalComplaints - activeComplaints);
+    const completionRate =
+        totalComplaints > 0
+            ? Math.round((resolvedComplaints / totalComplaints) * 100)
+            : 0;
+    const activeRate =
+        totalComplaints > 0
+            ? Math.round((activeComplaints / totalComplaints) * 100)
+            : 0;
+    const highPriorityRecent = recentComplaints.filter((item) => isHighPriority(item.priority)).length;
+    const onProgressRecent = recentComplaints.filter((item) => isInProgressStatus(item.status)).length;
+    const statCards = [
+        {
+            key: 'active',
+            label: 'Pengaduan Aktif',
+            value: activeComplaints,
+            icon: statVisualMap.alert.icon,
+            accent: statVisualMap.alert.accent,
+            subtext:
+                totalComplaints > 0
+                    ? `${activeRate}% dari total pengaduan`
+                    : 'Belum ada pengaduan',
+        },
+        {
+            key: 'total',
+            label: 'Total Pengaduan',
+            value: totalComplaints,
+            icon: statVisualMap.message.icon,
+            accent: statVisualMap.message.accent,
+            subtext: `${resolvedComplaints} pengaduan selesai`,
+        },
+        {
+            key: 'regulations',
+            label: 'Regulasi Terbaru',
+            value: regulationsCount,
+            icon: statVisualMap.file.icon,
+            accent: statVisualMap.file.accent,
+            subtext: 'Update regulasi 3 bulan terakhir',
+        },
+        {
+            key: 'resignation',
+            label: 'Pengajuan Resign',
+            value: resignationCount,
+            icon: statVisualMap.briefcase.icon,
+            accent: statVisualMap.briefcase.accent,
+            subtext: termination.active ? `Aktif: ${termination.active.status}` : 'Tidak ada pengajuan aktif',
+        },
+    ];
 
     const getDisplayProgress = (item: TerminationSummary | null) => {
         if (!item) return 0;
@@ -74,14 +164,6 @@ export default function StaffDashboard() {
         return Number.isFinite(raw) ? Math.max(0, raw) : 0;
     };
 
-    // Sembunyikan statistik regulasi/dokumen
-    const filteredStats = stats.filter(
-        (item) =>
-            item.icon !== 'file' &&
-            !item.label.toLowerCase().includes('regulasi') &&
-            !item.label.toLowerCase().includes('dokumen'),
-    );
-
     return (
         <>
             <Head title="Dashboard Staff" />
@@ -92,19 +174,83 @@ export default function StaffDashboard() {
                 {/* GRID TIDAK DIUBAH DI MOBILE  HANYA SCROLL */}
                 <section className="w-full">
                     <div className="grid w-full grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {filteredStats.map((item) => (
-                            <StatsCard
-                                key={item.label}
-                                label={item.label}
-                                value={item.value}
-                                icon={iconMap[item.icon]}
-                            />
-                        ))}
+                        {statCards.map((item) => {
+                            return (
+                                <StatsCard
+                                    key={item.key}
+                                    label={item.label}
+                                    value={item.value}
+                                    icon={item.icon}
+                                    accent={item.accent}
+                                    subtext={item.subtext}
+                                />
+                            );
+                        })}
                     </div>
                 </section>
 
+                <section className="mt-6">
+                    <Card className="p-4 sm:p-6">
+                        <div className="grid gap-4 lg:grid-cols-3">
+                            <div className="lg:col-span-2">
+                                <h2 className="text-lg font-semibold text-blue-900">Ringkasan Kinerja Pengaduan</h2>
+                                <p className="text-sm text-slate-500">
+                                    Pantau efektivitas penanganan keluhan berdasarkan data yang tersedia
+                                </p>
+
+                                <div className="mt-4 space-y-3">
+                                    <div className="rounded-lg border border-slate-200 p-3">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-medium text-slate-700">Tingkat Penyelesaian</p>
+                                            <p className="text-sm font-semibold text-emerald-700">{completionRate}%</p>
+                                        </div>
+                                        <Progress value={completionRate} className="mt-2" />
+                                    </div>
+
+                                    <div className="rounded-lg border border-slate-200 p-3">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-medium text-slate-700">Pengaduan Masih Aktif</p>
+                                            <p className="text-sm font-semibold text-amber-700">
+                                                {activeComplaints} dari {totalComplaints}
+                                            </p>
+                                        </div>
+                                        <Progress value={activeRate} className="mt-2" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="rounded-lg border border-slate-200 p-4">
+                                <h3 className="text-sm font-semibold text-slate-800">Snapshot Keluhan Terbaru</h3>
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Ringkasan dari {recentComplaints.length} keluhan terakhir
+                                </p>
+                                <div className="mt-3 space-y-2 text-sm text-slate-700">
+                                    <div className="flex items-center justify-between">
+                                        <span>Prioritas Tinggi</span>
+                                        <Badge variant="outline" className="border-red-500 text-red-600">
+                                            {highPriorityRecent}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span>On Progress</span>
+                                        <Badge variant="outline" className="border-amber-500 text-amber-600">
+                                            {onProgressRecent}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span>Status Resign Aktif</span>
+                                        <Badge variant="outline" className="border-blue-500 text-blue-600">
+                                            {termination.active ? termination.active.status : 'Tidak Ada'}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                </section>
+
                 {/* LIST SECTION */}
-                <section className="overflow-x-auto">
+                <section className="mt-6 overflow-x-auto">
                     <div className="grid min-w-max grid-cols-1 gap-6 lg:grid-cols-1">
                         <Card className="p-4 sm:p-6 w-full">
                             <h2 className="text-lg font-semibold text-blue-900">Keluhan Terbaru</h2>
@@ -156,7 +302,12 @@ export default function StaffDashboard() {
                                 <Detail label="Efektif" value={termination.active.effectiveDate} />
 
                                 <div>
-                                    <p className="text-xs uppercase text-slate-500">Progress</p>
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-xs uppercase text-slate-500">Progress</p>
+                                        <p className="text-xs font-semibold text-slate-700">
+                                            {getDisplayProgress(termination.active)}%
+                                        </p>
+                                    </div>
                                     <Progress
                                         value={getDisplayProgress(termination.active)}
                                         className="mt-2"
@@ -226,6 +377,22 @@ function PriorityBadge({ priority }: { priority: string }) {
     if (s.includes('sedang') || s === 'medium')
         return <Badge className="bg-orange-500 text-white">Prioritas Sedang</Badge>;
     return <Badge className="bg-blue-500 text-white">Prioritas Rendah</Badge>;
+}
+
+function isHighPriority(priority: string) {
+    const value = (priority ?? '').toLowerCase();
+    return value.includes('tinggi') || value.includes('high');
+}
+
+function isInProgressStatus(status: string) {
+    const value = (status ?? '').toLowerCase();
+    return (
+        value.includes('progress') ||
+        value.includes('proses') ||
+        value.includes('ditangani') ||
+        value.includes('new') ||
+        value.includes('baru')
+    );
 }
 
 

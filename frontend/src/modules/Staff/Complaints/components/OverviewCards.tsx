@@ -14,25 +14,25 @@ export default function OverviewCards({ stats }: OverviewCardsProps) {
             <StatsCard
                 label="Pengaduan Baru"
                 value={stats.new}
-                icon={<AlertCircle className="h-4 w-4 text-blue-900" />}
+                icon={<AlertCircle className="h-4 w-4" />}
                 accent="bg-blue-100 text-blue-900"
             />
             <StatsCard
                 label="Sedang Ditangani"
                 value={stats.inProgress}
-                icon={<MessageSquare className="h-4 w-4 text-blue-900" />}
+                icon={<MessageSquare className="h-4 w-4" />}
                 accent="bg-amber-100 text-amber-900"
             />
             <StatsCard
                 label="Selesai Bulan Ini"
                 value={stats.resolved}
-                icon={<FileText className="h-4 w-4 text-blue-900" />}
+                icon={<FileText className="h-4 w-4" />}
                 accent="bg-green-100 text-green-900"
             />
             <StatsCard
                 label="Regulasi Aktif"
                 value={stats.regulations}
-                icon={<Megaphone className="h-4 w-4 text-blue-900" />}
+                icon={<Megaphone className="h-4 w-4" />}
                 accent="bg-purple-100 text-purple-900"
             />
         </section>

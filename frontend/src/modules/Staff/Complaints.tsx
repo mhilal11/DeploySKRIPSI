@@ -11,8 +11,9 @@ import ComplaintComposerDialog from "./Complaints/components/ComplaintComposerDi
 import ComplaintDetailDialog from "./Complaints/components/ComplaintDetailDialog";
 import ComplaintFilters from "./Complaints/components/ComplaintFilters";
 import ComplaintTable from "./Complaints/components/ComplaintTable";
+import OverviewCards from "./Complaints/components/OverviewCards";
 
-import type { ComplaintRecord, ComplaintsPageProps } from "./Complaints/types";
+import type { ComplaintRecord, ComplaintStats, ComplaintsPageProps } from "./Complaints/types";
 
 const EMPTY_COMPLAINTS: ComplaintRecord[] = [];
 const EMPTY_FILTERS: ComplaintsPageProps["filters"] = {
@@ -20,11 +21,26 @@ const EMPTY_FILTERS: ComplaintsPageProps["filters"] = {
     statuses: [],
     priorities: [],
 };
+const EMPTY_STATS: ComplaintStats = {
+    new: 0,
+    inProgress: 0,
+    resolved: 0,
+    regulations: 0,
+};
 
 export default function StaffComplaints() {
     const { props } = usePage<PageProps<Partial<ComplaintsPageProps>>>();
     const complaints = props.complaints ?? EMPTY_COMPLAINTS;
     const filters = props.filters ?? EMPTY_FILTERS;
+    const stats =
+        props.stats && typeof props.stats === "object"
+            ? {
+                  new: Number((props.stats as ComplaintStats).new ?? 0),
+                  inProgress: Number((props.stats as ComplaintStats).inProgress ?? 0),
+                  resolved: Number((props.stats as ComplaintStats).resolved ?? 0),
+                  regulations: Number((props.stats as ComplaintStats).regulations ?? 0),
+              }
+            : EMPTY_STATS;
 
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
@@ -88,6 +104,10 @@ export default function StaffComplaints() {
                     </Button>
                 }
             >
+                <section className="mt-6">
+                    <OverviewCards stats={stats} />
+                </section>
+
                 <Card className="mt-6 p-4 sm:p-5 md:p-6">
                     <ComplaintFilters
                         searchTerm={searchTerm}
