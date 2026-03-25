@@ -1,4 +1,4 @@
-﻿export interface AccountRecord {
+export interface AccountRecord {
     id: number;
     employee_code?: string | null;
     name: string;
@@ -10,6 +10,29 @@
     inactive_at?: string | null;
     last_login_at?: string | null;
     created_at?: string | null;
+}
+
+export interface AccountProfile {
+    type: 'staff' | 'pelamar';
+    profile_photo_url?: string | null;
+    full_name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    date_of_birth?: string | null;
+    religion?: string | null;
+    gender?: string | null;
+    address?: string | null;
+    domicile_address?: string | null;
+    city?: string | null;
+    province?: string | null;
+    education_level?: string | null;
+    educations?: Array<Record<string, any>>;
+    experiences?: Array<Record<string, any>>;
+    certifications?: Array<Record<string, any>>;
+}
+
+export interface AccountDetailUser extends AccountRecord {
+    profile?: AccountProfile | null;
 }
 
 export interface PaginationLink {
@@ -28,4 +51,3 @@ export interface PaginatedAccounts {
     from: number | null;
     to: number | null;
 }
-

@@ -68,6 +68,7 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 
 	rg.GET("/super-admin/accounts", SuperAdminAccountsIndex)
 	rg.GET("/super-admin/accounts/create", SuperAdminAccountsCreate)
+	rg.GET("/super-admin/accounts/:id/detail", SuperAdminAccountsDetail)
 	rg.GET("/super-admin/accounts/:id/edit", SuperAdminAccountsEdit)
 	rg.POST("/super-admin/accounts", SuperAdminAccountsStore)
 	rg.PUT("/super-admin/accounts/:id", SuperAdminAccountsUpdate)
