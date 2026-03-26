@@ -2,7 +2,7 @@ import { ArrowLeft, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { FormEventHandler, useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { Toaster, toast } from 'sonner';
 
 import InputError from '@/shared/components/InputError';
 import {
@@ -22,6 +22,7 @@ import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
 
 
 const logo = '/img/LogoLDP.png';
+const REGISTER_SUCCESS_TOAST_KEY = 'auth_register_success_toast';
 
 export default function Login({
     status,
@@ -44,6 +45,11 @@ export default function Login({
     const typedErrors = errors as ExtendedErrors;
     const credentialError = typedErrors.credentials;
     const inactiveMessage = typedErrors.account_status;
+    const normalizedStatus = status?.trim().toLowerCase() ?? '';
+    const statusMessage =
+        normalizedStatus === 'email-verified'
+            ? 'Email berhasil diverifikasi. Silakan login.'
+            : status;
     const [showInactiveDialog, setShowInactiveDialog] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -54,10 +60,51 @@ export default function Login({
     }, []);
 
     useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const queuedToast = window.sessionStorage.getItem(
+            REGISTER_SUCCESS_TOAST_KEY,
+        );
+        if (!queuedToast) {
+            return;
+        }
+
+        window.sessionStorage.removeItem(REGISTER_SUCCESS_TOAST_KEY);
+
+        try {
+            const parsed = JSON.parse(queuedToast) as {
+                title?: string;
+                description?: string;
+            };
+            toast.success(parsed.title ?? 'Pendaftaran berhasil.', {
+                description:
+                    parsed.description ??
+                    'Akun berhasil dibuat. Silakan verifikasi email Anda terlebih dahulu sebelum login.',
+            });
+        } catch {
+            toast.success('Pendaftaran berhasil.', {
+                description: 'Akun berhasil dibuat. Silakan verifikasi email Anda terlebih dahulu sebelum login.',
+            });
+        }
+    }, []);
+
+    useEffect(() => {
         if (inactiveMessage) {
             setShowInactiveDialog(true);
         }
     }, [inactiveMessage]);
+
+    useEffect(() => {
+        if (normalizedStatus !== 'email-verified') {
+            return;
+        }
+
+        toast.success('Email berhasil diverifikasi.', {
+            description: 'Akun Anda sudah aktif. Silakan login.',
+        });
+    }, [normalizedStatus]);
 
     useEffect(() => {
         let mounted = true;
@@ -167,9 +214,9 @@ export default function Login({
                                 </p>
                             </div>
 
-                            {status && (
+                            {statusMessage && normalizedStatus !== 'email-verified' && (
                                 <div className="mb-4 rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-sm text-emerald-200">
-                                    {status}
+                                    {statusMessage}
                                 </div>
                             )}
 
@@ -323,6 +370,8 @@ export default function Login({
                     </AlertDialogContent>
                 </AlertDialog>
             )}
+
+            <Toaster richColors position="top-right" />
         </>
     );
 }

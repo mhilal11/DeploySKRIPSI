@@ -161,6 +161,19 @@ export default function Applications({
                     preserveScroll: true,
                 });
             },
+            onError: (formErrors) => {
+                const firstError = Object.values(formErrors).find(
+                    (message) =>
+                        typeof message === 'string' && message.trim() !== '',
+                );
+
+                toast.error('Gagal mengirim lamaran', {
+                    description:
+                        typeof firstError === 'string'
+                            ? firstError
+                            : 'Periksa kembali data lamaran Anda.',
+                });
+            },
         });
     };
 

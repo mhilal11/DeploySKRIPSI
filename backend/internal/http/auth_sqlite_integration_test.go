@@ -218,6 +218,101 @@ func TestForgotPasswordRejectsUnknownEmail_SQLiteIntegration(t *testing.T) {
 	}
 }
 
+func TestPelamarUnverifiedCannotLogin_SQLiteIntegration(t *testing.T) {
+	t.Parallel()
+
+	db := mustOpenSQLiteAuthDB(t)
+	defer db.Close()
+
+	password := "Password123!"
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("failed hashing password: %v", err)
+	}
+
+	_, err = db.Exec(`
+		INSERT INTO users (id, employee_code, name, email, role, division, status, password, email_verified_at)
+		VALUES (2, 'PEL-002', 'Pelamar Demo', 'pelamar@example.com', 'Pelamar', NULL, 'Active', ?, NULL)
+	`, string(hash))
+	if err != nil {
+		t.Fatalf("failed seeding pelamar user: %v", err)
+	}
+
+	cfg := config.Config{
+		Env:                     "development",
+		FrontendURL:             "http://localhost:5173",
+		BaseURL:                 "http://localhost:8080",
+		SessionSecret:           "0123456789abcdef0123456789abcdef",
+		SessionSecretFromEnv:    true,
+		CSRFSecret:              "abcdef0123456789abcdef0123456789",
+		CSRFSecretFromEnv:       true,
+		MaxRequestBodyBytes:     25 * 1024 * 1024,
+		StoragePath:             "./storage",
+		DisableBackgroundWorker: true,
+	}
+	router := NewRouter(cfg, db)
+	server := httptest.NewServer(router)
+	defer server.Close()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatalf("failed creating cookie jar: %v", err)
+	}
+	client := &http.Client{Jar: jar}
+
+	csrfRes, err := client.Get(server.URL + "/api/csrf")
+	if err != nil {
+		t.Fatalf("failed calling csrf endpoint: %v", err)
+	}
+	defer csrfRes.Body.Close()
+
+	csrfBody, err := io.ReadAll(csrfRes.Body)
+	if err != nil {
+		t.Fatalf("failed reading csrf response body: %v", err)
+	}
+	var csrfPayload struct {
+		Token string `json:"csrf_token"`
+	}
+	if err := json.Unmarshal(csrfBody, &csrfPayload); err != nil {
+		t.Fatalf("failed parsing csrf response: %v", err)
+	}
+
+	loginReq, err := http.NewRequest(
+		http.MethodPost,
+		server.URL+"/api/login",
+		strings.NewReader(`{"email":"pelamar@example.com","password":"Password123!"}`),
+	)
+	if err != nil {
+		t.Fatalf("failed creating login request: %v", err)
+	}
+	loginReq.Header.Set("Content-Type", "application/json")
+	loginReq.Header.Set("X-CSRF-Token", csrfPayload.Token)
+	loginRes, err := client.Do(loginReq)
+	if err != nil {
+		t.Fatalf("failed calling login endpoint: %v", err)
+	}
+	defer loginRes.Body.Close()
+
+	if loginRes.StatusCode != http.StatusUnprocessableEntity {
+		loginBody, _ := io.ReadAll(loginRes.Body)
+		t.Fatalf("expected login 422, got %d body=%s", loginRes.StatusCode, string(loginBody))
+	}
+
+	loginBody, err := io.ReadAll(loginRes.Body)
+	if err != nil {
+		t.Fatalf("failed reading login response body: %v", err)
+	}
+
+	var payload struct {
+		Errors map[string]string `json:"errors"`
+	}
+	if err := json.Unmarshal(loginBody, &payload); err != nil {
+		t.Fatalf("failed parsing login response: %v", err)
+	}
+	if payload.Errors["credentials"] == "" {
+		t.Fatalf("expected credentials error for unverified pelamar, got %+v", payload.Errors)
+	}
+}
+
 func mustOpenSQLiteAuthDB(t *testing.T) *sqlx.DB {
 	t.Helper()
 

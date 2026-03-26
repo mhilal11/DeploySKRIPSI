@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -235,6 +236,13 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	if user.Role == models.RolePelamar && user.EmailVerifiedAt == nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{
+			"credentials": "Email belum diverifikasi. Silakan cek inbox Anda dan klik tautan verifikasi terlebih dahulu.",
+		})
+		return
+	}
+
 	now := time.Now()
 	_ = repo.SetUserLastLogin(user.ID, now)
 
@@ -326,7 +334,7 @@ func Register(c *gin.Context) {
 	sendVerificationEmail(c, &models.User{ID: userID, Name: req.Name, Email: req.Email})
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":      "Akun Anda berhasil dibuat. Silakan masuk menggunakan email dan password yang telah didaftarkan.",
+		"status":      "Akun berhasil dibuat. Silakan verifikasi email Anda terlebih dahulu sebelum login.",
 		"redirect_to": "/login",
 	})
 }
@@ -362,7 +370,7 @@ func ForgotPassword(c *gin.Context) {
 	_ = repo.SavePasswordResetToken(req.Email, token, time.Now())
 
 	cfg := middleware.GetConfig(c)
-	resetURL := cfg.FrontendURL + "/reset-password/" + token + "?email=" + url.QueryEscape(req.Email)
+	resetURL := frontendURL(cfg, "/reset-password/"+token+"?email="+url.QueryEscape(req.Email))
 	body := fmt.Sprintf("Halo,\n\nSilakan klik tautan berikut untuk mereset kata sandi Anda:\n%s\n\nTautan ini berlaku selama 60 menit.\nJika Anda tidak meminta reset kata sandi, abaikan email ini.", resetURL)
 	_ = services.SendEmail(cfg, req.Email, "Reset Kata Sandi", body)
 
@@ -519,14 +527,14 @@ func VerifyEmail(c *gin.Context) {
 		if user.EmailVerifiedAt == nil {
 			_ = repo.MarkUserEmailVerified(user.ID, now)
 		}
-		_ = repo.DeleteEmailVerificationTokenByUserID(user.ID)
 
 		redirectURL := "/dashboard"
 		if wantsJSON(c) {
 			c.JSON(http.StatusOK, gin.H{"status": "verified", "redirect_to": redirectURL})
 			return
 		}
-		c.Redirect(http.StatusFound, middleware.GetConfig(c).FrontendURL+redirectURL)
+		cfg := middleware.GetConfig(c)
+		redirectBrowser(c, frontendURL(cfg, "/login?status="+url.QueryEscape("email-verified")))
 		return
 	}
 
@@ -584,7 +592,8 @@ func VerifyEmail(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "verified", "redirect_to": redirectURL})
 		return
 	}
-	c.Redirect(http.StatusFound, middleware.GetConfig(c).FrontendURL+redirectURL)
+	cfg := middleware.GetConfig(c)
+	redirectBrowser(c, frontendURL(cfg, "/login?status="+url.QueryEscape("email-verified")))
 }
 
 func dashboardPathFor(user models.User) string {
@@ -654,8 +663,94 @@ func sendVerificationEmail(c *gin.Context, user *models.User) {
 		return
 	}
 	cfg := middleware.GetConfig(c)
-	body := fmt.Sprintf("Halo %s,\n\nSilakan verifikasi alamat email Anda dengan membuka tautan berikut:\n%s\n\nTautan ini berlaku selama 60 menit.\nJika Anda tidak membuat akun, abaikan email ini.", user.Name, link)
-	_ = services.SendEmail(cfg, user.Email, "Verifikasi Email", body)
+	textBody, htmlBody := buildVerificationEmailTemplate(user.Name, link)
+	_ = services.SendEmailMultipart(cfg, user.Email, "Verifikasi Email", textBody, htmlBody)
+}
+
+func buildVerificationEmailTemplate(name string, verificationLink string) (string, string) {
+	displayName := strings.TrimSpace(name)
+	if displayName == "" {
+		displayName = "Pelamar"
+	}
+
+	cleanLink := strings.TrimSpace(verificationLink)
+	escapedName := html.EscapeString(displayName)
+	escapedLink := html.EscapeString(cleanLink)
+
+	textBody := fmt.Sprintf(
+		"Halo %s,\n\n"+
+			"Terima kasih sudah mendaftar di Lintas Data Prima.\n"+
+			"Silakan verifikasi alamat email Anda melalui tautan berikut:\n%s\n\n"+
+			"Tautan ini berlaku selama 60 menit.\n"+
+			"Jika Anda tidak membuat akun, abaikan email ini.\n\n"+
+			"Salam,\nTim Rekrutmen Lintas Data Prima",
+		displayName,
+		cleanLink,
+	)
+
+	htmlBody := fmt.Sprintf(`<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verifikasi Email</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f6fb;font-family:Segoe UI,Arial,sans-serif;color:#0f172a;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%%" style="background:#f3f6fb;padding:28px 14px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%%" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#0f172a 0%%,#1e3a8a 100%%);padding:24px 28px;">
+              <div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#c7d2fe;">Lintas Data Prima</div>
+              <h1 style="margin:10px 0 0;font-size:24px;line-height:1.3;color:#ffffff;">Verifikasi Email Anda</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;">
+              <p style="margin:0 0 14px;font-size:16px;line-height:1.7;">Halo <strong>%s</strong>,</p>
+              <p style="margin:0 0 14px;font-size:15px;line-height:1.7;color:#334155;">
+                Terima kasih sudah mendaftar sebagai pelamar di Lintas Data Prima.
+                Untuk melanjutkan proses rekrutmen, silakan verifikasi alamat email Anda.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0;">
+                <tr>
+                  <td style="border-radius:10px;background:#1d4ed8;">
+                    <a href="%s" style="display:inline-block;padding:14px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">
+                      Verifikasi Email Saya
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 10px;font-size:13px;line-height:1.6;color:#64748b;">
+                Tautan verifikasi ini berlaku selama <strong>60 menit</strong>.
+              </p>
+              <p style="margin:0 0 18px;font-size:13px;line-height:1.6;color:#64748b;">
+                Jika tombol tidak dapat diklik, salin dan buka tautan berikut di browser Anda:
+              </p>
+              <p style="margin:0;padding:12px 14px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;word-break:break-all;font-size:12px;line-height:1.6;color:#1e293b;">
+                <a href="%s" style="color:#1d4ed8;text-decoration:none;">%s</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 24px;border-top:1px solid #e2e8f0;">
+              <p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8;">
+                Jika Anda tidak membuat akun, abaikan email ini.
+              </p>
+              <p style="margin:8px 0 0;font-size:12px;line-height:1.6;color:#94a3b8;">
+                © Lintas Data Prima - Tim Rekrutmen
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`, escapedName, escapedLink, escapedLink, escapedLink)
+
+	return textBody, htmlBody
 }
 
 func signVerification(secret string, userID int64, hash string, expires int64) string {

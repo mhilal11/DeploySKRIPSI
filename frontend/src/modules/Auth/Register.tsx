@@ -2,7 +2,7 @@ import { ArrowLeft, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { FormEventHandler, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { Toaster, toast } from "sonner";
 
 import InputError from "@/shared/components/InputError";
 import {
@@ -21,6 +21,7 @@ import { Head, useForm } from "@/shared/lib/inertia";
 import { markLandingSplashSkipOnce } from "@/shared/lib/landing-splash";
 
 const logo = "/img/LogoLDP.png";
+const REGISTER_SUCCESS_TOAST_KEY = "auth_register_success_toast";
 
 function buildGoogleRegisterUrl(): string {
     const apiBase = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || "/api";
@@ -100,9 +101,25 @@ export default function Register({
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
         post("/register", {
-            onSuccess: () => {
-                toast.success("Pendaftaran berhasil.", {
-                    description: "Akun berhasil dibuat. Silakan lanjutkan proses login.",
+            onSuccess: (responseData: any) => {
+                const title = "Pendaftaran berhasil.";
+                const description =
+                    "Akun berhasil dibuat. Silakan verifikasi email Anda terlebih dahulu sebelum login.";
+
+                if (
+                    typeof window !== "undefined" &&
+                    typeof responseData?.redirect_to === "string" &&
+                    responseData.redirect_to.startsWith("/login")
+                ) {
+                    window.sessionStorage.setItem(
+                        REGISTER_SUCCESS_TOAST_KEY,
+                        JSON.stringify({ title, description })
+                    );
+                    return;
+                }
+
+                toast.success(title, {
+                    description,
                 });
             },
             onError: (formErrors) => {
@@ -428,6 +445,8 @@ export default function Register({
                     </AlertDialogContent>
                 </AlertDialog>
             )}
+
+            <Toaster richColors position="top-right" />
         </>
     );
 }
