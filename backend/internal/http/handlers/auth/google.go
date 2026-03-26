@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"errors"
+	"html"
 	"html/template"
 	"net/http"
 	"net/url"
@@ -273,8 +274,70 @@ func sendGooglePasswordSetupEmail(c *gin.Context, email string) error {
 
 	cfg := middleware.GetConfig(c)
 	resetURL := frontendURL(cfg, "/set-password/"+token+"?email="+url.QueryEscape(email))
-	body := "Halo,\n\nAkun Anda berhasil dibuat menggunakan Google.\nSilakan atur kata sandi akun Anda melalui tautan berikut:\n" + resetURL + "\n\nTautan ini berlaku selama 60 menit."
-	return services.SendEmail(cfg, email, "Atur Kata Sandi Akun", body)
+	logoURL := frontendURL(cfg, "/img/LogoLDP.png")
+	textBody, htmlBody := buildGoogleSetPasswordEmailTemplate(resetURL, logoURL)
+	return services.SendEmailMultipart(cfg, email, "Atur Kata Sandi Akun", textBody, htmlBody)
+}
+
+func buildGoogleSetPasswordEmailTemplate(resetURL string, logoURL string) (string, string) {
+	cleanURL := strings.TrimSpace(resetURL)
+	escapedURL := html.EscapeString(cleanURL)
+	escapedLogoURL := html.EscapeString(strings.TrimSpace(logoURL))
+
+	textBody := "Halo,\n\n" +
+		"Akun Anda berhasil dibuat menggunakan Google.\n" +
+		"Silakan atur kata sandi akun Anda melalui tautan berikut:\n" + cleanURL + "\n\n" +
+		"Tautan ini berlaku selama 60 menit.\n\n" +
+		"Salam,\nTim Rekrutmen Lintas Data Prima"
+
+	htmlBody := `<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atur Kata Sandi Akun</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f6fb;font-family:Segoe UI,Arial,sans-serif;color:#0f172a;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:#f3f6fb;padding:28px 14px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);padding:24px 28px;">
+              <img src="` + escapedLogoURL + `" alt="Lintas Data Prima" style="display:block;height:42px;width:auto;max-width:180px;margin-bottom:12px;" />
+              <h1 style="margin:0;font-size:24px;line-height:1.3;color:#ffffff;">Atur Kata Sandi Akun</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;">
+              <p style="margin:0 0 14px;font-size:15px;line-height:1.7;color:#334155;">
+                Akun Anda berhasil dibuat menggunakan Google. Silakan atur kata sandi agar Anda dapat login menggunakan email dan password.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0;">
+                <tr>
+                  <td style="border-radius:10px;background:#1d4ed8;">
+                    <a href="` + escapedURL + `" style="display:inline-block;padding:14px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">
+                      Atur Kata Sandi
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 10px;font-size:13px;line-height:1.6;color:#64748b;">
+                Tautan ini berlaku selama <strong>60 menit</strong>.
+              </p>
+              <p style="margin:0;padding:12px 14px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;word-break:break-all;font-size:12px;line-height:1.6;color:#1e293b;">
+                <a href="` + escapedURL + `" style="color:#1d4ed8;text-decoration:none;">` + escapedURL + `</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
+
+	return textBody, htmlBody
 }
 
 func clearGoogleOAuthSession(session sessions.Session) {

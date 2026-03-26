@@ -481,6 +481,7 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 			ApplicantName: application.FullName,
 			Position:      application.Position,
 			Division:      handlers.FirstString(application.Division, ""),
+			LogoURL:       superAdminFrontendURL(cfg.FrontendURL, "/img/LogoLDP.png"),
 			DateISO:       date,
 			StartTime:     timeStart,
 			EndTime:       timeEnd,
@@ -531,6 +532,7 @@ type interviewScheduleEmailPayload struct {
 	ApplicantName string
 	Position      string
 	Division      string
+	LogoURL       string
 	DateISO       string
 	StartTime     string
 	EndTime       string
@@ -663,6 +665,7 @@ func buildInterviewScheduleEmail(payload interviewScheduleEmailPayload) (string,
 	escapedInterviewer := html.EscapeString(interviewer)
 	escapedNotes := html.EscapeString(notes)
 	escapedMeetingLink := html.EscapeString(meetingLink)
+	escapedLogoURL := html.EscapeString(strings.TrimSpace(payload.LogoURL))
 
 	meetingLinkHTML := escapedMeetingLink
 	if strings.TrimSpace(meetingLink) != "-" && !strings.HasPrefix(strings.TrimSpace(meetingLink), "(") {
@@ -683,6 +686,7 @@ func buildInterviewScheduleEmail(payload interviewScheduleEmailPayload) (string,
         <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border:1px solid #dbeafe;border-radius:18px;overflow:hidden;">
           <tr>
             <td style="padding:24px 28px;background:linear-gradient(135deg,#0f172a 0%%,#1d4ed8 100%%);">
+              <img src="%s" alt="Lintas Data Prima" style="display:block;height:42px;width:auto;max-width:180px;margin-bottom:12px;" />
               <p style="margin:0;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#bfdbfe;font-weight:700;">Lintas Data Prima</p>
               <h1 style="margin:10px 0 0;font-size:24px;line-height:1.3;color:#ffffff;">%s</h1>
             </td>
@@ -718,6 +722,7 @@ func buildInterviewScheduleEmail(payload interviewScheduleEmailPayload) (string,
   </table>
 </body>
 </html>`,
+		escapedLogoURL,
 		escapedTitle,
 		escapedTitle,
 		escapedName,
@@ -734,4 +739,28 @@ func buildInterviewScheduleEmail(payload interviewScheduleEmailPayload) (string,
 	)
 
 	return subject, textBody, htmlBody
+}
+
+func superAdminFrontendURL(frontendCSV string, path string) string {
+	base := ""
+	for _, item := range strings.Split(frontendCSV, ",") {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		base = strings.TrimRight(trimmed, "/")
+		break
+	}
+
+	if path == "" {
+		path = "/"
+	}
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	if base == "" {
+		return path
+	}
+	return base + path
 }

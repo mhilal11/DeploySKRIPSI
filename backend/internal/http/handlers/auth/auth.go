@@ -371,8 +371,9 @@ func ForgotPassword(c *gin.Context) {
 
 	cfg := middleware.GetConfig(c)
 	resetURL := frontendURL(cfg, "/reset-password/"+token+"?email="+url.QueryEscape(req.Email))
-	body := fmt.Sprintf("Halo,\n\nSilakan klik tautan berikut untuk mereset kata sandi Anda:\n%s\n\nTautan ini berlaku selama 60 menit.\nJika Anda tidak meminta reset kata sandi, abaikan email ini.", resetURL)
-	_ = services.SendEmail(cfg, req.Email, "Reset Kata Sandi", body)
+	logoURL := frontendURL(cfg, "/img/LogoLDP.png")
+	textBody, htmlBody := buildForgotPasswordEmailTemplate(resetURL, logoURL)
+	_ = services.SendEmailMultipart(cfg, req.Email, "Reset Kata Sandi", textBody, htmlBody)
 
 	statusMessage := "Link reset password telah dikirim ke email Anda."
 	redirectURL := "/forgot-password?status=" + url.QueryEscape(statusMessage)
@@ -663,11 +664,86 @@ func sendVerificationEmail(c *gin.Context, user *models.User) {
 		return
 	}
 	cfg := middleware.GetConfig(c)
-	textBody, htmlBody := buildVerificationEmailTemplate(user.Name, link)
+	logoURL := frontendURL(cfg, "/img/LogoLDP.png")
+	textBody, htmlBody := buildVerificationEmailTemplate(user.Name, link, logoURL)
 	_ = services.SendEmailMultipart(cfg, user.Email, "Verifikasi Email", textBody, htmlBody)
 }
 
-func buildVerificationEmailTemplate(name string, verificationLink string) (string, string) {
+func buildForgotPasswordEmailTemplate(resetURL string, logoURL string) (string, string) {
+	cleanURL := strings.TrimSpace(resetURL)
+	escapedURL := html.EscapeString(cleanURL)
+	escapedLogoURL := html.EscapeString(strings.TrimSpace(logoURL))
+
+	textBody := fmt.Sprintf(
+		"Halo,\n\n"+
+			"Silakan klik tautan berikut untuk mereset kata sandi Anda:\n%s\n\n"+
+			"Tautan ini berlaku selama 60 menit.\n"+
+			"Jika Anda tidak meminta reset kata sandi, abaikan email ini.\n\n"+
+			"Salam,\nTim Rekrutmen Lintas Data Prima",
+		cleanURL,
+	)
+
+	htmlBody := fmt.Sprintf(`<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset Kata Sandi</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f6fb;font-family:Segoe UI,Arial,sans-serif;color:#0f172a;">
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%%" style="background:#f3f6fb;padding:28px 14px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%%" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;">
+          <tr>
+            <td style="background:linear-gradient(135deg,#0f172a 0%%,#1e3a8a 100%%);padding:24px 28px;">
+              <img src="%s" alt="Lintas Data Prima" style="display:block;height:42px;width:auto;max-width:180px;margin-bottom:12px;" />
+              <h1 style="margin:0;font-size:24px;line-height:1.3;color:#ffffff;">Reset Kata Sandi</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;">
+              <p style="margin:0 0 14px;font-size:15px;line-height:1.7;color:#334155;">
+                Kami menerima permintaan untuk mereset kata sandi akun Anda.
+              </p>
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:24px 0;">
+                <tr>
+                  <td style="border-radius:10px;background:#1d4ed8;">
+                    <a href="%s" style="display:inline-block;padding:14px 22px;font-size:14px;font-weight:700;color:#ffffff;text-decoration:none;">
+                      Atur Ulang Kata Sandi
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 10px;font-size:13px;line-height:1.6;color:#64748b;">
+                Tautan ini berlaku selama <strong>60 menit</strong>.
+              </p>
+              <p style="margin:0 0 18px;font-size:13px;line-height:1.6;color:#64748b;">
+                Jika tombol tidak dapat diklik, salin dan buka tautan berikut di browser Anda:
+              </p>
+              <p style="margin:0;padding:12px 14px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;word-break:break-all;font-size:12px;line-height:1.6;color:#1e293b;">
+                <a href="%s" style="color:#1d4ed8;text-decoration:none;">%s</a>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 24px;border-top:1px solid #e2e8f0;">
+              <p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8;">
+                Jika Anda tidak meminta reset kata sandi, abaikan email ini.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`, escapedLogoURL, escapedURL, escapedURL, escapedURL)
+
+	return textBody, htmlBody
+}
+
+func buildVerificationEmailTemplate(name string, verificationLink string, logoURL string) (string, string) {
 	displayName := strings.TrimSpace(name)
 	if displayName == "" {
 		displayName = "Pelamar"
@@ -676,6 +752,7 @@ func buildVerificationEmailTemplate(name string, verificationLink string) (strin
 	cleanLink := strings.TrimSpace(verificationLink)
 	escapedName := html.EscapeString(displayName)
 	escapedLink := html.EscapeString(cleanLink)
+	escapedLogoURL := html.EscapeString(strings.TrimSpace(logoURL))
 
 	textBody := fmt.Sprintf(
 		"Halo %s,\n\n"+
@@ -702,6 +779,7 @@ func buildVerificationEmailTemplate(name string, verificationLink string) (strin
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%%" style="max-width:620px;background:#ffffff;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;">
           <tr>
             <td style="background:linear-gradient(135deg,#0f172a 0%%,#1e3a8a 100%%);padding:24px 28px;">
+              <img src="%s" alt="Lintas Data Prima" style="display:block;height:42px;width:auto;max-width:180px;margin-bottom:12px;" />
               <div style="font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#c7d2fe;">Lintas Data Prima</div>
               <h1 style="margin:10px 0 0;font-size:24px;line-height:1.3;color:#ffffff;">Verifikasi Email Anda</h1>
             </td>
@@ -748,7 +826,7 @@ func buildVerificationEmailTemplate(name string, verificationLink string) (strin
     </tr>
   </table>
 </body>
-</html>`, escapedName, escapedLink, escapedLink, escapedLink)
+</html>`, escapedLogoURL, escapedName, escapedLink, escapedLink, escapedLink)
 
 	return textBody, htmlBody
 }
