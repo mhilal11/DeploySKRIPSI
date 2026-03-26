@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
@@ -103,6 +104,8 @@ func respondEducationReferences(c *gin.Context) {
 	reference := loadEducationReference(cfg.EducationReferencePath)
 
 	query := strings.ToLower(strings.TrimSpace(c.Query("q")))
+	queryNormalized := normalizeSearchKey(query)
+	queryCompact := strings.ReplaceAll(queryNormalized, " ", "")
 	limit := clampLimit(c.Query("limit"))
 
 	institutionsSet := map[string]string{}
@@ -114,7 +117,7 @@ func respondEducationReferences(c *gin.Context) {
 			continue
 		}
 
-		if query == "" || strings.Contains(strings.ToLower(institution), query) {
+		if matchesReferenceQuery(institution, query, queryNormalized, queryCompact) {
 			institutionKey := normalizeSearchKey(institution)
 			institutionsSet[institutionKey] = pickShorterDisplay(institutionsSet[institutionKey], institution)
 		}
@@ -124,7 +127,7 @@ func respondEducationReferences(c *gin.Context) {
 			if program == "" {
 				continue
 			}
-			if query == "" || strings.Contains(strings.ToLower(program), query) {
+			if matchesReferenceQuery(program, query, queryNormalized, queryCompact) {
 				programKey := normalizeSearchKey(program)
 				programsSet[programKey] = pickShorterDisplay(programsSet[programKey], program)
 			}
@@ -334,6 +337,68 @@ func normalizeSearchKey(value string) string {
 	)
 	value = replacer.Replace(value)
 	return strings.Join(strings.Fields(value), " ")
+}
+
+func buildSearchAcronym(normalizedValue string) string {
+	parts := strings.Fields(normalizedValue)
+	if len(parts) == 0 {
+		return ""
+	}
+
+	var builder strings.Builder
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+
+		runes := []rune(part)
+		if len(runes) == 0 {
+			continue
+		}
+
+		first := runes[0]
+		if unicode.IsLetter(first) || unicode.IsDigit(first) {
+			builder.WriteRune(unicode.ToLower(first))
+		}
+	}
+
+	return builder.String()
+}
+
+func matchesReferenceQuery(value, rawQuery, normalizedQuery, compactQuery string) bool {
+	if rawQuery == "" {
+		return true
+	}
+
+	valueLower := strings.ToLower(strings.TrimSpace(value))
+	if valueLower == "" {
+		return false
+	}
+
+	if strings.Contains(valueLower, rawQuery) {
+		return true
+	}
+
+	normalizedValue := normalizeSearchKey(valueLower)
+	if normalizedQuery != "" && strings.Contains(normalizedValue, normalizedQuery) {
+		return true
+	}
+
+	if compactQuery == "" {
+		return false
+	}
+
+	compactValue := strings.ReplaceAll(normalizedValue, " ", "")
+	if strings.Contains(compactValue, compactQuery) {
+		return true
+	}
+
+	acronym := buildSearchAcronym(normalizedValue)
+	if acronym != "" && strings.Contains(acronym, compactQuery) {
+		return true
+	}
+
+	return false
 }
 
 func pickShorterDisplay(current, candidate string) string {

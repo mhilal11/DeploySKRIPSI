@@ -1,7 +1,7 @@
 {
   "source": "BAN-PT Direktori Prodi (sumber resmi)",
   "source_url": "https://www.banpt.or.id/direktori/model/dir_prodi/get_hasil_pencariannew.php",
-  "last_updated": "2026-02-09",
+  "last_updated": "2026-03-26",
   "institutions": [
     {
       "institution": "AKADEMI ADMINISTRASI RUMAH SAKIT MATARAM",
@@ -8803,6 +8803,45 @@
       ]
     },
     {
+      "institution": "Institut Teknologi Bandung",
+      "programs": [
+        "Arsitektur",
+        "Astronomi",
+        "Desain Interior",
+        "Desain Komunikasi Visual",
+        "Farmasi",
+        "Fisika",
+        "Kimia",
+        "Matematika",
+        "Mikrobiologi",
+        "Meteorologi",
+        "Oseanografi",
+        "Perencanaan Wilayah Dan Kota",
+        "Rekayasa Hayati",
+        "Sains Dan Teknologi Farmasi",
+        "Seni Rupa",
+        "Sistem Dan Teknologi Informasi",
+        "Teknik Dirgantara",
+        "Teknik Elektro",
+        "Teknik Fisika",
+        "Teknik Geodesi Dan Geomatika",
+        "Teknik Geofisika",
+        "Teknik Geologi",
+        "Teknik Industri",
+        "Teknik Informatika",
+        "Teknik Kimia",
+        "Teknik Lingkungan",
+        "Teknik Material",
+        "Teknik Mesin",
+        "Teknik Metalurgi",
+        "Teknik Pertambangan",
+        "Teknik Perminyakan",
+        "Teknik Sipil",
+        "Teknik Telekomunikasi",
+        "Teknologi Pasca Panen"
+      ]
+    },
+    {
       "institution": "Institut Teknologi Nasional Bandung",
       "programs": [
         "Arsitektur",
@@ -10590,14 +10629,6 @@
         "Pengelolaan Perhotelan",
         "Perhotelan",
         "Teknologi Informasi"
-      ]
-    },
-    {
-      "institution": "Politeknik Elektronik Negeri Surabaya",
-      "programs": [
-        "Teknik Elektro Industri",
-        "Teknik Elektronika",
-        "Teknik Telekomunikasi"
       ]
     },
     {
