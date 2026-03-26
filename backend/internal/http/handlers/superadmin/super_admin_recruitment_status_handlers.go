@@ -2,6 +2,7 @@ package superadmin
 
 import (
 	"fmt"
+	"html"
 	"mime"
 	"net/http"
 	"path/filepath"
@@ -472,6 +473,27 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 		return
 	}
 
+	emailSent := false
+	if application, appErr := dbrepo.GetApplicationByID(db, applicationID); appErr == nil && application != nil {
+		cfg := middleware.GetConfig(c)
+		subject, textBody, htmlBody := buildInterviewScheduleEmail(interviewScheduleEmailPayload{
+			IsReschedule:  hasExistingInterviewSchedule(previousSchedule),
+			ApplicantName: application.FullName,
+			Position:      application.Position,
+			Division:      handlers.FirstString(application.Division, ""),
+			DateISO:       date,
+			StartTime:     timeStart,
+			EndTime:       timeEnd,
+			Mode:          mode,
+			MeetingLink:   meetingLink,
+			Interviewer:   interviewer,
+			Notes:         notes,
+		})
+		if sendErr := services.SendEmailMultipart(cfg, strings.TrimSpace(application.Email), subject, textBody, htmlBody); sendErr == nil {
+			emailSent = true
+		}
+	}
+
 	appendAuditLog(c, db, auditLogPayload{
 		Module:      "Recruitment",
 		Action:      "SCHEDULE_INTERVIEW",
@@ -498,5 +520,218 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 		},
 	})
 
-	c.JSON(http.StatusOK, gin.H{"status": "Jadwal interview berhasil disimpan."})
+	c.JSON(http.StatusOK, gin.H{
+		"status":     "Jadwal interview berhasil disimpan.",
+		"email_sent": emailSent,
+	})
+}
+
+type interviewScheduleEmailPayload struct {
+	IsReschedule  bool
+	ApplicantName string
+	Position      string
+	Division      string
+	DateISO       string
+	StartTime     string
+	EndTime       string
+	Mode          string
+	MeetingLink   string
+	Interviewer   string
+	Notes         string
+}
+
+func hasExistingInterviewSchedule(previous *dbrepo.RecruitmentInterviewScheduleState) bool {
+	if previous == nil {
+		return false
+	}
+	if previous.InterviewDate != nil {
+		return true
+	}
+	if strings.TrimSpace(handlers.FirstString(previous.InterviewTime, "")) != "" {
+		return true
+	}
+	if strings.TrimSpace(handlers.FirstString(previous.InterviewEnd, "")) != "" {
+		return true
+	}
+	if strings.TrimSpace(handlers.FirstString(previous.InterviewMode, "")) != "" {
+		return true
+	}
+	return false
+}
+
+func formatInterviewDateID(dateISO string) string {
+	parsed, err := time.Parse("2006-01-02", strings.TrimSpace(dateISO))
+	if err != nil {
+		return strings.TrimSpace(dateISO)
+	}
+	months := []string{
+		"Januari", "Februari", "Maret", "April", "Mei", "Juni",
+		"Juli", "Agustus", "September", "Oktober", "November", "Desember",
+	}
+	monthLabel := months[int(parsed.Month())-1]
+	return fmt.Sprintf("%d %s %d", parsed.Day(), monthLabel, parsed.Year())
+}
+
+func buildInterviewScheduleEmail(payload interviewScheduleEmailPayload) (string, string, string) {
+	name := strings.TrimSpace(payload.ApplicantName)
+	if name == "" {
+		name = "Pelamar"
+	}
+
+	position := strings.TrimSpace(payload.Position)
+	if position == "" {
+		position = "Posisi yang dilamar"
+	}
+
+	division := strings.TrimSpace(payload.Division)
+	if division == "" {
+		division = "-"
+	}
+
+	mode := strings.TrimSpace(payload.Mode)
+	if mode == "" {
+		mode = "-"
+	}
+
+	meetingLink := strings.TrimSpace(payload.MeetingLink)
+	if mode == "Online" && meetingLink == "" {
+		meetingLink = "(Akan diinformasikan menyusul)"
+	}
+	if mode != "Online" && meetingLink == "" {
+		meetingLink = "-"
+	}
+
+	notes := strings.TrimSpace(payload.Notes)
+	if notes == "" {
+		notes = "-"
+	}
+
+	dateDisplay := formatInterviewDateID(payload.DateISO)
+	interviewer := strings.TrimSpace(payload.Interviewer)
+	if interviewer == "" {
+		interviewer = "Tim HR"
+	}
+
+	subjectPrefix := "Undangan Wawancara"
+	title := "Undangan Wawancara Anda"
+	description := "Anda diundang untuk mengikuti proses wawancara."
+	if payload.IsReschedule {
+		subjectPrefix = "Pembaruan Jadwal Wawancara"
+		title = "Pembaruan Jadwal Wawancara"
+		description = "Jadwal wawancara Anda telah diperbarui."
+	}
+
+	subject := fmt.Sprintf("%s - %s", subjectPrefix, position)
+
+	textBody := fmt.Sprintf(
+		"Halo %s,\n\n"+
+			"%s\n\n"+
+			"Detail jadwal wawancara:\n"+
+			"- Posisi: %s\n"+
+			"- Divisi: %s\n"+
+			"- Tanggal: %s\n"+
+			"- Waktu: %s - %s WIB\n"+
+			"- Mode: %s\n"+
+			"- Pewawancara: %s\n"+
+			"- Link Meeting: %s\n"+
+			"- Catatan: %s\n\n"+
+			"Mohon hadir tepat waktu dan siapkan dokumen pendukung yang diperlukan.\n"+
+			"Jika ada pertanyaan, silakan balas email ini.\n\n"+
+			"Salam,\nTim Rekrutmen Lintas Data Prima",
+		name,
+		description,
+		position,
+		division,
+		dateDisplay,
+		payload.StartTime,
+		payload.EndTime,
+		mode,
+		interviewer,
+		meetingLink,
+		notes,
+	)
+
+	escapedName := html.EscapeString(name)
+	escapedTitle := html.EscapeString(title)
+	escapedDescription := html.EscapeString(description)
+	escapedPosition := html.EscapeString(position)
+	escapedDivision := html.EscapeString(division)
+	escapedDate := html.EscapeString(dateDisplay)
+	escapedStart := html.EscapeString(payload.StartTime)
+	escapedEnd := html.EscapeString(payload.EndTime)
+	escapedMode := html.EscapeString(mode)
+	escapedInterviewer := html.EscapeString(interviewer)
+	escapedNotes := html.EscapeString(notes)
+	escapedMeetingLink := html.EscapeString(meetingLink)
+
+	meetingLinkHTML := escapedMeetingLink
+	if strings.TrimSpace(meetingLink) != "-" && !strings.HasPrefix(strings.TrimSpace(meetingLink), "(") {
+		meetingLinkHTML = fmt.Sprintf("<a href=\"%s\" style=\"color:#1d4ed8;text-decoration:none;\">%s</a>", escapedMeetingLink, escapedMeetingLink)
+	}
+
+	htmlBody := fmt.Sprintf(`<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>%s</title>
+</head>
+<body style="margin:0;padding:0;background:#eef2ff;font-family:Segoe UI,Arial,sans-serif;color:#0f172a;">
+  <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" style="background:#eef2ff;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;background:#ffffff;border:1px solid #dbeafe;border-radius:18px;overflow:hidden;">
+          <tr>
+            <td style="padding:24px 28px;background:linear-gradient(135deg,#0f172a 0%%,#1d4ed8 100%%);">
+              <p style="margin:0;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#bfdbfe;font-weight:700;">Lintas Data Prima</p>
+              <h1 style="margin:10px 0 0;font-size:24px;line-height:1.3;color:#ffffff;">%s</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px;">
+              <p style="margin:0 0 14px;font-size:16px;line-height:1.7;">Halo <strong>%s</strong>,</p>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#334155;">%s</p>
+              <table role="presentation" width="100%%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate;border-spacing:0 8px;">
+                <tr><td style="font-size:13px;color:#64748b;width:160px;">Posisi</td><td style="font-size:14px;color:#0f172a;font-weight:600;">%s</td></tr>
+                <tr><td style="font-size:13px;color:#64748b;">Divisi</td><td style="font-size:14px;color:#0f172a;">%s</td></tr>
+                <tr><td style="font-size:13px;color:#64748b;">Tanggal</td><td style="font-size:14px;color:#0f172a;">%s</td></tr>
+                <tr><td style="font-size:13px;color:#64748b;">Waktu</td><td style="font-size:14px;color:#0f172a;">%s - %s WIB</td></tr>
+                <tr><td style="font-size:13px;color:#64748b;">Mode</td><td style="font-size:14px;color:#0f172a;">%s</td></tr>
+                <tr><td style="font-size:13px;color:#64748b;">Pewawancara</td><td style="font-size:14px;color:#0f172a;">%s</td></tr>
+                <tr><td style="font-size:13px;color:#64748b;">Link Meeting</td><td style="font-size:14px;color:#0f172a;word-break:break-word;">%s</td></tr>
+                <tr><td style="font-size:13px;color:#64748b;vertical-align:top;padding-top:2px;">Catatan</td><td style="font-size:14px;color:#0f172a;white-space:pre-wrap;">%s</td></tr>
+              </table>
+              <p style="margin:20px 0 0;font-size:13px;line-height:1.7;color:#64748b;">
+                Mohon hadir tepat waktu dan siapkan dokumen pendukung yang diperlukan.
+                Jika ada pertanyaan, silakan balas email ini.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 24px;border-top:1px solid #e2e8f0;">
+              <p style="margin:0;font-size:12px;line-height:1.6;color:#94a3b8;">Email ini dikirim otomatis oleh sistem rekrutmen Lintas Data Prima.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+		escapedTitle,
+		escapedTitle,
+		escapedName,
+		escapedDescription,
+		escapedPosition,
+		escapedDivision,
+		escapedDate,
+		escapedStart,
+		escapedEnd,
+		escapedMode,
+		escapedInterviewer,
+		meetingLinkHTML,
+		escapedNotes,
+	)
+
+	return subject, textBody, htmlBody
 }
