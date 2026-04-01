@@ -1,6 +1,5 @@
-import { FilePlus2, Save, Upload, X } from 'lucide-react';
+import { Eye, EyeOff, FileText, FilePlus2, Save, X } from 'lucide-react';
 import Image from 'next/image';
-import type { ChangeEvent, FormEvent, RefObject } from 'react';
 
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -14,10 +13,9 @@ import {
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { cn } from '@/shared/lib/utils';
 
-import { NON_BODY_PLACEHOLDERS } from './constants';
 import type { EditableField, EditorMode, TemplateForm } from './types';
+import type { ChangeEvent, FormEvent, RefObject } from 'react';
 
 type TemplateEditorCardProps = {
     activeField: EditableField;
@@ -28,14 +26,17 @@ type TemplateEditorCardProps = {
     isBusy: boolean;
     logoInputRef: RefObject<HTMLInputElement>;
     logoPreview: string | null;
-    placeholders: Record<string, string>;
     templateContentRef: RefObject<HTMLTextAreaElement>;
+    canPreview: boolean;
+    isPdfPreviewLoading: boolean;
+    isPreviewVisible: boolean;
     onClearLogo: () => void;
-    onInsertPlaceholder: (placeholder: string) => void;
     onLogoChange: (event: ChangeEvent<HTMLInputElement>) => void;
+    onOpenPdfPreview: () => void;
     onResetEditor: () => void;
     onSetActiveField: (field: EditableField) => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+    onTogglePreview: () => void;
 };
 
 export function TemplateEditorCard({
@@ -47,20 +48,23 @@ export function TemplateEditorCard({
     isBusy,
     logoInputRef,
     logoPreview,
-    placeholders,
     templateContentRef,
+    canPreview,
+    isPdfPreviewLoading,
+    isPreviewVisible,
     onClearLogo,
-    onInsertPlaceholder,
     onLogoChange,
+    onOpenPdfPreview,
     onResetEditor,
     onSetActiveField,
     onSubmit,
+    onTogglePreview,
 }: TemplateEditorCardProps) {
     const isEditing = editorMode === 'edit';
 
     return (
-        <Card className="border-slate-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100">
+        <Card className="flex h-full flex-col border-slate-200 bg-white shadow-sm">
+            <CardHeader className="shrink-0 border-b border-slate-100">
                 <div className="flex flex-wrap items-center gap-2">
                     <CardTitle className="text-base text-blue-950">
                         {isEditing ? 'Edit Template' : 'Template Baru'}
@@ -74,13 +78,14 @@ export function TemplateEditorCard({
                     ini.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="pt-6">
+            <CardContent className="flex-1 overflow-y-auto pt-6">
                 <form className="space-y-5" onSubmit={onSubmit}>
                     <div className="space-y-2">
                         <Label htmlFor="template-name">Nama Template</Label>
                         <Input
                             id="template-name"
                             value={form.data.name}
+                            disabled={isBusy}
                             onChange={(event) => form.setData('name', event.target.value)}
                             placeholder="Contoh: Template Disposisi Utama"
                         />
@@ -97,6 +102,7 @@ export function TemplateEditorCard({
                                 ref={headerRef}
                                 rows={4}
                                 value={form.data.header_text}
+                                disabled={isBusy}
                                 onFocus={() => onSetActiveField('header_text')}
                                 onChange={(event) =>
                                     form.setData('header_text', event.target.value)
@@ -117,6 +123,7 @@ export function TemplateEditorCard({
                                 ref={footerRef}
                                 rows={4}
                                 value={form.data.footer_text}
+                                disabled={isBusy}
                                 onFocus={() => onSetActiveField('footer_text')}
                                 onChange={(event) =>
                                     form.setData('footer_text', event.target.value)
@@ -139,6 +146,7 @@ export function TemplateEditorCard({
                                 ref={logoInputRef}
                                 type="file"
                                 accept="image/png,image/jpeg,image/jpg"
+                                disabled={isBusy}
                                 onChange={onLogoChange}
                                 className="max-w-sm"
                             />
@@ -157,6 +165,7 @@ export function TemplateEditorCard({
                                         variant="ghost"
                                         size="sm"
                                         onClick={onClearLogo}
+                                        disabled={isBusy}
                                     >
                                         <X />
                                         Hapus logo
@@ -164,6 +173,11 @@ export function TemplateEditorCard({
                                 </div>
                             )}
                         </div>
+                        {form.errors.logo_file && (
+                            <p className="text-xs text-red-500">
+                                {form.errors.logo_file}
+                            </p>
+                        )}
                     </div>
 
                     <div className="space-y-2">
@@ -178,6 +192,7 @@ export function TemplateEditorCard({
                             ref={templateContentRef}
                             rows={16}
                             value={form.data.template_content}
+                            disabled={isBusy}
                             onFocus={() => onSetActiveField('template_content')}
                             onChange={(event) =>
                                 form.setData('template_content', event.target.value)
@@ -193,42 +208,6 @@ export function TemplateEditorCard({
                                 {form.errors.template_content}
                             </p>
                         )}
-                    </div>
-
-                    <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                            <Upload className="h-4 w-4" />
-                            Placeholder Siap Pakai
-                        </div>
-                        <p className="text-xs text-slate-500">
-                            Klik placeholder untuk menyisipkan ke area editor yang sedang
-                            aktif.
-                        </p>
-                        <div className="grid gap-2 md:grid-cols-2">
-                            {Object.entries(placeholders).map(([key, label]) => {
-                                const isAutomatic = NON_BODY_PLACEHOLDERS.has(key);
-
-                                return (
-                                    <button
-                                        key={key}
-                                        type="button"
-                                        disabled={isAutomatic}
-                                        onClick={() => onInsertPlaceholder(key)}
-                                        className={cn(
-                                            'flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors',
-                                            isAutomatic
-                                                ? 'cursor-not-allowed border-slate-200 bg-white text-slate-400'
-                                                : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50',
-                                        )}
-                                    >
-                                        <code className="text-xs">{key}</code>
-                                        <span className="ml-3 text-xs">
-                                            {isAutomatic ? 'Otomatis' : label}
-                                        </span>
-                                    </button>
-                                );
-                            })}
-                        </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3">
@@ -249,6 +228,28 @@ export function TemplateEditorCard({
                             <FilePlus2 />
                             Reset Editor
                         </Button>
+                        {canPreview && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onTogglePreview}
+                                disabled={isBusy}
+                            >
+                                {isPreviewVisible ? <EyeOff /> : <Eye />}
+                                {isPreviewVisible ? 'Sembunyikan Preview' : 'Preview'}
+                            </Button>
+                        )}
+                        {canPreview && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onOpenPdfPreview}
+                                disabled={isBusy || isPdfPreviewLoading}
+                            >
+                                <FileText />
+                                {isPdfPreviewLoading ? 'Menyiapkan PDF...' : 'Preview PDF'}
+                            </Button>
+                        )}
                         {form.recentlySuccessful && (
                             <span className="text-sm text-emerald-600">
                                 Template berhasil disimpan.

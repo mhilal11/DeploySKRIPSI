@@ -1,5 +1,3 @@
-import { Sparkles } from 'lucide-react';
-
 import {
     Card,
     CardDescription,
@@ -17,7 +15,7 @@ export function TemplateStatsGrid({
     templatesCount,
 }: TemplateStatsGridProps) {
     return (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
             <Card className="border-slate-200 bg-white shadow-sm">
                 <CardHeader className="pb-4">
                     <CardDescription>Total template</CardDescription>
@@ -31,17 +29,6 @@ export function TemplateStatsGrid({
                     <CardDescription>Template aktif</CardDescription>
                     <CardTitle className="text-lg font-semibold text-blue-950">
                         {activeTemplateName ?? 'Belum ada template aktif'}
-                    </CardTitle>
-                </CardHeader>
-            </Card>
-            <Card className="border-slate-200 bg-gradient-to-br from-blue-950 to-blue-900 text-white shadow-sm">
-                <CardHeader className="pb-4">
-                    <CardDescription className="text-blue-100">
-                        Mode kerja
-                    </CardDescription>
-                    <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                        <Sparkles className="h-5 w-5" />
-                        Editor Langsung
                     </CardTitle>
                 </CardHeader>
             </Card>

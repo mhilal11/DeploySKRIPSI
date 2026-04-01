@@ -22,7 +22,7 @@ type TemplateListPanelProps = {
     selectedTemplateId: number | null;
     templates: Template[];
     onDeleteTemplate: (template: Template) => void;
-    onDownloadTemplate: (templateId: number) => void;
+    onDownloadTemplate: (template: Template) => void;
     onSelectTemplate: (template: Template) => void;
     onToggleTemplate: (template: Template) => void;
 };
@@ -39,8 +39,8 @@ export function TemplateListPanel({
     onToggleTemplate,
 }: TemplateListPanelProps) {
     return (
-        <Card className="border-slate-200 bg-white shadow-sm">
-            <CardHeader className="border-b border-slate-100">
+        <Card className="flex h-full flex-col border-slate-200 bg-white shadow-sm">
+            <CardHeader className="shrink-0 border-b border-slate-100">
                 <CardTitle className="text-base text-blue-950">
                     Daftar Template
                 </CardTitle>
@@ -48,14 +48,14 @@ export function TemplateListPanel({
                     Pilih template untuk diedit, aktifkan, nonaktifkan, atau hapus.
                 </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3 pt-6">
+            <CardContent className="flex-1 space-y-3 overflow-y-auto pt-6">
                 {isRefreshingTemplates && (
                     <p className="text-xs text-slate-500">
                         Menyegarkan data template...
                     </p>
                 )}
                 {templates.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                    <div className="flex min-h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
                         Belum ada template. Buat template baru untuk mulai mengelola
                         surat.
                     </div>
@@ -77,7 +77,8 @@ export function TemplateListPanel({
                                 <button
                                     type="button"
                                     onClick={() => onSelectTemplate(template)}
-                                    className="w-full text-left"
+                                    disabled={isBusy}
+                                    className="w-full text-left disabled:cursor-not-allowed disabled:opacity-70"
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
@@ -129,7 +130,7 @@ export function TemplateListPanel({
                                         type="button"
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => onDownloadTemplate(template.id)}
+                                        onClick={() => onDownloadTemplate(template)}
                                         disabled={isBusy}
                                     >
                                         <Download />

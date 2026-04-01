@@ -51,6 +51,7 @@ func RegisterSuperAdminRoutes(rg *gin.RouterGroup) {
 
 	rg.GET("/super-admin/kelola-surat/templates/list", SuperAdminTemplatesList)
 	rg.GET("/super-admin/kelola-surat/templates/sample", SuperAdminTemplatesSample)
+	rg.POST("/super-admin/kelola-surat/templates/preview-pdf", SuperAdminTemplatesPreviewPDF)
 	rg.GET("/super-admin/kelola-surat/templates/:id/download", SuperAdminTemplatesDownload)
 	rg.GET("/super-admin/kelola-surat/templates", SuperAdminTemplatesIndex)
 	rg.POST("/super-admin/kelola-surat/templates", SuperAdminTemplatesStore)

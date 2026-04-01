@@ -208,7 +208,10 @@ export function useKelolaSuratState({
         });
     };
 
-    const handleDispositionSubmit = (mode: 'forward' | 'reject' | 'final') => {
+    const handleDispositionSubmit = (
+        mode: 'forward' | 'reject' | 'final',
+        options?: { templateId?: number | null },
+    ) => {
         const letterIds = dispositionTargets.map((letter) => letter.id);
 
         if (letterIds.length === 0) {
@@ -237,6 +240,10 @@ export function useKelolaSuratState({
         dispositionForm.transform((data) => ({
             ...data,
             letter_ids: letterIds,
+            template_id:
+                mode === 'final' && options?.templateId != null
+                    ? options.templateId
+                    : undefined,
         }));
 
         dispositionForm.post(route(routeName), {

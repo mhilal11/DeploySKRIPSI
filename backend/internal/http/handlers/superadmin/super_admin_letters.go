@@ -1,6 +1,7 @@
 package superadmin
 
 import (
+	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	dbrepo "hris-backend/internal/repository"
 
@@ -41,6 +42,7 @@ func SuperAdminLettersIndex(c *gin.Context) {
 	letters, _ := dbrepo.ListSuratByFiltersPaged(db, filterConfig, pagination.Limit, pagination.Offset)
 	totalLetters, _ := dbrepo.CountSuratByFilters(db, filterConfig)
 	letterStats, _ := dbrepo.CountSuratStatsByFilters(db, filterConfig)
+	templates, _ := dbrepo.ListLetterTemplates(db)
 
 	archive := []models.Surat{}
 	activeLetters := []models.Surat{}
@@ -79,6 +81,10 @@ func SuperAdminLettersIndex(c *gin.Context) {
 
 	divisionCode := services.DivisionCodeFromName(handlers.FirstString(user.Division, ""))
 	nextNumber, _ := services.GenerateNomorSurat(db, divisionCode, time.Now())
+	templatePayload := make([]dto.LetterTemplateListItem, 0, len(templates))
+	for _, template := range templates {
+		templatePayload = append(templatePayload, buildTemplateListItem(c, db, &template))
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"stats":      stats,
@@ -111,6 +117,7 @@ func SuperAdminLettersIndex(c *gin.Context) {
 			"divisions":   hrDivisionOptions(db),
 		},
 		"nextLetterNumber":     nextNumber,
+		"templates":            templatePayload,
 		"sidebarNotifications": handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
 	})
 }
@@ -320,6 +327,7 @@ func SuperAdminLettersFinalDisposition(c *gin.Context) {
 		ids = c.PostFormArray("letter_ids")
 	}
 	note := strings.TrimSpace(c.PostForm("disposition_note"))
+	templateIDValue := strings.TrimSpace(c.PostForm("template_id"))
 	validationErrors := handlers.FieldErrors{}
 	if note == "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"disposition_note": "Catatan disposisi wajib diisi untuk disposisi final."})
@@ -332,6 +340,21 @@ func SuperAdminLettersFinalDisposition(c *gin.Context) {
 	}
 
 	db := middleware.GetDB(c)
+	var selectedTemplateID int64
+	if templateIDValue != "" {
+		parsedTemplateID, err := strconv.ParseInt(templateIDValue, 10, 64)
+		if err != nil || parsedTemplateID <= 0 {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"template_id": "Template disposisi final tidak valid."})
+			return
+		}
+		selectedTemplate, err := dbrepo.GetLetterTemplateByID(db, parsedTemplateID)
+		if err != nil || selectedTemplate == nil {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"template_id": "Template disposisi final tidak ditemukan."})
+			return
+		}
+		selectedTemplateID = parsedTemplateID
+	}
+
 	for _, id := range ids {
 		suratID, parseErr := strconv.ParseInt(id, 10, 64)
 		if parseErr != nil || suratID <= 0 {
@@ -346,7 +369,7 @@ func SuperAdminLettersFinalDisposition(c *gin.Context) {
 			surat.DispositionNote = &note
 		}
 
-		filePath, fileName := generateDispositionDocument(c, db, surat)
+		filePath, fileName := generateDispositionDocument(c, db, surat, selectedTemplateID)
 		_ = dbrepo.UpdateSuratFinalDisposition(db, surat.SuratID, &filePath, &fileName, surat.DispositionNote, user.ID, time.Now())
 	}
 
@@ -404,7 +427,7 @@ func SuperAdminLettersExportWord(c *gin.Context) {
 		return
 	}
 
-	filePath, fileName := generateDispositionDocument(c, db, surat)
+	filePath, fileName := generateDispositionDocument(c, db, surat, 0)
 	normalizedPath := handlers.NormalizeAttachmentPath(filePath)
 	absPath, ok := resolveStorageFilePath(middleware.GetConfig(c).StoragePath, normalizedPath)
 	if !ok {
@@ -424,11 +447,19 @@ func SuperAdminLettersExportFinal(c *gin.Context) {
 	SuperAdminLettersExportWord(c)
 }
 
-func generateDispositionDocument(c *gin.Context, db *sqlx.DB, surat *models.Surat) (string, string) {
+func generateDispositionDocument(c *gin.Context, db *sqlx.DB, surat *models.Surat, templateID int64) (string, string) {
 	placeholders := dispositionPlaceholders(db, surat)
 
 	// try template
-	template, err := dbrepo.GetActiveLetterTemplate(db)
+	var (
+		template *models.LetterTemplate
+		err      error
+	)
+	if templateID > 0 {
+		template, err = dbrepo.GetLetterTemplateByID(db, templateID)
+	} else {
+		template, err = dbrepo.GetActiveLetterTemplate(db)
+	}
 	if err == nil && template != nil {
 		placeholders["{{header}}"] = handlers.FirstString(template.HeaderText, "")
 		placeholders["{{footer}}"] = handlers.FirstString(template.FooterText, "")

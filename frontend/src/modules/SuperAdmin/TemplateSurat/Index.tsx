@@ -11,6 +11,8 @@ import {
     TemplateEditorCard,
     TemplateListPanel,
     TemplatePageActions,
+    TemplatePlaceholderCard,
+    TemplatePdfPreviewDialog,
     TemplatePreviewCard,
     TemplateStatsGrid,
     type ConfirmTemplateAction,
@@ -27,12 +29,18 @@ import {
     buildInitialFormState,
     renderTemplateText,
 } from '@/modules/SuperAdmin/TemplateSurat/components/utils';
-import { api, apiUrl } from '@/shared/lib/api';
+import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
 import { Head, router, useForm, usePage, usePageManager } from '@/shared/lib/inertia';
 import { route } from '@/shared/lib/route';
 import type { PageProps } from '@/shared/types';
 
 import type { ChangeEvent, FormEvent, RefObject } from 'react';
+
+const ALLOWED_LOGO_FILE_TYPES = new Set([
+    'image/png',
+    'image/jpeg',
+    'image/jpg',
+]);
 
 export default function TemplateSuratIndex() {
     const page = usePage<PageProps<TemplateSuratPageProps>>();
@@ -78,6 +86,13 @@ export default function TemplateSuratIndex() {
         useState<ConfirmTemplateAction>(null);
     const [isMutatingTemplate, setIsMutatingTemplate] = useState(false);
     const [isRefreshingTemplates, setIsRefreshingTemplates] = useState(false);
+    const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+    const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false);
+    const [isPdfPreviewVisible, setIsPdfPreviewVisible] = useState(false);
+    const [hasPreviewAccess, setHasPreviewAccess] = useState(
+        initialTemplates.length > 0,
+    );
+    const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
 
     const templateContentRef = useRef<HTMLTextAreaElement>(null);
     const headerRef = useRef<HTMLTextAreaElement>(null);
@@ -104,10 +119,20 @@ export default function TemplateSuratIndex() {
         clearErrors();
         setLogoPreview(selectedTemplate?.logoUrl ?? null);
         setActiveField('template_content');
+        setHasPreviewAccess(Boolean(selectedTemplate));
+        setIsPdfPreviewVisible(false);
         if (logoInputRef.current) {
             logoInputRef.current.value = '';
         }
     }, [clearErrors, selectedTemplate, setData]);
+
+    useEffect(() => {
+        return () => {
+            if (pdfPreviewUrl) {
+                window.URL.revokeObjectURL(pdfPreviewUrl);
+            }
+        };
+    }, [pdfPreviewUrl]);
 
     const renderedHeader = useMemo(
         () => renderTemplateText(form.data.header_text, PREVIEW_VALUES),
@@ -124,6 +149,27 @@ export default function TemplateSuratIndex() {
 
     const isBusy =
         form.processing || isMutatingTemplate || isRefreshingTemplates;
+
+    const resetLogoInput = () => {
+        if (logoInputRef.current) {
+            logoInputRef.current.value = '';
+        }
+    };
+
+    const getFirstErrorMessage = (
+        errors: Record<string, string> | undefined,
+        fallbackMessage: string,
+    ) => {
+        if (!errors) {
+            return fallbackMessage;
+        }
+
+        const firstMessage = Object.values(errors).find(
+            (value) => typeof value === 'string' && value.trim() !== '',
+        );
+
+        return firstMessage ?? fallbackMessage;
+    };
 
     const syncTemplates = (
         nextTemplates: Template[],
@@ -159,11 +205,14 @@ export default function TemplateSuratIndex() {
 
         setEditorMode('edit');
         setSelectedTemplateId(resolvedSelection.id);
+
+        return resolvedSelection;
     };
 
     const refreshTemplates = async (options?: {
         preferredTemplateId?: number | null;
         mode?: EditorMode | 'auto';
+        suppressErrorToast?: boolean;
     }) => {
         setIsRefreshingTemplates(true);
         try {
@@ -175,42 +224,74 @@ export default function TemplateSuratIndex() {
             );
             const nextTemplates = (data?.templates ?? []) as Template[];
             syncTemplates(nextTemplates, options);
-            return nextTemplates;
+            return true;
         } catch {
-            toast.error('Gagal memuat ulang data template surat.');
-            return [];
+            if (!options?.suppressErrorToast) {
+                toast.error('Gagal memuat ulang data template surat.');
+            }
+            return false;
         } finally {
             setIsRefreshingTemplates(false);
         }
     };
 
     const selectTemplate = (template: Template | null) => {
+        if (isBusy) {
+            return;
+        }
+
         setEditorMode(template ? 'edit' : 'create');
         setSelectedTemplateId(template?.id ?? null);
     };
 
     const handleCreateNew = () => {
+        if (isBusy) {
+            return;
+        }
+
         setEditorMode('create');
         setSelectedTemplateId(null);
         form.setData(buildInitialFormState(null));
         form.clearErrors();
         setLogoPreview(null);
         setActiveField('template_content');
-        if (logoInputRef.current) {
-            logoInputRef.current.value = '';
+        setHasPreviewAccess(false);
+        setIsPreviewVisible(false);
+        setIsPdfPreviewVisible(false);
+        if (pdfPreviewUrl) {
+            window.URL.revokeObjectURL(pdfPreviewUrl);
+            setPdfPreviewUrl(null);
         }
+        resetLogoInput();
         templateContentRef.current?.focus();
     };
 
     const handleLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0] ?? null;
-        form.setData('logo_file', file);
-        form.setData('remove_logo', false);
+        clearErrors('logo_file');
 
         if (!file) {
-            setLogoPreview(selectedTemplate?.logoUrl ?? null);
+            form.setData('logo_file', null);
+            setLogoPreview(
+                form.data.remove_logo ? null : selectedTemplate?.logoUrl ?? null,
+            );
+            resetLogoInput();
             return;
         }
+
+        if (!ALLOWED_LOGO_FILE_TYPES.has(file.type)) {
+            form.setData('logo_file', null);
+            form.setError('logo_file', 'Logo harus berupa PNG atau JPG.');
+            setLogoPreview(
+                form.data.remove_logo ? null : selectedTemplate?.logoUrl ?? null,
+            );
+            resetLogoInput();
+            toast.error('Logo harus berupa PNG atau JPG.');
+            return;
+        }
+
+        form.setData('logo_file', file);
+        form.setData('remove_logo', false);
 
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -222,10 +303,9 @@ export default function TemplateSuratIndex() {
     const handleClearLogo = () => {
         form.setData('logo_file', null);
         form.setData('remove_logo', true);
+        clearErrors('logo_file');
         setLogoPreview(null);
-        if (logoInputRef.current) {
-            logoInputRef.current.value = '';
-        }
+        resetLogoInput();
     };
 
     const insertPlaceholder = (placeholder: string) => {
@@ -264,26 +344,76 @@ export default function TemplateSuratIndex() {
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const editingTemplate = editorMode === 'edit' ? selectedTemplate : null;
+        const toastId = toast.loading(
+            editingTemplate
+                ? 'Menyimpan perubahan template surat...'
+                : 'Menyimpan template surat...',
+        );
 
         const submitOptions = {
             forceFormData: true,
             onSuccess: async (data?: TemplateMutationResponse) => {
-                toast.success(
+                const successMessage =
                     data?.status ??
-                        (editingTemplate
-                            ? 'Template berhasil diperbarui.'
-                            : 'Template berhasil dibuat.'),
-                );
-                await refreshTemplates({
+                    (editingTemplate
+                        ? 'Template berhasil diperbarui.'
+                        : 'Template berhasil dibuat.');
+
+                if (editingTemplate) {
+                    syncTemplates(
+                        templates.map((template) =>
+                            template.id === editingTemplate.id
+                                ? {
+                                      ...template,
+                                      name: form.data.name.trim() || template.name,
+                                      templateContent:
+                                          form.data.template_content.trim() || null,
+                                      headerText:
+                                          form.data.header_text.trim() || null,
+                                      footerText:
+                                          form.data.footer_text.trim() || null,
+                                      logoUrl: form.data.remove_logo
+                                          ? null
+                                          : logoPreview ?? template.logoUrl,
+                                  }
+                                : template,
+                        ),
+                        {
+                            preferredTemplateId: editingTemplate.id,
+                            mode: 'auto',
+                        },
+                    );
+                }
+
+                setHasPreviewAccess(true);
+                setIsPreviewVisible(true);
+
+                const refreshed = await refreshTemplates({
                     preferredTemplateId: editingTemplate?.id ?? null,
                     mode: 'auto',
+                    suppressErrorToast: true,
+                });
+
+                if (refreshed) {
+                    toast.success(successMessage, { id: toastId });
+                    return;
+                }
+
+                toast.success(successMessage, {
+                    id: toastId,
+                    description:
+                        'Perubahan tersimpan, tetapi daftar template belum berhasil dimuat ulang.',
                 });
             },
-            onError: () => {
+            onError: (errors: Record<string, string>) => {
                 toast.error(
-                    editingTemplate
-                        ? 'Gagal memperbarui template surat.'
-                        : 'Gagal membuat template surat.',
+                    getFirstErrorMessage(
+                        errors,
+                        editingTemplate
+                            ? 'Gagal memperbarui template surat.'
+                            : 'Gagal membuat template surat.',
+                    ),
+                    { id: toastId },
                 );
             },
         };
@@ -303,25 +433,66 @@ export default function TemplateSuratIndex() {
 
     const executeToggle = (template: Template) => {
         setIsMutatingTemplate(true);
+        const isDeactivating = template.isActive;
+        const toastId = toast.loading(
+            isDeactivating
+                ? 'Menonaktifkan template surat...'
+                : 'Mengaktifkan template surat...',
+        );
         router.post(
             route('super-admin.letters.templates.toggle', { template: template.id }),
             {},
             {
                 onSuccess: async (data?: TemplateMutationResponse) => {
-                    toast.success(
+                    const successMessage =
                         data?.status ??
-                            (template.isActive
-                                ? 'Template berhasil dinonaktifkan.'
-                                : 'Template berhasil diaktifkan.'),
+                        (isDeactivating
+                            ? 'Template berhasil dinonaktifkan.'
+                            : 'Template berhasil diaktifkan.');
+
+                    syncTemplates(
+                        templates.map((item) => {
+                            if (item.id === template.id) {
+                                return { ...item, isActive: !isDeactivating };
+                            }
+
+                            if (!isDeactivating && item.isActive) {
+                                return { ...item, isActive: false };
+                            }
+
+                            return item;
+                        }),
+                        {
+                            preferredTemplateId: template.id,
+                            mode: 'auto',
+                        },
                     );
-                    await refreshTemplates({
+
+                    const refreshed = await refreshTemplates({
                         preferredTemplateId: template.id,
                         mode: 'auto',
+                        suppressErrorToast: true,
                     });
+
+                    if (refreshed) {
+                        toast.success(successMessage, { id: toastId });
+                    } else {
+                        toast.success(successMessage, {
+                            id: toastId,
+                            description:
+                                'Status tersimpan, tetapi daftar template belum berhasil dimuat ulang.',
+                        });
+                    }
                     setConfirmAction(null);
                 },
-                onError: () =>
-                    toast.error('Gagal mengubah status template surat.'),
+                onError: (errors: Record<string, string>) =>
+                    toast.error(
+                        getFirstErrorMessage(
+                            errors,
+                            'Gagal mengubah status template surat.',
+                        ),
+                        { id: toastId },
+                    ),
                 onFinish: () => setIsMutatingTemplate(false),
             },
         );
@@ -329,15 +500,46 @@ export default function TemplateSuratIndex() {
 
     const executeDelete = (template: Template) => {
         setIsMutatingTemplate(true);
+        const toastId = toast.loading('Menghapus template surat...');
         router.delete(
             route('super-admin.letters.templates.destroy', { template: template.id }),
+            {},
             {
                 onSuccess: async (data?: TemplateMutationResponse) => {
-                    toast.success(data?.status ?? 'Template berhasil dihapus.');
-                    await refreshTemplates({ mode: 'auto' });
+                    const successMessage =
+                        data?.status ?? 'Template berhasil dihapus.';
+
+                    const nextTemplates = templates.filter(
+                        (item) => item.id !== template.id,
+                    );
+                    syncTemplates(nextTemplates, {
+                        mode: nextTemplates.length > 0 ? 'auto' : 'create',
+                    });
+
+                    const refreshed = await refreshTemplates({
+                        mode: 'auto',
+                        suppressErrorToast: true,
+                    });
+
+                    if (refreshed) {
+                        toast.success(successMessage, { id: toastId });
+                    } else {
+                        toast.success(successMessage, {
+                            id: toastId,
+                            description:
+                                'Template terhapus, tetapi daftar template belum berhasil dimuat ulang.',
+                        });
+                    }
                     setConfirmAction(null);
                 },
-                onError: () => toast.error('Gagal menghapus template surat.'),
+                onError: (errors: Record<string, string>) =>
+                    toast.error(
+                        getFirstErrorMessage(
+                            errors,
+                            'Gagal menghapus template surat.',
+                        ),
+                        { id: toastId },
+                    ),
                 onFinish: () => setIsMutatingTemplate(false),
             },
         );
@@ -375,15 +577,96 @@ export default function TemplateSuratIndex() {
         }
     };
 
-    const openDownload = (templateId: number) => {
-        window.open(
+    const openDownload = (template: Template) => {
+        const toastId = toast.loading('Menyiapkan file template...');
+        const downloadWindow = window.open(
             apiUrl(
                 route('super-admin.letters.templates.download', {
-                    template: templateId,
+                    template: template.id,
                 }),
             ),
             '_blank',
         );
+
+        if (!downloadWindow) {
+            toast.error('Browser memblokir jendela unduhan template.', {
+                id: toastId,
+            });
+            return;
+        }
+
+        toast.success(`File template "${template.name}" sedang diunduh.`, {
+            id: toastId,
+        });
+    };
+
+    const openPdfPreview = async () => {
+        if (!hasPreviewAccess) {
+            return;
+        }
+
+        const toastId = toast.loading('Menyiapkan preview PDF...');
+        setIsPdfPreviewLoading(true);
+        setIsPdfPreviewVisible(true);
+
+        try {
+            const payload = new FormData();
+            payload.append('name', form.data.name);
+            payload.append('template_content', form.data.template_content);
+            payload.append('header_text', form.data.header_text);
+            payload.append('footer_text', form.data.footer_text);
+            payload.append('remove_logo', String(form.data.remove_logo));
+
+            if (editorMode === 'edit' && selectedTemplateId != null) {
+                payload.append('template_id', String(selectedTemplateId));
+            }
+
+            if (form.data.logo_file) {
+                payload.append('logo_file', form.data.logo_file);
+            }
+
+            const response = await api.post(
+                apiUrl('/super-admin/kelola-surat/templates/preview-pdf'),
+                payload,
+                {
+                    responseType: 'blob',
+                },
+            );
+
+            const nextUrl = window.URL.createObjectURL(
+                new Blob([response.data], { type: 'application/pdf' }),
+            );
+
+            setPdfPreviewUrl((current) => {
+                if (current) {
+                    window.URL.revokeObjectURL(current);
+                }
+                return nextUrl;
+            });
+
+            toast.success('Preview PDF siap ditampilkan.', { id: toastId });
+        } catch (error) {
+            let message = 'Gagal menyiapkan preview PDF template.';
+            if (isAxiosError(error) && error.response?.data instanceof Blob) {
+                try {
+                    const text = await error.response.data.text();
+                    const parsed = JSON.parse(text) as {
+                        error?: string;
+                        errors?: Record<string, string>;
+                    };
+                    message =
+                        parsed.error ??
+                        Object.values(parsed.errors ?? {})[0] ??
+                        message;
+                } catch {
+                    // ignore blob parse failure
+                }
+            }
+            setIsPdfPreviewVisible(false);
+            toast.error(message, { id: toastId });
+        } finally {
+            setIsPdfPreviewLoading(false);
+        }
     };
 
     return (
@@ -406,7 +689,7 @@ export default function TemplateSuratIndex() {
                 activeTemplateName={activeTemplate?.name ?? null}
             />
 
-            <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
+            <div className="grid items-stretch gap-6 xl:grid-cols-[340px_minmax(280px,0.75fr)_minmax(0,1.15fr)]">
                 <TemplateListPanel
                     editorMode={editorMode}
                     isBusy={isBusy}
@@ -419,7 +702,15 @@ export default function TemplateSuratIndex() {
                     onToggleTemplate={handleToggleRequest}
                 />
 
-                <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+                <div className="h-full min-h-0">
+                    <TemplatePlaceholderCard
+                        isBusy={isBusy}
+                        placeholders={placeholders}
+                        onInsertPlaceholder={insertPlaceholder}
+                    />
+                </div>
+
+                <div className="min-w-0 h-full">
                     <TemplateEditorCard
                         activeField={activeField}
                         editorMode={editorMode}
@@ -427,23 +718,21 @@ export default function TemplateSuratIndex() {
                         footerRef={footerRef}
                         headerRef={headerRef}
                         isBusy={isBusy}
+                        canPreview={hasPreviewAccess}
+                        isPdfPreviewLoading={isPdfPreviewLoading}
+                        isPreviewVisible={isPreviewVisible}
                         logoInputRef={logoInputRef}
                         logoPreview={logoPreview}
-                        placeholders={placeholders}
                         templateContentRef={templateContentRef}
                         onClearLogo={handleClearLogo}
-                        onInsertPlaceholder={insertPlaceholder}
                         onLogoChange={handleLogoChange}
+                        onOpenPdfPreview={openPdfPreview}
                         onResetEditor={handleCreateNew}
                         onSetActiveField={setActiveField}
                         onSubmit={handleSubmit}
-                    />
-
-                    <TemplatePreviewCard
-                        logoPreview={logoPreview}
-                        renderedContent={renderedContent}
-                        renderedFooter={renderedFooter}
-                        renderedHeader={renderedHeader}
+                        onTogglePreview={() =>
+                            setIsPreviewVisible((current) => !current)
+                        }
                     />
                 </div>
             </div>
@@ -453,6 +742,22 @@ export default function TemplateSuratIndex() {
                 isMutatingTemplate={isMutatingTemplate}
                 onConfirm={handleConfirmAction}
                 onOpenChange={handleConfirmDialogOpenChange}
+            />
+
+            <TemplatePreviewCard
+                open={hasPreviewAccess && isPreviewVisible}
+                onOpenChange={setIsPreviewVisible}
+                logoPreview={logoPreview}
+                renderedContent={renderedContent}
+                renderedFooter={renderedFooter}
+                renderedHeader={renderedHeader}
+            />
+
+            <TemplatePdfPreviewDialog
+                open={hasPreviewAccess && isPdfPreviewVisible}
+                onOpenChange={setIsPdfPreviewVisible}
+                isLoading={isPdfPreviewLoading}
+                pdfUrl={pdfPreviewUrl}
             />
         </SuperAdminLayout>
     );

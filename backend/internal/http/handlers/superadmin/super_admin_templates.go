@@ -1,6 +1,7 @@
 package superadmin
 
 import (
+	"bytes"
 	"fmt"
 	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
@@ -18,6 +19,7 @@ import (
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jung-kurt/gofpdf"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -114,16 +116,16 @@ func SuperAdminTemplatesSample(c *gin.Context) {
 		"${header}",
 		"Nomor: ${nomor_surat}",
 		"Tanggal: ${tanggal}",
-		"Prioritas: ${prioritas}",
+		"Pengirim: ${pengirim}",
+		"Divisi Pengirim: ${divisi_pengirim}",
 		"Kepada Yth.",
 		"${penerima}",
 		"Perihal: ${perihal}",
 		"${isi_surat}",
+		"Prioritas: ${prioritas}",
 		"Catatan Disposisi: ${catatan_disposisi}",
 		"Tanggal Disposisi: ${tanggal_disposisi}",
 		"Oleh: ${oleh}",
-		"Pengirim: ${pengirim}",
-		"Divisi: ${divisi_pengirim}",
 		"${footer}",
 	}
 	outFile, err := os.CreateTemp("", "Template_Disposisi_Sample_*.docx")
@@ -342,6 +344,104 @@ func SuperAdminTemplatesDownload(c *gin.Context) {
 		defer os.Remove(tempFile)
 	}
 	c.FileAttachment(tempFile, "Preview_"+template.FileName)
+}
+
+func SuperAdminTemplatesPreviewPDF(c *gin.Context) {
+	user := middleware.CurrentUser(c)
+	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	templateID := int64(0)
+	if rawID := strings.TrimSpace(c.PostForm("template_id")); rawID != "" {
+		parsedID, err := strconv.ParseInt(rawID, 10, 64)
+		if err != nil || parsedID <= 0 {
+			handlers.JSONError(c, http.StatusBadRequest, "ID template tidak valid")
+			return
+		}
+		templateID = parsedID
+	}
+
+	db := middleware.GetDB(c)
+	repo := newTemplatesRepository(db)
+
+	var existingTemplate *models.LetterTemplate
+	if templateID > 0 {
+		template, err := repo.GetLetterTemplateByID(templateID)
+		if err != nil || template == nil {
+			handlers.JSONError(c, http.StatusNotFound, "Template tidak ditemukan")
+			return
+		}
+		existingTemplate = template
+	}
+
+	headerText := strings.TrimSpace(c.PostForm("header_text"))
+	footerText := strings.TrimSpace(c.PostForm("footer_text"))
+	templateContent := normalizeTemplateEditorContent(c.PostForm("template_content"))
+	if headerText == "" && existingTemplate != nil {
+		headerText = strings.TrimSpace(handlers.FirstString(existingTemplate.HeaderText, ""))
+	}
+	if footerText == "" && existingTemplate != nil {
+		footerText = strings.TrimSpace(handlers.FirstString(existingTemplate.FooterText, ""))
+	}
+	if templateContent == "" && existingTemplate != nil {
+		templateContent = strings.TrimSpace(handlers.FirstString(resolveTemplateEditorContent(c, existingTemplate), ""))
+	}
+	if templateContent == "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{
+			"template_content": "Isi template wajib diisi sebelum preview PDF dibuat.",
+		})
+		return
+	}
+
+	logoPath, cleanupLogo, err := resolveTemplatePreviewLogo(c, existingTemplate)
+	if err != nil {
+		handlers.JSONError(c, http.StatusUnprocessableEntity, "Logo tidak dapat diproses untuk preview PDF.")
+		return
+	}
+	if cleanupLogo != nil {
+		defer cleanupLogo()
+	}
+
+	replacements := templatePreviewReplacements()
+	renderedContent := renderTemplatePreviewText(templateContent, replacements)
+	renderedHeader := renderTemplatePreviewText(headerText, replacements)
+	renderedFooter := renderTemplatePreviewText(footerText, replacements)
+
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.SetMargins(16, 16, 16)
+	pdf.SetAutoPageBreak(true, 16)
+	pdf.AddPage()
+
+	drawTemplatePreviewPDFHeader(pdf, logoPath, renderedHeader)
+
+	pdf.SetFont("Arial", "", 11)
+	pdf.SetTextColor(51, 65, 85)
+	pdf.MultiCell(0, 7.5, firstNonEmptyText(renderedContent, "-"), "", "L", false)
+
+	if strings.TrimSpace(renderedFooter) != "" {
+		pdf.Ln(6)
+		left, _, right, _ := pdf.GetMargins()
+		pageWidth, _ := pdf.GetPageSize()
+		lineY := pdf.GetY()
+		pdf.SetDrawColor(226, 232, 240)
+		pdf.Line(left, lineY, pageWidth-right, lineY)
+		pdf.Ln(4)
+		pdf.SetFont("Arial", "", 10)
+		pdf.SetTextColor(100, 116, 139)
+		pdf.MultiCell(0, 6, renderedFooter, "", "L", false)
+	}
+
+	var out bytes.Buffer
+	if err := pdf.Output(&out); err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuat preview PDF template.")
+		return
+	}
+
+	c.Header("Content-Type", "application/pdf")
+	c.Header("Content-Disposition", `inline; filename="template-preview.pdf"`)
+	c.Data(http.StatusOK, "application/pdf", out.Bytes())
 }
 
 func SuperAdminTemplatesUpdate(c *gin.Context) {
@@ -621,4 +721,157 @@ func normalizeTemplateEditorContent(value string) string {
 	normalized := strings.ReplaceAll(value, "\r\n", "\n")
 	normalized = strings.ReplaceAll(normalized, "\r", "\n")
 	return strings.TrimSpace(normalized)
+}
+
+func templatePreviewReplacements() map[string]string {
+	replacements := map[string]string{
+		"{{nomor_surat}}":       "001/HC/LDP/IV/2026",
+		"{{tanggal}}":           "01 April 2026",
+		"{{pengirim}}":          "Alya Putri",
+		"{{divisi_pengirim}}":   "Human Capital",
+		"{{penerima}}":          "Divisi Operasional",
+		"{{perihal}}":           "Tindak Lanjut Kebutuhan Personel",
+		"{{isi_surat}}":         "Mohon menindaklanjuti kebutuhan personel untuk area operasional sesuai prioritas yang telah disepakati pada rapat koordinasi minggu ini.",
+		"{{prioritas}}":         "Tinggi",
+		"{{catatan_disposisi}}": "Harap diproses maksimal 2 hari kerja dan koordinasikan hasilnya kembali ke Human Capital.",
+		"{{tanggal_disposisi}}": "02 April 2026 09:30",
+		"{{oleh}}":              "Nadia Rahma",
+	}
+
+	for key, value := range replacements {
+		replacements[strings.ReplaceAll(strings.ReplaceAll(key, "{{", "${"), "}}", "}")] = value
+	}
+
+	return replacements
+}
+
+func renderTemplatePreviewText(content string, replacements map[string]string) string {
+	output := content
+	for key, value := range replacements {
+		output = strings.ReplaceAll(output, key, value)
+	}
+	return strings.TrimSpace(output)
+}
+
+func resolveTemplatePreviewLogo(c *gin.Context, template *models.LetterTemplate) (string, func(), error) {
+	if removeLogo := c.PostForm("remove_logo") == "true"; removeLogo {
+		return "", nil, nil
+	}
+
+	if _, err := c.FormFile("logo_file"); err == nil {
+		return savePreviewUploadToTemp(c, "logo_file")
+	}
+
+	if template == nil || template.LogoPath == nil || strings.TrimSpace(*template.LogoPath) == "" {
+		return "", nil, nil
+	}
+
+	normalizedLogoPath := handlers.NormalizeAttachmentPath(*template.LogoPath)
+	logoPath, ok := resolveStorageFilePath(middleware.GetConfig(c).StoragePath, normalizedLogoPath)
+	if !ok {
+		return "", nil, nil
+	}
+
+	readPath, cleanup, err := services.PrepareFileForRead(
+		logoPath,
+		middleware.GetConfig(c).StorageEncryptionKey,
+	)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return readPath, cleanup, nil
+}
+
+func savePreviewUploadToTemp(c *gin.Context, field string) (string, func(), error) {
+	fileHeader, err := c.FormFile(field)
+	if err != nil {
+		return "", nil, err
+	}
+
+	source, err := fileHeader.Open()
+	if err != nil {
+		return "", nil, err
+	}
+	defer source.Close()
+
+	ext := strings.ToLower(filepath.Ext(fileHeader.Filename))
+	if ext == "" {
+		ext = ".tmp"
+	}
+
+	tempFile, err := os.CreateTemp("", "template_preview_logo_*"+ext)
+	if err != nil {
+		return "", nil, err
+	}
+	tempPath := tempFile.Name()
+
+	if _, err := tempFile.ReadFrom(source); err != nil {
+		tempFile.Close()
+		_ = os.Remove(tempPath)
+		return "", nil, err
+	}
+	if err := tempFile.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return "", nil, err
+	}
+
+	return tempPath, func() {
+		_ = os.Remove(tempPath)
+	}, nil
+}
+
+func drawTemplatePreviewPDFHeader(pdf *gofpdf.Fpdf, logoPath string, headerText string) {
+	if strings.TrimSpace(headerText) == "" && strings.TrimSpace(logoPath) == "" {
+		return
+	}
+
+	left, top, right, _ := pdf.GetMargins()
+	pageWidth, _ := pdf.GetPageSize()
+	contentWidth := pageWidth - left - right
+	headerStartY := top
+	logoColumnWidth := 26.0
+	spacerWidth := 26.0
+	centerWidth := contentWidth - logoColumnWidth - spacerWidth
+	if centerWidth < 80 {
+		centerWidth = contentWidth
+	}
+
+	maxY := headerStartY
+	logoHeight := 20.0
+	hasLogo := strings.TrimSpace(logoPath) != ""
+	if strings.TrimSpace(logoPath) != "" {
+		options := gofpdf.ImageOptions{
+			ImageType: strings.TrimPrefix(strings.ToUpper(filepath.Ext(logoPath)), "."),
+			ReadDpi:   true,
+		}
+		pdf.ImageOptions(logoPath, left+2, headerStartY, 20, logoHeight, false, options, 0, "")
+		if headerStartY+logoHeight > maxY {
+			maxY = headerStartY + logoHeight
+		}
+	}
+
+	if strings.TrimSpace(headerText) != "" {
+		lineHeight := 7.0
+		headerLines := strings.Split(strings.TrimSpace(headerText), "\n")
+		headerBlockHeight := float64(len(headerLines)) * lineHeight
+		textStartY := headerStartY
+		if hasLogo && headerBlockHeight < logoHeight {
+			textStartY = headerStartY + (logoHeight - headerBlockHeight)
+		}
+
+		pdf.SetXY(left+logoColumnWidth, textStartY)
+		pdf.SetFont("Arial", "B", 13)
+		pdf.SetTextColor(30, 41, 59)
+		pdf.MultiCell(centerWidth, lineHeight, headerText, "", "C", false)
+		if pdf.GetY() > maxY {
+			maxY = pdf.GetY()
+		}
+	}
+
+	pdf.SetY(maxY + 4)
+	lineY := pdf.GetY()
+	pdf.SetDrawColor(226, 232, 240)
+	pdf.Line(left, lineY, pageWidth-right, lineY)
+	pdf.Ln(8)
 }

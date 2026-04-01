@@ -1,6 +1,8 @@
 export const DEFAULT_TEMPLATE_CONTENT = [
     'Nomor: {{nomor_surat}}',
     'Tanggal: {{tanggal}}',
+    'Pengirim: {{pengirim}}',
+    'Divisi Pengirim: {{divisi_pengirim}}',
     '',
     'Kepada Yth.',
     '{{penerima}}',

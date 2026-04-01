@@ -1,14 +1,17 @@
 ﻿import { FileText } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 import ComposeLetterDialog from '@/modules/SuperAdmin/KelolaSurat/components/ComposeLetterDialog';
 import DispositionDialog from '@/modules/SuperAdmin/KelolaSurat/components/DispositionDialog';
+import FinalDispositionTemplateDialog from '@/modules/SuperAdmin/KelolaSurat/components/FinalDispositionTemplateDialog';
 import LetterDetailDialog from '@/modules/SuperAdmin/KelolaSurat/components/LetterDetailDialog';
 import { LetterRecord } from '@/modules/SuperAdmin/KelolaSurat/components/LettersTable';
 import LettersTabsPanel from '@/modules/SuperAdmin/KelolaSurat/components/LettersTabsPanel';
 import PendingDispositionPanel from '@/modules/SuperAdmin/KelolaSurat/components/PendingDispositionPanel';
 import PriorityStatsCards from '@/modules/SuperAdmin/KelolaSurat/components/PriorityStatsCards';
 import StatsCards from '@/modules/SuperAdmin/KelolaSurat/components/StatsCards';
+import type { Template } from '@/modules/SuperAdmin/KelolaSurat/components/template-dialog/types';
 import { useKelolaSuratState } from '@/modules/SuperAdmin/KelolaSurat/hooks/useKelolaSuratState';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
 import { Head, usePage } from '@/shared/lib/inertia';
@@ -39,6 +42,7 @@ interface KelolaSuratPageProps extends Record<string, unknown> {
         divisions: string[];
     };
     nextLetterNumber: string;
+    templates?: Template[];
 }
 
 type LettersCollection = {
@@ -160,6 +164,10 @@ export default function KelolaSuratIndex() {
     const options = page.props?.options ?? DEFAULT_OPTIONS;
     const nextLetterNumber = page.props?.nextLetterNumber ?? '';
     const pendingDisposition = page.props?.pendingDisposition ?? EMPTY_PENDING_DISPOSITION;
+    const templates = useMemo(
+        () => page.props?.templates ?? [],
+        [page.props?.templates],
+    );
 
     const isHumanCapitalAdmin =
         auth?.user?.role === 'Admin' &&
@@ -200,6 +208,10 @@ export default function KelolaSuratIndex() {
         pending: sortLettersByLatestActivity(pendingDisposition),
         stats,
     }));
+    const [finalTemplateDialogOpen, setFinalTemplateDialogOpen] = useState(false);
+    const [selectedFinalTemplateId, setSelectedFinalTemplateId] = useState<number | null>(
+        templates.find((template) => template.isActive)?.id ?? templates[0]?.id ?? null,
+    );
 
     useEffect(() => {
         setLiveData({
@@ -212,6 +224,14 @@ export default function KelolaSuratIndex() {
             stats,
         });
     }, [letters, pendingDisposition, stats]);
+
+    useEffect(() => {
+        setSelectedFinalTemplateId(
+            templates.find((template) => template.isActive)?.id ??
+                templates[0]?.id ??
+                null,
+        );
+    }, [templates]);
 
     const sortLetters = useCallback((items: LetterRecord[]) => {
         return sortLettersByLatestActivity(items);
@@ -417,6 +437,32 @@ export default function KelolaSuratIndex() {
                 targets={dispositionTargets}
                 dispositionForm={dispositionForm}
                 onSubmit={handleDispositionSubmit}
+                onRequestFinalDisposition={() => {
+                    if (templates.length === 0) {
+                        toast.error('Belum ada template surat yang tersedia untuk disposisi final.');
+                        return;
+                    }
+                    setFinalTemplateDialogOpen(true);
+                }}
+            />
+
+            <FinalDispositionTemplateDialog
+                open={finalTemplateDialogOpen}
+                onOpenChange={setFinalTemplateDialogOpen}
+                templates={templates}
+                processing={dispositionForm.processing}
+                selectedTemplateId={selectedFinalTemplateId}
+                onSelectTemplate={setSelectedFinalTemplateId}
+                onConfirm={() => {
+                    if (selectedFinalTemplateId == null) {
+                        toast.error('Pilih template terlebih dahulu untuk disposisi final.');
+                        return;
+                    }
+                    setFinalTemplateDialogOpen(false);
+                    handleDispositionSubmit('final', {
+                        templateId: selectedFinalTemplateId,
+                    });
+                }}
             />
 
         </SuperAdminLayout>

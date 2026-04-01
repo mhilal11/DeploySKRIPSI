@@ -26,6 +26,7 @@ interface DispositionDialogProps {
     letter_ids: number[];
   }>;
   onSubmit: (mode: 'forward' | 'reject' | 'final') => void;
+  onRequestFinalDisposition: () => void;
 }
 
 export default function DispositionDialog({
@@ -34,6 +35,7 @@ export default function DispositionDialog({
   targets,
   dispositionForm,
   onSubmit,
+  onRequestFinalDisposition,
 }: DispositionDialogProps) {
   const setDispositionData = dispositionForm.setData;
   const resetDisposition = dispositionForm.reset;
@@ -234,7 +236,7 @@ export default function DispositionDialog({
               type="button"
               className="w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
               disabled={dispositionForm.processing}
-              onClick={() => onSubmit('final')}
+              onClick={onRequestFinalDisposition}
             >
               {dispositionForm.processing ? (
                 'Memproses...'
