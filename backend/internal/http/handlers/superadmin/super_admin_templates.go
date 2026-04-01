@@ -1,12 +1,14 @@
 package superadmin
 
 import (
+	"fmt"
 	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	dbrepo "hris-backend/internal/repository"
 
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -90,17 +92,7 @@ func SuperAdminTemplatesList(c *gin.Context) {
 
 	payload := make([]dto.LetterTemplateListItem, 0, len(templates))
 	for _, t := range templates {
-		payload = append(payload, dto.LetterTemplateListItem{
-			ID:         t.ID,
-			Name:       t.Name,
-			FileName:   t.FileName,
-			HeaderText: t.HeaderText,
-			FooterText: t.FooterText,
-			LogoURL:    handlers.AttachmentURL(c, t.LogoPath),
-			IsActive:   t.IsActive,
-			CreatedBy:  handlers.LookupUserName(db, derefInt64(t.CreatedBy)),
-			CreatedAt:  handlers.FormatDateTime(t.CreatedAt),
-		})
+		payload = append(payload, buildTemplateListItem(c, db, &t))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -165,15 +157,7 @@ func SuperAdminTemplatesIndex(c *gin.Context) {
 	totalTemplates, _ := repo.CountLetterTemplates()
 	payload := make([]dto.LetterTemplateListItem, 0, len(templates))
 	for _, t := range templates {
-		payload = append(payload, dto.LetterTemplateListItem{
-			ID:        t.ID,
-			Name:      t.Name,
-			FileName:  t.FileName,
-			LogoURL:   handlers.AttachmentURL(c, t.LogoPath),
-			IsActive:  t.IsActive,
-			CreatedBy: handlers.LookupUserName(db, derefInt64(t.CreatedBy)),
-			CreatedAt: handlers.FormatDateTime(t.CreatedAt),
-		})
+		payload = append(payload, buildTemplateListItem(c, db, &t))
 	}
 
 	placeholders := map[string]string{
@@ -216,7 +200,9 @@ func SuperAdminTemplatesStore(c *gin.Context) {
 	validationErrors := handlers.FieldErrors{}
 	headerText := c.PostForm("header_text")
 	footerText := c.PostForm("footer_text")
+	templateContent := normalizeTemplateEditorContent(c.PostForm("template_content"))
 	handlers.ValidateFieldLength(validationErrors, "name", "Nama template", name, 120)
+	handlers.ValidateFieldLength(validationErrors, "template_content", "Isi template", templateContent, 20000)
 	handlers.ValidateFieldLength(validationErrors, "header_text", "Header template", headerText, 4000)
 	handlers.ValidateFieldLength(validationErrors, "footer_text", "Footer template", footerText, 4000)
 	if len(validationErrors) > 0 {
@@ -224,10 +210,34 @@ func SuperAdminTemplatesStore(c *gin.Context) {
 		return
 	}
 
-	templatePath, meta, err := handlers.SaveUploadedFile(c, "template_file", "letter-templates")
-	if err != nil {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"template_file": "File template wajib diupload."})
-		return
+	templatePath := ""
+	templateFileName := ""
+	if _, err := c.FormFile("template_file"); err == nil {
+		path, meta, saveErr := handlers.SaveUploadedFile(c, "template_file", "letter-templates")
+		if saveErr != nil {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"template_file": "File template tidak dapat diproses."})
+			return
+		}
+		templatePath = path
+		templateFileName = meta.OriginalName
+		if templateContent == "" {
+			templateContent = resolveTemplateEditorContentFromStorage(c, templatePath)
+		}
+	}
+
+	if templatePath == "" {
+		if templateContent == "" {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"template_content": "Isi template wajib diisi."})
+			return
+		}
+
+		path, fileName, genErr := generateTemplateFileFromContent(c, name, templateContent)
+		if genErr != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuat file template")
+			return
+		}
+		templatePath = path
+		templateFileName = fileName
 	}
 
 	var logoPath *string
@@ -242,17 +252,18 @@ func SuperAdminTemplatesStore(c *gin.Context) {
 	repo := newTemplatesRepository(db)
 	now := time.Now()
 	_ = repo.CreateAndActivateLetterTemplate(dbrepo.LetterTemplateCreateInput{
-		Name:       name,
-		FilePath:   templatePath,
-		FileName:   meta.OriginalName,
-		HeaderText: headerText,
-		FooterText: footerText,
-		LogoPath:   logoPath,
-		CreatedBy:  user.ID,
-		Now:        now,
+		Name:            name,
+		FilePath:        templatePath,
+		FileName:        templateFileName,
+		TemplateContent: templateContent,
+		HeaderText:      headerText,
+		FooterText:      footerText,
+		LogoPath:        logoPath,
+		CreatedBy:       user.ID,
+		Now:             now,
 	})
 
-	c.JSON(http.StatusOK, gin.H{"status": "Template berhasil diunggah dan diaktifkan."})
+	c.JSON(http.StatusOK, gin.H{"status": "Template berhasil disimpan dan diaktifkan."})
 }
 
 func SuperAdminTemplatesToggle(c *gin.Context) {
@@ -348,9 +359,11 @@ func SuperAdminTemplatesUpdate(c *gin.Context) {
 	name := c.PostForm("name")
 	headerText := c.PostForm("header_text")
 	footerText := c.PostForm("footer_text")
+	templateContent := normalizeTemplateEditorContent(c.PostForm("template_content"))
 	removeLogo := c.PostForm("remove_logo") == "true"
 	validationErrors := handlers.FieldErrors{}
 	handlers.ValidateFieldLength(validationErrors, "name", "Nama template", name, 120)
+	handlers.ValidateFieldLength(validationErrors, "template_content", "Isi template", templateContent, 20000)
 	handlers.ValidateFieldLength(validationErrors, "header_text", "Header template", headerText, 4000)
 	handlers.ValidateFieldLength(validationErrors, "footer_text", "Footer template", footerText, 4000)
 	if len(validationErrors) > 0 {
@@ -373,12 +386,32 @@ func SuperAdminTemplatesUpdate(c *gin.Context) {
 	filePath := template.FilePath
 	fileName := template.FileName
 	oldTemplatePath := template.FilePath
+	existingTemplateContent := normalizeTemplateEditorContent(handlers.FirstString(template.TemplateContent, ""))
+	if templateContent == "" {
+		templateContent = existingTemplateContent
+	}
 	if _, err := c.FormFile("template_file"); err == nil {
 		path, meta, err := handlers.SaveUploadedFile(c, "template_file", "letter-templates")
 		if err == nil {
 			filePath = path
 			fileName = meta.OriginalName
+			if templateContent == "" {
+				templateContent = resolveTemplateEditorContentFromStorage(c, filePath)
+			}
 		}
+	} else if templateContent != "" && (templateContent != existingTemplateContent || filePath == "") {
+		path, generatedFileName, genErr := generateTemplateFileFromContent(c, name, templateContent)
+		if genErr != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui file template")
+			return
+		}
+		filePath = path
+		fileName = generatedFileName
+	}
+
+	if filePath == "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"template_content": "Isi template wajib diisi."})
+		return
 	}
 
 	logoPath := template.LogoPath
@@ -393,14 +426,15 @@ func SuperAdminTemplatesUpdate(c *gin.Context) {
 	}
 
 	_ = repo.UpdateLetterTemplate(dbrepo.LetterTemplateUpdateInput{
-		ID:         id,
-		Name:       name,
-		FilePath:   filePath,
-		FileName:   fileName,
-		HeaderText: headerText,
-		FooterText: footerText,
-		LogoPath:   logoPath,
-		UpdatedAt:  time.Now(),
+		ID:              id,
+		Name:            name,
+		FilePath:        filePath,
+		FileName:        fileName,
+		TemplateContent: templateContent,
+		HeaderText:      headerText,
+		FooterText:      footerText,
+		LogoPath:        logoPath,
+		UpdatedAt:       time.Now(),
 	})
 
 	cfg := middleware.GetConfig(c)
@@ -465,4 +499,126 @@ func deleteStoredPath(basePath string, relPath string) {
 		return
 	}
 	_ = os.Remove(abs)
+}
+
+func buildTemplateListItem(c *gin.Context, db *sqlx.DB, template *models.LetterTemplate) dto.LetterTemplateListItem {
+	return dto.LetterTemplateListItem{
+		ID:              template.ID,
+		Name:            template.Name,
+		FileName:        template.FileName,
+		TemplateContent: resolveTemplateEditorContent(c, template),
+		HeaderText:      template.HeaderText,
+		FooterText:      template.FooterText,
+		LogoURL:         handlers.AttachmentURL(c, template.LogoPath),
+		IsActive:        template.IsActive,
+		CreatedBy:       handlers.LookupUserName(db, derefInt64(template.CreatedBy)),
+		CreatedAt:       handlers.FormatDateTime(template.CreatedAt),
+	}
+}
+
+func resolveTemplateEditorContent(c *gin.Context, template *models.LetterTemplate) *string {
+	if template == nil {
+		return nil
+	}
+
+	content := normalizeTemplateEditorContent(handlers.FirstString(template.TemplateContent, ""))
+	if content == "" && template.FilePath != "" {
+		content = resolveTemplateEditorContentFromStorage(c, template.FilePath)
+	}
+	if content == "" {
+		return nil
+	}
+
+	return &content
+}
+
+func resolveTemplateEditorContentFromStorage(c *gin.Context, relPath string) string {
+	normalizedTemplatePath := handlers.NormalizeAttachmentPath(relPath)
+	templatePath, ok := resolveStorageFilePath(middleware.GetConfig(c).StoragePath, normalizedTemplatePath)
+	if !ok {
+		return ""
+	}
+
+	readTemplatePath, cleanupReadTemplate, prepErr := services.PrepareFileForRead(
+		templatePath,
+		middleware.GetConfig(c).StorageEncryptionKey,
+	)
+	if prepErr != nil {
+		return ""
+	}
+	defer cleanupReadTemplate()
+
+	content, err := services.ExtractDocxText(readTemplatePath)
+	if err != nil {
+		return ""
+	}
+
+	return cleanExtractedTemplateContent(content)
+}
+
+func cleanExtractedTemplateContent(content string) string {
+	normalized := normalizeTemplateEditorContent(content)
+	if normalized == "" {
+		return ""
+	}
+
+	lines := strings.Split(normalized, "\n")
+	cleaned := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch trimmed {
+		case "${logo}", "{{logo}}", "${header}", "{{header}}", "${footer}", "{{footer}}":
+			continue
+		default:
+			cleaned = append(cleaned, line)
+		}
+	}
+
+	return strings.TrimSpace(strings.Join(cleaned, "\n"))
+}
+
+func generateTemplateFileFromContent(c *gin.Context, name string, templateContent string) (string, string, error) {
+	cfg := middleware.GetConfig(c)
+	safeName := sanitizeFilename(strings.TrimSpace(name))
+	safeName = strings.TrimSuffix(safeName, ".docx")
+	if safeName == "" {
+		safeName = "template_surat"
+	}
+
+	displayFileName := safeName + ".docx"
+	storedFileName := fmt.Sprintf("%s_%s", time.Now().Format("20060102_150405"), displayFileName)
+	relPath := filepath.ToSlash(filepath.Join("letter-templates", storedFileName))
+	absPath := filepath.Join(cfg.StoragePath, relPath)
+	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
+		return "", "", err
+	}
+
+	tempFile, err := os.CreateTemp("", "letter_template_*.docx")
+	if err != nil {
+		return "", "", err
+	}
+	tempPath := tempFile.Name()
+	tempFile.Close()
+	defer os.Remove(tempPath)
+
+	if err := services.GenerateSimpleDocx(services.BuildTemplateDocxLines(templateContent), tempPath); err != nil {
+		return "", "", err
+	}
+	if err := copyFile(tempPath, absPath); err != nil {
+		return "", "", err
+	}
+	if cfg.StorageEncryptUploads && cfg.StorageEncryptionKey != "" {
+		if err := services.EncryptFileInPlace(absPath, cfg.StorageEncryptionKey); err != nil {
+			_ = os.Remove(absPath)
+			return "", "", err
+		}
+	}
+
+	return relPath, displayFileName, nil
+}
+
+func normalizeTemplateEditorContent(value string) string {
+	normalized := strings.ReplaceAll(value, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	return strings.TrimSpace(normalized)
 }

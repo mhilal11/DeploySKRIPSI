@@ -9,7 +9,6 @@ import LettersTabsPanel from '@/modules/SuperAdmin/KelolaSurat/components/Letter
 import PendingDispositionPanel from '@/modules/SuperAdmin/KelolaSurat/components/PendingDispositionPanel';
 import PriorityStatsCards from '@/modules/SuperAdmin/KelolaSurat/components/PriorityStatsCards';
 import StatsCards from '@/modules/SuperAdmin/KelolaSurat/components/StatsCards';
-import TemplateDialog from '@/modules/SuperAdmin/KelolaSurat/components/TemplateDialog';
 import { useKelolaSuratState } from '@/modules/SuperAdmin/KelolaSurat/hooks/useKelolaSuratState';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
 import { Head, usePage } from '@/shared/lib/inertia';
@@ -170,10 +169,12 @@ export default function KelolaSuratIndex() {
         ? [
             { label: 'Admin', href: route('admin-staff.dashboard') },
             { label: 'Kelola Surat' },
+            { label: 'Disposisi Surat' },
         ]
         : [
             { label: 'Super Admin', href: route('super-admin.dashboard') },
             { label: 'Kelola Surat' },
+            { label: 'Disposisi Surat' },
         ];
 
     const appliedFilters = {
@@ -199,8 +200,6 @@ export default function KelolaSuratIndex() {
         pending: sortLettersByLatestActivity(pendingDisposition),
         stats,
     }));
-
-    const [templateOpen, setTemplateOpen] = useState(false);
 
     useEffect(() => {
         setLiveData({
@@ -337,19 +336,14 @@ export default function KelolaSuratIndex() {
 
     return (
         <SuperAdminLayout
-            title="Kelola Surat"
-            description="Kelola surat masuk, keluar, dan arsip digital"
+            title="Disposisi Surat"
+            description="Kelola surat masuk, keluar, disposisi, dan arsip digital"
             breadcrumbs={breadcrumbs}
             actions={
-                <div className="flex gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setTemplateOpen(true)}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                    >
+                <div className="flex items-center gap-2">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500">
                         <FileText className="h-4 w-4" />
-                        Template
-                    </button>
+                    </span>
                     <ComposeLetterDialog
                         open={isComposeOpen}
                         onOpenChange={setComposeOpen}
@@ -369,7 +363,7 @@ export default function KelolaSuratIndex() {
                 </div>
             }
         >
-            <Head title="Kelola Surat" />
+            <Head title="Disposisi Surat" />
 
             <StatsCards stats={liveData.stats} />
 
@@ -425,10 +419,6 @@ export default function KelolaSuratIndex() {
                 onSubmit={handleDispositionSubmit}
             />
 
-            <TemplateDialog
-                open={templateOpen}
-                onOpenChange={setTemplateOpen}
-            />
         </SuperAdminLayout>
     );
 }

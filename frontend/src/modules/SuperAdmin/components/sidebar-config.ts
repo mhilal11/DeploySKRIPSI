@@ -61,8 +61,21 @@ export const defaultNavItems: NavItem[] = [
         label: 'Kelola Surat',
         icon: Mail,
         routeName: 'super-admin.letters.index',
-        pattern: 'super-admin.letters.*',
+        pattern: ['super-admin.letters.*', 'super-admin.letters.templates.*'],
         badgeKey: 'super-admin.letters.index',
+        children: [
+            {
+                label: 'Disposisi Surat',
+                routeName: 'super-admin.letters.index',
+                pattern: 'super-admin.letters.index',
+                badgeKey: 'super-admin.letters.index',
+            },
+            {
+                label: 'Template Surat',
+                routeName: 'super-admin.letters.templates.index',
+                pattern: 'super-admin.letters.templates.*',
+            },
+        ],
     },
     {
         label: 'Kelola Staff',

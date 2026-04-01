@@ -2,5 +2,6 @@
 /.github/
 /.vscode/
 
-# Ignore local analysis document at repository root
+# Ignore local markdown notes at repository root
+/AGENTS.md
 /ANALISIS_PROYEK.md

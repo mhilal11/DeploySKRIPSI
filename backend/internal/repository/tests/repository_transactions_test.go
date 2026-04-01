@@ -74,18 +74,19 @@ func TestCreateAndActivateLetterTemplate_Success(t *testing.T) {
 
 	now := time.Date(2026, 3, 11, 10, 0, 0, 0, time.UTC)
 	input := repository.LetterTemplateCreateInput{
-		Name:       "Template A",
-		FilePath:   "letter-templates/a.docx",
-		FileName:   "a.docx",
-		HeaderText: "H",
-		FooterText: "F",
-		CreatedBy:  1,
-		Now:        now,
+		Name:            "Template A",
+		FilePath:        "letter-templates/a.docx",
+		FileName:        "a.docx",
+		TemplateContent: "Isi template",
+		HeaderText:      "H",
+		FooterText:      "F",
+		CreatedBy:       1,
+		Now:             now,
 	}
 
 	mock.ExpectBegin()
 	mock.ExpectExec("(?s)INSERT INTO letter_templates").
-		WithArgs(input.Name, input.FilePath, input.FileName, input.HeaderText, input.FooterText, input.LogoPath, input.CreatedBy, input.Now, input.Now).
+		WithArgs(input.Name, input.FilePath, input.FileName, input.TemplateContent, input.HeaderText, input.FooterText, input.LogoPath, input.CreatedBy, input.Now, input.Now).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectExec(regexp.QuoteMeta("UPDATE letter_templates SET is_active = 0 WHERE file_path != ?")).
 		WithArgs(input.FilePath).

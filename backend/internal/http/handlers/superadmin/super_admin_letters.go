@@ -429,6 +429,18 @@ func generateDispositionDocument(c *gin.Context, db *sqlx.DB, surat *models.Sura
 
 	// try template
 	template, err := dbrepo.GetActiveLetterTemplate(db)
+	if err == nil && template != nil {
+		placeholders["{{header}}"] = handlers.FirstString(template.HeaderText, "")
+		placeholders["{{footer}}"] = handlers.FirstString(template.FooterText, "")
+		placeholders["{{logo}}"] = ""
+		for key, value := range map[string]string{
+			"${header}": placeholders["{{header}}"],
+			"${footer}": placeholders["{{footer}}"],
+			"${logo}":   placeholders["{{logo}}"],
+		} {
+			placeholders[key] = value
+		}
+	}
 	var tempFile string
 	if err == nil && template != nil && template.FilePath != "" {
 		templatePath := handlers.NormalizeAttachmentPath(template.FilePath)

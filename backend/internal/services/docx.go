@@ -142,6 +142,7 @@ func ReplaceDocxPlaceholders(templatePath string, replacements map[string]string
 }
 
 var docxTextRe = regexp.MustCompile(`(?s)(<w:t[^>]*>)(.*?)(</w:t>)`)
+var docxParagraphRe = regexp.MustCompile(`(?s)<w:p\b[^>]*>(.*?)</w:p>`)
 
 func replaceDocxXML(content string, replacements map[string]string) string {
 	matches := docxTextRe.FindAllStringSubmatchIndex(content, -1)
@@ -183,11 +184,55 @@ func replaceDocxXML(content string, replacements map[string]string) string {
 	return b.String()
 }
 
+// ExtractDocxText reads plain text from word/document.xml for UI editing.
+func ExtractDocxText(templatePath string) (string, error) {
+	zr, err := zip.OpenReader(templatePath)
+	if err != nil {
+		return "", err
+	}
+	defer zr.Close()
+
+	for _, file := range zr.File {
+		if file.Name != "word/document.xml" {
+			continue
+		}
+
+		rc, err := file.Open()
+		if err != nil {
+			return "", err
+		}
+		data, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			return "", err
+		}
+
+		return extractDocxTextFromXML(string(data)), nil
+	}
+
+	return "", fmt.Errorf("word/document.xml tidak ditemukan")
+}
+
 func replaceSimple(content string, replacements map[string]string) string {
 	for key, value := range replacements {
 		content = strings.ReplaceAll(content, key, xmlEscape(value))
 	}
 	return content
+}
+
+// BuildTemplateDocxLines converts editable template content into a simple docx layout.
+func BuildTemplateDocxLines(content string) []string {
+	lines := []string{"${logo}", "${header}"}
+
+	normalized := normalizeMultilineText(content)
+	if normalized == "" {
+		lines = append(lines, "Perihal: {{perihal}}", "", "{{isi_surat}}")
+	} else {
+		lines = append(lines, strings.Split(normalized, "\n")...)
+	}
+
+	lines = append(lines, "${footer}")
+	return lines
 }
 
 func replaceAcrossRuns(texts []string, key, value string) []string {
@@ -231,6 +276,61 @@ func findRunOffset(texts []string, pos int) (int, int) {
 	}
 	last := len(texts) - 1
 	return last, len(texts[last])
+}
+
+func extractDocxTextFromXML(content string) string {
+	paragraphs := docxParagraphRe.FindAllStringSubmatch(content, -1)
+	if len(paragraphs) == 0 {
+		return strings.TrimSpace(extractDocxTextSegment(content))
+	}
+
+	lines := make([]string, 0, len(paragraphs))
+	for _, paragraph := range paragraphs {
+		if len(paragraph) < 2 {
+			continue
+		}
+		lines = append(lines, extractDocxTextSegment(paragraph[1]))
+	}
+
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func extractDocxTextSegment(segment string) string {
+	segment = strings.ReplaceAll(segment, "<w:tab/>", "\t")
+	segment = strings.ReplaceAll(segment, "<w:br/>", "\n")
+	segment = strings.ReplaceAll(segment, "<w:cr/>", "\n")
+
+	matches := docxTextRe.FindAllStringSubmatch(segment, -1)
+	if len(matches) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	for _, match := range matches {
+		if len(match) < 3 {
+			continue
+		}
+		b.WriteString(xmlUnescape(match[2]))
+	}
+
+	return strings.TrimSpace(b.String())
+}
+
+func xmlUnescape(s string) string {
+	r := strings.NewReplacer(
+		"&lt;", "<",
+		"&gt;", ">",
+		"&quot;", `"`,
+		"&apos;", "'",
+		"&amp;", "&",
+	)
+	return r.Replace(s)
+}
+
+func normalizeMultilineText(value string) string {
+	normalized := strings.ReplaceAll(value, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	return strings.TrimSpace(normalized)
 }
 
 func zipDir(dir string, outPath string) error {

@@ -11,25 +11,27 @@ import (
 )
 
 type LetterTemplateCreateInput struct {
-	Name       string
-	FilePath   string
-	FileName   string
-	HeaderText string
-	FooterText string
-	LogoPath   *string
-	CreatedBy  int64
-	Now        time.Time
+	Name            string
+	FilePath        string
+	FileName        string
+	TemplateContent string
+	HeaderText      string
+	FooterText      string
+	LogoPath        *string
+	CreatedBy       int64
+	Now             time.Time
 }
 
 type LetterTemplateUpdateInput struct {
-	ID         int64
-	Name       string
-	FilePath   string
-	FileName   string
-	HeaderText string
-	FooterText string
-	LogoPath   *string
-	UpdatedAt  time.Time
+	ID              int64
+	Name            string
+	FilePath        string
+	FileName        string
+	TemplateContent string
+	HeaderText      string
+	FooterText      string
+	LogoPath        *string
+	UpdatedAt       time.Time
 }
 
 func ListLetterTemplates(db *sqlx.DB) ([]models.LetterTemplate, error) {
@@ -75,11 +77,12 @@ func CreateLetterTemplate(db *sqlx.DB, input LetterTemplateCreateInput) error {
 	if input.Now.IsZero() {
 		input.Now = time.Now()
 	}
-	_, err := db.Exec(`INSERT INTO letter_templates (name, file_path, file_name, header_text, footer_text, logo_path, is_active, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+	_, err := db.Exec(`INSERT INTO letter_templates (name, file_path, file_name, template_content, header_text, footer_text, logo_path, is_active, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
 		input.Name,
 		input.FilePath,
 		input.FileName,
+		input.TemplateContent,
 		input.HeaderText,
 		input.FooterText,
 		input.LogoPath,
@@ -164,10 +167,11 @@ func UpdateLetterTemplate(db *sqlx.DB, input LetterTemplateUpdateInput) error {
 	if input.UpdatedAt.IsZero() {
 		input.UpdatedAt = time.Now()
 	}
-	_, err := db.Exec(`UPDATE letter_templates SET name=?, file_path=?, file_name=?, header_text=?, footer_text=?, logo_path=?, updated_at=? WHERE id = ?`,
+	_, err := db.Exec(`UPDATE letter_templates SET name=?, file_path=?, file_name=?, template_content=?, header_text=?, footer_text=?, logo_path=?, updated_at=? WHERE id = ?`,
 		input.Name,
 		input.FilePath,
 		input.FileName,
+		input.TemplateContent,
 		input.HeaderText,
 		input.FooterText,
 		input.LogoPath,
@@ -200,11 +204,12 @@ func CreateAndActivateLetterTemplate(db *sqlx.DB, input LetterTemplateCreateInpu
 	defer tx.Rollback()
 
 	if _, err := tx.Exec(
-		`INSERT INTO letter_templates (name, file_path, file_name, header_text, footer_text, logo_path, is_active, created_by, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+		`INSERT INTO letter_templates (name, file_path, file_name, template_content, header_text, footer_text, logo_path, is_active, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
 		input.Name,
 		input.FilePath,
 		input.FileName,
+		input.TemplateContent,
 		input.HeaderText,
 		input.FooterText,
 		input.LogoPath,

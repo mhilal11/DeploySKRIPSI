@@ -2,6 +2,7 @@ export interface Template {
     id: number;
     name: string;
     fileName: string;
+    templateContent: string | null;
     headerText: string | null;
     footerText: string | null;
     logoUrl: string | null;

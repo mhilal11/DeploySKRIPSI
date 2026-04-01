@@ -31,6 +31,7 @@ const loadSuperAdminAdminHRDashboard = () => import('@/modules/SuperAdmin/AdminH
 const loadSuperAdminRecruitment = () => import('@/modules/SuperAdmin/KelolaRekrutmen/Index');
 const loadSuperAdminDivisions = () => import('@/modules/SuperAdmin/KelolaDivisi/Index');
 const loadSuperAdminLetters = () => import('@/modules/SuperAdmin/KelolaSurat/Index');
+const loadSuperAdminLetterTemplates = () => import('@/modules/SuperAdmin/TemplateSurat/Index');
 const loadSuperAdminStaff = () => import('@/modules/SuperAdmin/KelolaStaff/Index');
 const loadSuperAdminComplaints = () => import('@/modules/SuperAdmin/KelolaPengaduan/Index');
 const loadSuperAdminAuditLog = () => import('@/modules/SuperAdmin/AuditLog/Index');
@@ -67,6 +68,7 @@ const SuperAdminAdminHRDashboard = lazy(loadSuperAdminAdminHRDashboard);
 const SuperAdminRecruitment = lazy(loadSuperAdminRecruitment);
 const SuperAdminDivisions = lazy(loadSuperAdminDivisions);
 const SuperAdminLetters = lazy(loadSuperAdminLetters);
+const SuperAdminLetterTemplates = lazy(loadSuperAdminLetterTemplates);
 const SuperAdminStaff = lazy(loadSuperAdminStaff);
 const SuperAdminComplaints = lazy(loadSuperAdminComplaints);
 const SuperAdminAuditLog = lazy(loadSuperAdminAuditLog);
@@ -235,6 +237,12 @@ export const ROUTES: RouteConfig[] = [
     api: '/super-admin/kelola-surat',
   },
   {
+    path: '/super-admin/kelola-surat/templates',
+    name: 'super-admin.letters.templates.index',
+    component: SuperAdminLetterTemplates,
+    api: '/super-admin/kelola-surat/templates',
+  },
+  {
     path: '/super-admin/kelola-staff',
     name: 'super-admin.staff.index',
     component: SuperAdminStaff,
@@ -288,6 +296,7 @@ export function getWarmupLoaders(user: any): Array<() => Promise<unknown>> {
       loadSuperAdminDashboard,
       loadSuperAdminRecruitment,
       loadSuperAdminLetters,
+      loadSuperAdminLetterTemplates,
       loadSuperAdminStaff,
       loadSuperAdminAuditLog,
     );
@@ -298,6 +307,7 @@ export function getWarmupLoaders(user: any): Array<() => Promise<unknown>> {
         loadSuperAdminAdminHRDashboard,
         loadSuperAdminRecruitment,
         loadSuperAdminLetters,
+        loadSuperAdminLetterTemplates,
       );
     } else {
       warmups.push(loadAdminStaffDashboard, loadAdminStaffLetters, loadAdminStaffRecruitment);
@@ -320,6 +330,7 @@ export function getWarmupApiEndpoints(user: any): string[] {
       '/super-admin/recruitment',
       '/super-admin/kelola-divisi',
       '/super-admin/kelola-surat',
+      '/super-admin/kelola-surat/templates',
       '/super-admin/kelola-staff',
       '/super-admin/kelola-pengaduan',
       '/super-admin/audit-log',
@@ -332,6 +343,7 @@ export function getWarmupApiEndpoints(user: any): string[] {
         '/super-admin/recruitment',
         '/super-admin/kelola-divisi',
         '/super-admin/kelola-surat',
+        '/super-admin/kelola-surat/templates',
       );
     } else {
       endpoints.push(
