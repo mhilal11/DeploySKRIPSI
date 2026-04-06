@@ -17,7 +17,6 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
     "plugins": [
       {
         "name": "next"
@@ -25,16 +24,16 @@
     ],
     "paths": {
       "@/runtime/*": [
-        "src/runtime/*"
+        "./src/runtime/*"
       ],
       "@/modules/*": [
-        "src/modules/*"
+        "./src/modules/*"
       ],
       "@/shared/*": [
-        "src/shared/*"
+        "./src/shared/*"
       ],
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
     },
     "resolveJsonModule": true

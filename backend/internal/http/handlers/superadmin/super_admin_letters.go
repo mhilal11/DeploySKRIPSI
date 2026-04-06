@@ -1,12 +1,14 @@
 package superadmin
 
 import (
+	"bytes"
 	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	dbrepo "hris-backend/internal/repository"
 
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,6 +21,7 @@ import (
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jung-kurt/gofpdf"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -369,7 +372,11 @@ func SuperAdminLettersFinalDisposition(c *gin.Context) {
 			surat.DispositionNote = &note
 		}
 
-		filePath, fileName := generateDispositionDocument(c, db, surat, selectedTemplateID)
+		filePath, fileName := generateDispositionFinalPDFDocument(c, db, surat, selectedTemplateID)
+		if strings.TrimSpace(filePath) == "" || strings.TrimSpace(fileName) == "" {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuat lampiran PDF disposisi final.")
+			return
+		}
 		_ = dbrepo.UpdateSuratFinalDisposition(db, surat.SuratID, &filePath, &fileName, surat.DispositionNote, user.ID, time.Now())
 	}
 
@@ -444,7 +451,55 @@ func SuperAdminLettersExportWord(c *gin.Context) {
 }
 
 func SuperAdminLettersExportFinal(c *gin.Context) {
-	SuperAdminLettersExportWord(c)
+	user := middleware.CurrentUser(c)
+	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
+		handlers.JSONError(c, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		handlers.JSONError(c, http.StatusBadRequest, "ID surat tidak valid")
+		return
+	}
+	db := middleware.GetDB(c)
+	surat, err := dbrepo.GetSuratByID(db, id)
+	if err != nil || surat == nil {
+		handlers.JSONError(c, http.StatusNotFound, "Surat tidak ditemukan")
+		return
+	}
+
+	filePath := strings.TrimSpace(handlers.FirstString(surat.DispositionDocumentPath, ""))
+	fileName := strings.TrimSpace(handlers.FirstString(surat.DispositionDocumentName, ""))
+
+	if filePath == "" || fileName == "" {
+		generatedPath, generatedName := generateDispositionFinalPDFDocument(c, db, surat, 0)
+		if strings.TrimSpace(generatedPath) == "" || strings.TrimSpace(generatedName) == "" {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuat dokumen PDF disposisi final.")
+			return
+		}
+		filePath = generatedPath
+		fileName = generatedName
+	}
+
+	normalizedPath := handlers.NormalizeAttachmentPath(filePath)
+	absPath, ok := resolveStorageFilePath(middleware.GetConfig(c).StoragePath, normalizedPath)
+	if !ok {
+		handlers.JSONError(c, http.StatusUnprocessableEntity, "Path dokumen disposisi final tidak valid.")
+		return
+	}
+	content, _, readErr := services.ReadFileMaybeDecrypted(absPath, middleware.GetConfig(c).StorageEncryptionKey)
+	if readErr != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal membaca dokumen disposisi final.")
+		return
+	}
+
+	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(fileName)))
+	if strings.TrimSpace(contentType) == "" {
+		contentType = "application/pdf"
+	}
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	c.Data(http.StatusOK, contentType, content)
 }
 
 func generateDispositionDocument(c *gin.Context, db *sqlx.DB, surat *models.Surat, templateID int64) (string, string) {
@@ -508,6 +563,105 @@ func generateDispositionDocument(c *gin.Context, db *sqlx.DB, surat *models.Sura
 
 	relPath := filepath.ToSlash(filepath.Join("disposition_documents", fileName))
 	return relPath, fileName
+}
+
+func generateDispositionFinalPDFDocument(c *gin.Context, db *sqlx.DB, surat *models.Surat, templateID int64) (string, string) {
+	placeholders := dispositionPlaceholders(db, surat)
+
+	var (
+		template *models.LetterTemplate
+		err      error
+	)
+	if templateID > 0 {
+		template, err = dbrepo.GetLetterTemplateByID(db, templateID)
+	} else {
+		template, err = dbrepo.GetActiveLetterTemplate(db)
+	}
+
+	headerText := ""
+	footerText := ""
+	templateContent := surat.IsiSurat
+	logoPath := ""
+	var cleanupLogo func()
+
+	if err == nil && template != nil {
+		headerText = handlers.FirstString(template.HeaderText, "")
+		footerText = handlers.FirstString(template.FooterText, "")
+		if resolvedContent := resolveTemplateEditorContent(c, template); resolvedContent != nil {
+			templateContent = *resolvedContent
+		}
+		if template.LogoPath != nil && strings.TrimSpace(*template.LogoPath) != "" {
+			normalizedLogoPath := handlers.NormalizeAttachmentPath(*template.LogoPath)
+			if absLogoPath, ok := resolveStorageFilePath(middleware.GetConfig(c).StoragePath, normalizedLogoPath); ok {
+				readPath, cleanup, prepErr := services.PrepareFileForRead(
+					absLogoPath,
+					middleware.GetConfig(c).StorageEncryptionKey,
+				)
+				if prepErr == nil {
+					logoPath = readPath
+					cleanupLogo = cleanup
+				}
+			}
+		}
+	}
+	if cleanupLogo != nil {
+		defer cleanupLogo()
+	}
+
+	renderedContent := renderDispositionPDFText(templateContent, placeholders)
+	renderedHeader := renderDispositionPDFText(headerText, placeholders)
+	renderedFooter := renderDispositionPDFText(footerText, placeholders)
+
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.SetMargins(16, 16, 16)
+	pdf.SetAutoPageBreak(true, 16)
+	pdf.AddPage()
+
+	drawTemplatePreviewPDFHeader(pdf, logoPath, renderedHeader)
+
+	pdf.SetFont("Arial", "", 11)
+	pdf.SetTextColor(51, 65, 85)
+	pdf.MultiCell(0, 7.5, firstNonEmptyText(renderedContent, "-"), "", "L", false)
+
+	if strings.TrimSpace(renderedFooter) != "" {
+		pdf.Ln(6)
+		left, _, right, _ := pdf.GetMargins()
+		pageWidth, _ := pdf.GetPageSize()
+		lineY := pdf.GetY()
+		pdf.SetDrawColor(226, 232, 240)
+		pdf.Line(left, lineY, pageWidth-right, lineY)
+		pdf.Ln(4)
+		pdf.SetFont("Arial", "", 10)
+		pdf.SetTextColor(100, 116, 139)
+		pdf.MultiCell(0, 6, renderedFooter, "", "L", false)
+	}
+
+	var out bytes.Buffer
+	if err := pdf.Output(&out); err != nil {
+		return "", ""
+	}
+
+	fileName := fmt.Sprintf("disposisi_final_%s_%s.pdf", surat.NomorSurat, time.Now().Format("20060102_150405"))
+	fileName = sanitizeFilename(fileName)
+	storagePath := filepath.Join(middleware.GetConfig(c).StoragePath, "disposition_documents")
+	_ = os.MkdirAll(storagePath, 0o755)
+	destPath := filepath.Join(storagePath, fileName)
+	_ = os.WriteFile(destPath, out.Bytes(), 0o644)
+	cfg := middleware.GetConfig(c)
+	if cfg.StorageEncryptUploads && cfg.StorageEncryptionKey != "" {
+		_ = services.EncryptFileInPlace(destPath, cfg.StorageEncryptionKey)
+	}
+
+	relPath := filepath.ToSlash(filepath.Join("disposition_documents", fileName))
+	return relPath, fileName
+}
+
+func renderDispositionPDFText(content string, replacements map[string]string) string {
+	output := content
+	for key, value := range replacements {
+		output = strings.ReplaceAll(output, key, value)
+	}
+	return strings.TrimSpace(output)
 }
 
 func dispositionPlaceholders(db *sqlx.DB, surat *models.Surat) map[string]string {

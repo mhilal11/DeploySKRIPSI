@@ -128,17 +128,35 @@ export default function AccountTable({
                                             </AlertDialogFooter>
                                         </AlertDialogContent>
                                     </AlertDialog>
-                                    <IconButton
-                                        label="Hapus"
-                                        size="sm"
-                                        onClick={() => {
-                                            if (window.confirm(`Hapus akun ${user.name}?`)) {
-                                                onDelete(user);
-                                            }
-                                        }}
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                                    </IconButton>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <div className="inline-block">
+                                                <IconButton label="Hapus Akun" onClick={() => { }} size="sm">
+                                                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                                </IconButton>
+                                            </div>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent className="bg-white">
+                                            <AlertDialogHeader>
+                                                <div className="flex items-center gap-2">
+                                                    <AlertTriangle className="h-5 w-5 text-red-500" />
+                                                    <AlertDialogTitle>Hapus Akun?</AlertDialogTitle>
+                                                </div>
+                                                <AlertDialogDescription>
+                                                    Apakah Anda yakin ingin menghapus akun <span className="font-semibold text-slate-900">{user.name}</span>? Tindakan ini tidak dapat dibatalkan.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Batal</AlertDialogCancel>
+                                                <AlertDialogAction
+                                                    onClick={() => onDelete(user)}
+                                                    className="bg-red-600 hover:bg-red-700"
+                                                >
+                                                    Ya, Hapus
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                 </div>
                             </div>
                         ))}
@@ -250,20 +268,35 @@ export default function AccountTable({
                                                 </AlertDialogFooter>
                                             </AlertDialogContent>
                                         </AlertDialog>
-                                        <IconButton
-                                            label="Hapus"
-                                            onClick={() => {
-                                                if (
-                                                    window.confirm(
-                                                        `Hapus akun ${user.name}?`,
-                                                    )
-                                                ) {
-                                                    onDelete(user);
-                                                }
-                                            }}
-                                        >
-                                            <Trash2 className="h-4 w-4 text-red-500" />
-                                        </IconButton>
+                                        <AlertDialog>
+                                            <AlertDialogTrigger asChild>
+                                                <div className="inline-block">
+                                                    <IconButton label="Hapus Akun" onClick={() => { }}>
+                                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                                    </IconButton>
+                                                </div>
+                                            </AlertDialogTrigger>
+                                            <AlertDialogContent className="bg-white">
+                                                <AlertDialogHeader>
+                                                    <div className="flex items-center gap-2">
+                                                        <AlertTriangle className="h-5 w-5 text-red-500" />
+                                                        <AlertDialogTitle>Hapus Akun?</AlertDialogTitle>
+                                                    </div>
+                                                    <AlertDialogDescription>
+                                                        Apakah Anda yakin ingin menghapus akun <span className="font-semibold text-slate-900">{user.name}</span>? Tindakan ini tidak dapat dibatalkan.
+                                                    </AlertDialogDescription>
+                                                </AlertDialogHeader>
+                                                <AlertDialogFooter>
+                                                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                                                    <AlertDialogAction
+                                                        onClick={() => onDelete(user)}
+                                                        className="bg-red-600 hover:bg-red-700"
+                                                    >
+                                                        Ya, Hapus
+                                                    </AlertDialogAction>
+                                                </AlertDialogFooter>
+                                            </AlertDialogContent>
+                                        </AlertDialog>
                                     </div>
                                 </td>
                             </tr>

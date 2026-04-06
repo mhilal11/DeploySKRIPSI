@@ -12,6 +12,15 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/shared/components/ui/alert-dialog';
+import { Button } from '@/shared/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/shared/components/ui/dialog';
 import { api, apiUrl, resolveAssetUrl } from '@/shared/lib/api';
 
 import { AccountDetailUser, AccountProfile, AccountRecord } from './types';
@@ -34,20 +43,6 @@ export default function AccountDetailDialog({
     const [detailUser, setDetailUser] = useState<AccountDetailUser | null>(null);
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<TabKey>('akun');
-
-    useEffect(() => {
-        if (typeof document === 'undefined') {
-            return;
-        }
-        if (open) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = '';
-        }
-        return () => {
-            document.body.style.overflow = '';
-        };
-    }, [open]);
 
     useEffect(() => {
         if (!open || !user) {
@@ -88,48 +83,49 @@ export default function AccountDetailDialog({
     ];
 
     return (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 px-4 py-6">
-            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
-                {/* Header with profile photo */}
-                <div className="mb-4 flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                        {loading ? (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
-                                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-                            </div>
-                        ) : profilePhotoUrl ? (
-                            <img
-                                src={profilePhotoUrl}
-                                alt={displayUser.name}
-                                className="h-16 w-16 rounded-full border-2 border-blue-100 object-cover shadow-sm"
-                            />
-                        ) : (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200 shadow-sm">
-                                <User className="h-7 w-7 text-blue-600" />
-                            </div>
-                        )}
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[90vh] w-[96vw] overflow-hidden border-0 bg-white p-0 sm:w-full sm:max-w-2xl">
+                <DialogHeader className="space-y-0 border-b border-slate-100 px-4 py-4 pr-12 text-left sm:px-6">
+                    <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0">
+                            {loading ? (
+                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-slate-100">
+                                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                                </div>
+                            ) : profilePhotoUrl ? (
+                                <img
+                                    src={profilePhotoUrl}
+                                    alt={displayUser.name}
+                                    className="h-16 w-16 rounded-full border-2 border-blue-100 object-cover shadow-sm"
+                                />
+                            ) : (
+                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200 shadow-sm">
+                                    <User className="h-7 w-7 text-blue-600" />
+                                </div>
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <DialogTitle className="text-lg font-semibold text-blue-900">
+                                Detail Akun
+                            </DialogTitle>
+                            <DialogDescription className="mt-1 text-sm text-slate-500">
+                                Informasi lengkap akun pengguna sistem.
+                            </DialogDescription>
+                        </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                        <h2 className="text-lg font-semibold text-blue-900">
-                            Account Details
-                        </h2>
-                        <p className="text-sm text-slate-500">
-                            Informasi lengkap akun pengguna
-                        </p>
-                    </div>
-                </div>
+                </DialogHeader>
 
                 {loading ? (
-                    <div className="flex items-center justify-center py-10">
+                    <div className="flex min-h-[280px] items-center justify-center px-4 py-10 sm:px-6">
                         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                     </div>
                 ) : (
-                    <>
-                        {/* Tab Navigation */}
+                    <div className="max-h-[calc(90vh-12rem)] overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
                         <div className="mb-4 flex border-b border-slate-200">
                             {tabs.map((tab) => (
                                 <button
                                     key={tab.key}
+                                    type="button"
                                     onClick={() => setActiveTab(tab.key)}
                                     className={`relative flex-1 px-3 py-2.5 text-center text-sm font-medium transition-colors ${
                                         activeTab === tab.key
@@ -145,7 +141,6 @@ export default function AccountDetailDialog({
                             ))}
                         </div>
 
-                        {/* Tab Content */}
                         {activeTab === 'akun' && (
                             <div className="space-y-3 py-2 text-sm">
                                 <InfoRow label="User ID" value={displayUser.employee_code} />
@@ -206,17 +201,19 @@ export default function AccountDetailDialog({
                                 </div>
                             )
                         )}
-                    </>
+                    </div>
                 )}
 
-                <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <DialogFooter className="border-t border-slate-100 px-4 py-4 sm:px-6">
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
-                            <button
-                                className="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto"
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full border-slate-200 text-slate-700 hover:bg-slate-50 sm:w-auto"
                             >
                                 {user.status === 'Active' ? 'Nonaktifkan' : 'Aktifkan'}
-                            </button>
+                            </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent className="bg-white">
                             <AlertDialogHeader>
@@ -239,15 +236,16 @@ export default function AccountDetailDialog({
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
-                    <button
-                        className="w-full rounded-lg bg-blue-900 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 sm:w-auto"
+                    <Button
+                        type="button"
                         onClick={() => onOpenChange(false)}
+                        className="w-full bg-blue-900 text-white hover:bg-blue-800 sm:w-auto"
                     >
                         Tutup
-                    </button>
-                </div>
-            </div>
-        </div>
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 

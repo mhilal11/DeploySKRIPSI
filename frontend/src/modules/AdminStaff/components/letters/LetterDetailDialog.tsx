@@ -282,17 +282,30 @@ export function LetterDetailDialog({
                               </div>
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-semibold text-slate-900 truncate">
-                                  {letter.dispositionDocumentName ?? 'Surat Disposisi.docx'}
+                                  {letter.dispositionDocumentName ?? 'Surat Disposisi.pdf'}
                                 </p>
                                 <p className="text-xs text-emerald-600">Dokumen disposisi resmi</p>
                               </div>
                             </div>
-                            <Button asChild size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 sm:w-auto">
-                              <a href={letter.dispositionDocumentUrl} download>
-                                <Download className="mr-2 h-4 w-4" />
-                                Unduh
-                              </a>
-                            </Button>
+                            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                              <Button
+                                asChild
+                                size="sm"
+                                variant="outline"
+                                className="w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50 sm:w-auto"
+                              >
+                                <a href={letter.dispositionDocumentUrl} target="_blank" rel="noreferrer">
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Lihat
+                                </a>
+                              </Button>
+                              <Button asChild size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 sm:w-auto">
+                                <a href={letter.dispositionDocumentUrl} download>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Unduh
+                                </a>
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </Card>
