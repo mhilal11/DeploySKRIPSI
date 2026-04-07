@@ -328,8 +328,8 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
 
     return (
         <Dialog open={Boolean(division)} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-h-[90vh] w-[96vw] overflow-hidden border-0 bg-white p-0 sm:w-full sm:max-w-2xl">
-                <DialogHeader className="space-y-1 border-b border-slate-100 px-4 py-4 sm:px-6">
+            <DialogContent className="flex max-h-[90vh] w-[96vw] flex-col overflow-hidden border-0 bg-white p-0 sm:w-full sm:max-w-2xl">
+                <DialogHeader className="shrink-0 space-y-1 border-b border-slate-100 px-4 py-4 sm:px-6">
                     <DialogTitle>{form.data.job_id ? 'Edit Lowongan' : 'Publikasikan Lowongan'}</DialogTitle>
                     <DialogDescription>
                         Lengkapi detail rekrutmen untuk divisi {division?.name}.
@@ -337,8 +337,8 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                 </DialogHeader>
 
                 {division && (
-                    <form onSubmit={handleSubmit} className="space-y-6 px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
-                        <div className="max-h-[calc(90vh-11rem)] space-y-6 overflow-y-auto pr-1">
+                    <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-4 pr-3 sm:px-6 sm:py-5 sm:pr-4">
                             <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
                                 Kapasitas {division.current_staff}/{division.capacity}  Slot tersedia {division.available_slots}
                                 {division.available_slots === 0 && (
@@ -459,7 +459,7 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                             />
                         </div>
 
-                        <DialogFooter className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+                        <DialogFooter className="shrink-0 border-t border-slate-100 bg-white px-4 py-4 sm:px-6">
                             <Button type="button" className="w-full bg-red-600 text-white hover:bg-red-700 sm:w-auto" onClick={onClose}>
                                 Batalkan
                             </Button>
