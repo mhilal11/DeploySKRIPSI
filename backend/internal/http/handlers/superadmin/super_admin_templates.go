@@ -19,8 +19,8 @@ import (
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jung-kurt/gofpdf"
 	"github.com/jmoiron/sqlx"
+	"github.com/jung-kurt/gofpdf"
 )
 
 type templatesRepository interface {
@@ -114,18 +114,26 @@ func SuperAdminTemplatesSample(c *gin.Context) {
 	lines := []string{
 		"${logo}",
 		"${header}",
+		"",
 		"Nomor: ${nomor_surat}",
 		"Tanggal: ${tanggal}",
 		"Pengirim: ${pengirim}",
 		"Divisi Pengirim: ${divisi_pengirim}",
+		"",
 		"Kepada Yth.",
 		"${penerima}",
+		"",
 		"Perihal: ${perihal}",
-		"${isi_surat}",
 		"Prioritas: ${prioritas}",
+		"",
+		"Dengan hormat,",
+		"${isi_surat}",
+		"",
+		"Demikian disampaikan. Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.",
+		"",
 		"Catatan Disposisi: ${catatan_disposisi}",
 		"Tanggal Disposisi: ${tanggal_disposisi}",
-		"Oleh: ${oleh}",
+		"Diproses oleh: ${oleh}",
 		"${footer}",
 	}
 	outFile, err := os.CreateTemp("", "Template_Disposisi_Sample_*.docx")
@@ -405,33 +413,14 @@ func SuperAdminTemplatesPreviewPDF(c *gin.Context) {
 	}
 
 	replacements := templatePreviewReplacements()
-	renderedContent := renderTemplatePreviewText(templateContent, replacements)
-	renderedHeader := renderTemplatePreviewText(headerText, replacements)
-	renderedFooter := renderTemplatePreviewText(footerText, replacements)
+	previewData := buildModernLetterPreviewData(templateContent, headerText, footerText, replacements)
 
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(16, 16, 16)
 	pdf.SetAutoPageBreak(true, 16)
 	pdf.AddPage()
 
-	drawTemplatePreviewPDFHeader(pdf, logoPath, renderedHeader)
-
-	pdf.SetFont("Arial", "", 11)
-	pdf.SetTextColor(51, 65, 85)
-	pdf.MultiCell(0, 7.5, firstNonEmptyText(renderedContent, "-"), "", "L", false)
-
-	if strings.TrimSpace(renderedFooter) != "" {
-		pdf.Ln(6)
-		left, _, right, _ := pdf.GetMargins()
-		pageWidth, _ := pdf.GetPageSize()
-		lineY := pdf.GetY()
-		pdf.SetDrawColor(226, 232, 240)
-		pdf.Line(left, lineY, pageWidth-right, lineY)
-		pdf.Ln(4)
-		pdf.SetFont("Arial", "", 10)
-		pdf.SetTextColor(100, 116, 139)
-		pdf.MultiCell(0, 6, renderedFooter, "", "L", false)
-	}
+	drawModernLetterPDF(pdf, logoPath, previewData)
 
 	var out bytes.Buffer
 	if err := pdf.Output(&out); err != nil {
@@ -725,17 +714,17 @@ func normalizeTemplateEditorContent(value string) string {
 
 func templatePreviewReplacements() map[string]string {
 	replacements := map[string]string{
-		"{{nomor_surat}}":       "001/HC/LDP/IV/2026",
-		"{{tanggal}}":           "01 April 2026",
-		"{{pengirim}}":          "Alya Putri",
-		"{{divisi_pengirim}}":   "Human Capital",
-		"{{penerima}}":          "Divisi Operasional",
-		"{{perihal}}":           "Tindak Lanjut Kebutuhan Personel",
-		"{{isi_surat}}":         "Mohon menindaklanjuti kebutuhan personel untuk area operasional sesuai prioritas yang telah disepakati pada rapat koordinasi minggu ini.",
-		"{{prioritas}}":         "Tinggi",
-		"{{catatan_disposisi}}": "Harap diproses maksimal 2 hari kerja dan koordinasikan hasilnya kembali ke Human Capital.",
-		"{{tanggal_disposisi}}": "02 April 2026 09:30",
-		"{{oleh}}":              "Nadia Rahma",
+		"{{nomor_surat}}":       "003/COR/2026",
+		"{{tanggal}}":           "07 Februari 2026",
+		"{{pengirim}}":          "Akbar",
+		"{{divisi_pengirim}}":   "Corporate",
+		"{{penerima}}":          "Government and Partner",
+		"{{perihal}}":           "Undangan Kolaborasi",
+		"{{isi_surat}}":         "Sehubungan dengan rencana sinergi antara PT. Lintas Data Prima dan pihak Government and Partner, kami mengundang Bapak/Ibu untuk mendiskusikan peluang kolaborasi, ruang lingkup kerja sama, serta rencana tindak lanjut yang dapat memberikan nilai tambah bagi kedua belah pihak.\n\nWaktu pelaksanaan dan detail agenda dapat disesuaikan dengan ketersediaan pihak terkait. Template ini dapat dipakai ulang untuk surat undangan, nota dinas, surat pengantar, maupun disposisi internal hanya dengan mengganti metadata dan isi utama surat.",
+		"{{prioritas}}":         "High",
+		"{{catatan_disposisi}}": "OK, lanjutkan ke Government and Partner untuk koordinasi agenda dan tindak lanjut awal.",
+		"{{tanggal_disposisi}}": "-",
+		"{{oleh}}":              "HR Admin",
 	}
 
 	for key, value := range replacements {
@@ -821,57 +810,535 @@ func savePreviewUploadToTemp(c *gin.Context, field string) (string, func(), erro
 	}, nil
 }
 
-func drawTemplatePreviewPDFHeader(pdf *gofpdf.Fpdf, logoPath string, headerText string) {
-	if strings.TrimSpace(headerText) == "" && strings.TrimSpace(logoPath) == "" {
-		return
+type modernLetterPreviewData struct {
+	BodyParagraphs  []string
+	DispositionDate string
+	DispositionNote string
+	FooterLines     []string
+	HeaderLines     []string
+	NomorSurat      string
+	Priority        string
+	ProcessedBy     string
+	Recipient       string
+	Sender          string
+	SenderDivision  string
+	Subject         string
+	Tanggal         string
+}
+
+func buildModernLetterPreviewData(content, headerText, footerText string, replacements map[string]string) modernLetterPreviewData {
+	renderedContent := renderTemplatePreviewText(content, replacements)
+	renderedHeader := renderTemplatePreviewText(headerText, replacements)
+	renderedFooter := renderTemplatePreviewText(footerText, replacements)
+	bodyParagraphs := extractModernLetterBodyParagraphs(renderedContent)
+	if len(bodyParagraphs) == 0 {
+		bodyParagraphs = normalizePreviewParagraphs(splitPreviewParagraphs(firstReplacementValue(replacements, "{{isi_surat}}", "${isi_surat}", "-")))
 	}
 
+	return modernLetterPreviewData{
+		BodyParagraphs:  bodyParagraphs,
+		DispositionDate: firstReplacementValue(replacements, "{{tanggal_disposisi}}", "${tanggal_disposisi}", "-"),
+		DispositionNote: firstReplacementValue(replacements, "{{catatan_disposisi}}", "${catatan_disposisi}", "-"),
+		FooterLines:     splitNonEmptyLines(renderedFooter),
+		HeaderLines:     splitNonEmptyLines(renderedHeader),
+		NomorSurat:      firstReplacementValue(replacements, "{{nomor_surat}}", "${nomor_surat}", "-"),
+		Priority:        firstReplacementValue(replacements, "{{prioritas}}", "${prioritas}", "-"),
+		ProcessedBy:     firstReplacementValue(replacements, "{{oleh}}", "${oleh}", "-"),
+		Recipient:       firstReplacementValue(replacements, "{{penerima}}", "${penerima}", "-"),
+		Sender:          firstReplacementValue(replacements, "{{pengirim}}", "${pengirim}", "-"),
+		SenderDivision:  firstReplacementValue(replacements, "{{divisi_pengirim}}", "${divisi_pengirim}", "-"),
+		Subject:         firstReplacementValue(replacements, "{{perihal}}", "${perihal}", "-"),
+		Tanggal:         firstReplacementValue(replacements, "{{tanggal}}", "${tanggal}", "-"),
+	}
+}
+
+func firstReplacementValue(replacements map[string]string, keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(replacements[key]); value != "" {
+			return value
+		}
+	}
+	return "-"
+}
+
+func splitNonEmptyLines(value string) []string {
+	normalized := normalizeTemplateEditorContent(value)
+	if normalized == "" {
+		return nil
+	}
+
+	parts := strings.Split(normalized, "\n")
+	lines := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			lines = append(lines, trimmed)
+		}
+	}
+	return lines
+}
+
+func startsWithPreviewLabel(line, label string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(line)), strings.ToLower(label)+":")
+}
+
+func isKnownPreviewSectionLine(line string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(line))
+	if normalized == "" {
+		return false
+	}
+
+	return normalized == "kepada yth." ||
+		normalized == "kepada yth" ||
+		startsWithPreviewLabel(line, "Nomor") ||
+		startsWithPreviewLabel(line, "Tanggal") ||
+		startsWithPreviewLabel(line, "Pengirim") ||
+		startsWithPreviewLabel(line, "Divisi Pengirim") ||
+		startsWithPreviewLabel(line, "Perihal") ||
+		startsWithPreviewLabel(line, "Prioritas") ||
+		startsWithPreviewLabel(line, "Catatan Disposisi") ||
+		startsWithPreviewLabel(line, "Tanggal Disposisi") ||
+		startsWithPreviewLabel(line, "Diproses oleh") ||
+		startsWithPreviewLabel(line, "Oleh")
+}
+
+func splitPreviewParagraphs(value string) []string {
+	normalized := normalizeTemplateEditorContent(value)
+	if normalized == "" {
+		return nil
+	}
+
+	lines := strings.Split(normalized, "\n")
+	paragraphs := make([]string, 0, len(lines))
+	current := make([]string, 0, 2)
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			if len(current) > 0 {
+				paragraphs = append(paragraphs, strings.Join(current, " "))
+				current = current[:0]
+			}
+			continue
+		}
+		current = append(current, trimmed)
+	}
+	if len(current) > 0 {
+		paragraphs = append(paragraphs, strings.Join(current, " "))
+	}
+
+	return paragraphs
+}
+
+func normalizePreviewParagraphs(paragraphs []string) []string {
+	normalized := make([]string, 0, len(paragraphs))
+	for _, paragraph := range paragraphs {
+		trimmed := strings.TrimSpace(paragraph)
+		lower := strings.ToLower(trimmed)
+		opening := "dengan hormat,"
+		if strings.HasPrefix(lower, opening) && len(trimmed) > len(opening) {
+			normalized = append(normalized, "Dengan hormat,")
+			remaining := strings.TrimSpace(trimmed[len(opening):])
+			if remaining != "" {
+				normalized = append(normalized, remaining)
+			}
+			continue
+		}
+
+		if trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+
+	return normalized
+}
+
+func extractModernLetterBodyParagraphs(renderedContent string) []string {
+	normalized := normalizeTemplateEditorContent(renderedContent)
+	if normalized == "" {
+		return nil
+	}
+
+	lines := strings.Split(normalized, "\n")
+	bodyLines := make([]string, 0, len(lines))
+	skipRecipientBlock := false
+	skipDispositionBlock := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			if skipRecipientBlock || skipDispositionBlock {
+				skipRecipientBlock = false
+				skipDispositionBlock = false
+			}
+			bodyLines = append(bodyLines, "")
+			continue
+		}
+
+		if skipRecipientBlock {
+			if isKnownPreviewSectionLine(trimmed) {
+				skipRecipientBlock = false
+			} else {
+				continue
+			}
+		}
+
+		if skipDispositionBlock {
+			if isKnownPreviewSectionLine(trimmed) {
+				skipDispositionBlock = false
+			} else {
+				continue
+			}
+		}
+
+		lower := strings.ToLower(trimmed)
+		if lower == "kepada yth." || lower == "kepada yth" {
+			skipRecipientBlock = true
+			continue
+		}
+
+		if startsWithPreviewLabel(trimmed, "Catatan Disposisi") {
+			parts := strings.SplitN(trimmed, ":", 2)
+			if len(parts) < 2 || strings.TrimSpace(parts[1]) == "" {
+				skipDispositionBlock = true
+			}
+			continue
+		}
+
+		if isKnownPreviewSectionLine(trimmed) {
+			continue
+		}
+
+		bodyLines = append(bodyLines, trimmed)
+	}
+
+	return normalizePreviewParagraphs(splitPreviewParagraphs(strings.Join(bodyLines, "\n")))
+}
+
+func ensurePDFSpace(pdf *gofpdf.Fpdf, height float64) {
+	_, pageHeight := pdf.GetPageSize()
+	_, _, _, bottom := pdf.GetMargins()
+	if pdf.GetY()+height > pageHeight-bottom {
+		pdf.AddPage()
+	}
+}
+
+func measurePDFTextHeight(pdf *gofpdf.Fpdf, text string, width, lineHeight float64) float64 {
+	normalized := strings.ReplaceAll(text, "\r\n", "\n")
+	normalized = strings.ReplaceAll(normalized, "\r", "\n")
+	if strings.TrimSpace(normalized) == "" {
+		return lineHeight
+	}
+
+	totalLines := 0
+	for _, rawLine := range strings.Split(normalized, "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			totalLines++
+			continue
+		}
+		split := pdf.SplitLines([]byte(line), width)
+		if len(split) == 0 {
+			totalLines++
+			continue
+		}
+		totalLines += len(split)
+	}
+
+	if totalLines == 0 {
+		totalLines = 1
+	}
+
+	return float64(totalLines) * lineHeight
+}
+
+func drawMiniInfoBox(pdf *gofpdf.Fpdf, x, y, w, h float64, label, value string) {
+	pdf.SetDrawColor(228, 234, 241)
+	pdf.SetFillColor(251, 252, 254)
+	pdf.Rect(x, y, w, h, "FD")
+	pdf.SetXY(x+3, y+3)
+	pdf.SetFont("Arial", "", 8)
+	pdf.SetTextColor(102, 112, 133)
+	pdf.MultiCell(w-6, 4, strings.ToUpper(label), "", "L", false)
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetTextColor(19, 34, 56)
+	pdf.SetX(x + 3)
+	pdf.MultiCell(w-6, 5, firstNonEmptyText(value, "-"), "", "L", false)
+}
+
+func drawModernLetterPDF(pdf *gofpdf.Fpdf, logoPath string, data modernLetterPreviewData) {
 	left, top, right, _ := pdf.GetMargins()
 	pageWidth, _ := pdf.GetPageSize()
 	contentWidth := pageWidth - left - right
-	headerStartY := top
-	logoColumnWidth := 26.0
-	spacerWidth := 26.0
-	centerWidth := contentWidth - logoColumnWidth - spacerWidth
-	if centerWidth < 80 {
-		centerWidth = contentWidth
-	}
 
-	maxY := headerStartY
-	logoHeight := 20.0
-	hasLogo := strings.TrimSpace(logoPath) != ""
+	pdf.SetFillColor(91, 59, 140)
+	pdf.Rect(left, top, contentWidth*0.74, 4, "F")
+	pdf.SetFillColor(240, 180, 0)
+	pdf.Rect(left+contentWidth*0.74, top, contentWidth*0.26, 4, "F")
+	pdf.SetY(top + 7)
+
+	headerY := pdf.GetY()
+	headerBottom := headerY
 	if strings.TrimSpace(logoPath) != "" {
 		options := gofpdf.ImageOptions{
 			ImageType: strings.TrimPrefix(strings.ToUpper(filepath.Ext(logoPath)), "."),
 			ReadDpi:   true,
 		}
-		pdf.ImageOptions(logoPath, left+2, headerStartY, 20, logoHeight, false, options, 0, "")
-		if headerStartY+logoHeight > maxY {
-			maxY = headerStartY + logoHeight
+		pdf.SetDrawColor(231, 221, 243)
+		pdf.SetFillColor(248, 245, 252)
+		pdf.Rect(left, headerY, 18, 18, "FD")
+		pdf.ImageOptions(logoPath, left+2.5, headerY+2.5, 13, 13, false, options, 0, "")
+		headerBottom = headerY + 18
+	} else {
+		pdf.SetDrawColor(231, 221, 243)
+		pdf.SetFillColor(248, 245, 252)
+		pdf.Rect(left, headerY, 18, 18, "FD")
+		pdf.SetXY(left, headerY+5)
+		pdf.SetFont("Arial", "B", 15)
+		pdf.SetTextColor(91, 59, 140)
+		pdf.CellFormat(18, 6, "dp", "", 0, "C", false, 0, "")
+		headerBottom = headerY + 18
+	}
+
+	headerTextX := left + 22
+	chipWidth := 24.0
+	headerTextWidth := contentWidth - 22 - chipWidth - 4
+	if len(data.HeaderLines) > 0 {
+		pdf.SetXY(headerTextX, headerY)
+		pdf.SetFont("Arial", "B", 15)
+		pdf.SetTextColor(19, 34, 56)
+		pdf.MultiCell(headerTextWidth, 6, data.HeaderLines[0], "", "L", false)
+		if len(data.HeaderLines) > 1 {
+			pdf.SetFont("Arial", "", 8.8)
+			pdf.SetTextColor(102, 112, 133)
+			for _, line := range data.HeaderLines[1:] {
+				pdf.SetX(headerTextX)
+				pdf.MultiCell(headerTextWidth, 4.5, line, "", "L", false)
+			}
+		}
+		if pdf.GetY() > headerBottom {
+			headerBottom = pdf.GetY()
 		}
 	}
 
-	if strings.TrimSpace(headerText) != "" {
-		lineHeight := 7.0
-		headerLines := strings.Split(strings.TrimSpace(headerText), "\n")
-		headerBlockHeight := float64(len(headerLines)) * lineHeight
-		textStartY := headerStartY
-		if hasLogo && headerBlockHeight < logoHeight {
-			textStartY = headerStartY + (logoHeight - headerBlockHeight)
-		}
-
-		pdf.SetXY(left+logoColumnWidth, textStartY)
-		pdf.SetFont("Arial", "B", 13)
-		pdf.SetTextColor(30, 41, 59)
-		pdf.MultiCell(centerWidth, lineHeight, headerText, "", "C", false)
-		if pdf.GetY() > maxY {
-			maxY = pdf.GetY()
-		}
+	pdf.SetDrawColor(231, 221, 243)
+	pdf.SetFillColor(239, 233, 248)
+	pdf.Rect(left+contentWidth-chipWidth, headerY+1, chipWidth, 8, "FD")
+	pdf.SetXY(left+contentWidth-chipWidth, headerY+3)
+	pdf.SetFont("Arial", "B", 8.5)
+	pdf.SetTextColor(91, 59, 140)
+	pdf.CellFormat(chipWidth, 3, "HRIS LDP", "", 0, "C", false, 0, "")
+	if headerY+9 > headerBottom {
+		headerBottom = headerY + 9
 	}
 
-	pdf.SetY(maxY + 4)
-	lineY := pdf.GetY()
-	pdf.SetDrawColor(226, 232, 240)
-	pdf.Line(left, lineY, pageWidth-right, lineY)
-	pdf.Ln(8)
+	pdf.SetDrawColor(217, 224, 234)
+	pdf.Line(left, headerBottom+3, pageWidth-right, headerBottom+3)
+	pdf.SetY(headerBottom + 8)
+
+	metaY := pdf.GetY()
+	leftCardWidth := contentWidth * 0.6
+	rightCardWidth := contentWidth - leftCardWidth - 4
+	pdf.SetFont("Arial", "", 9.5)
+	recipientHeight := measurePDFTextHeight(pdf, firstNonEmptyText(data.Recipient, "-"), rightCardWidth-12, 5)
+	cardHeight := 33.0
+	if calculated := 21.0 + recipientHeight; calculated > cardHeight {
+		cardHeight = calculated
+	}
+	pdf.SetDrawColor(217, 224, 234)
+	pdf.Rect(left, metaY, leftCardWidth, cardHeight, "D")
+	pdf.SetFillColor(246, 248, 251)
+	pdf.Rect(left+leftCardWidth+4, metaY, rightCardWidth, cardHeight, "FD")
+
+	pdf.SetXY(left+4, metaY+4)
+	pdf.SetFont("Arial", "B", 8)
+	pdf.SetTextColor(102, 112, 133)
+	pdf.CellFormat(leftCardWidth-8, 4, "INFORMASI SURAT", "", 0, "L", false, 0, "")
+
+	infoRows := [][2]string{
+		{"Nomor", data.NomorSurat},
+		{"Tanggal", data.Tanggal},
+		{"Pengirim", data.Sender},
+		{"Divisi Pengirim", data.SenderDivision},
+	}
+	rowY := metaY + 10
+	for _, row := range infoRows {
+		pdf.SetXY(left+4, rowY)
+		pdf.SetFont("Arial", "", 8.5)
+		pdf.SetTextColor(102, 112, 133)
+		pdf.CellFormat(28, 4.5, row[0], "", 0, "L", false, 0, "")
+		pdf.SetFont("Arial", "B", 9)
+		pdf.SetTextColor(19, 34, 56)
+		pdf.CellFormat(leftCardWidth-36, 4.5, ": "+firstNonEmptyText(row[1], "-"), "", 0, "L", false, 0, "")
+		rowY += 5.2
+	}
+
+	rightX := left + leftCardWidth + 8
+	pdf.SetXY(rightX, metaY+4)
+	pdf.SetFont("Arial", "B", 8)
+	pdf.SetTextColor(102, 112, 133)
+	pdf.CellFormat(rightCardWidth-8, 4, "TUJUAN SURAT", "", 0, "L", false, 0, "")
+	pdf.SetXY(rightX, metaY+11)
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetTextColor(19, 34, 56)
+	pdf.CellFormat(rightCardWidth-8, 5, "Kepada Yth.", "", 0, "L", false, 0, "")
+	pdf.SetXY(rightX, metaY+17)
+	pdf.SetFont("Arial", "", 9.5)
+	pdf.SetTextColor(36, 52, 71)
+	pdf.MultiCell(rightCardWidth-12, 5, firstNonEmptyText(data.Recipient, "-"), "", "L", false)
+
+	pdf.SetY(metaY + cardHeight + 5)
+	subjectY := pdf.GetY()
+	pdf.SetFont("Arial", "B", 13)
+	subjectHeight := measurePDFTextHeight(pdf, firstNonEmptyText(data.Subject, "-"), contentWidth-48, 5.5) + 10
+	if subjectHeight < 16 {
+		subjectHeight = 16
+	}
+	pdf.SetDrawColor(231, 221, 243)
+	pdf.SetFillColor(250, 247, 255)
+	pdf.Rect(left, subjectY, contentWidth, subjectHeight, "FD")
+	pdf.SetXY(left+4, subjectY+3)
+	pdf.SetFont("Arial", "", 8)
+	pdf.SetTextColor(102, 112, 133)
+	pdf.CellFormat(50, 4, "PERIHAL", "", 0, "L", false, 0, "")
+	pdf.SetXY(left+4, subjectY+7.5)
+	pdf.SetFont("Arial", "B", 13)
+	pdf.SetTextColor(23, 43, 77)
+	pdf.MultiCell(contentWidth-40, 5.5, firstNonEmptyText(data.Subject, "-"), "", "L", false)
+
+	pdf.SetFillColor(253, 236, 234)
+	pdf.SetDrawColor(247, 197, 191)
+	pdf.Rect(left+contentWidth-38, subjectY+3, 34, 8, "FD")
+	pdf.SetXY(left+contentWidth-37, subjectY+5.5)
+	pdf.SetFont("Arial", "B", 7.5)
+	pdf.SetTextColor(180, 35, 24)
+	pdf.CellFormat(32, 2.5, "PRIORITAS: "+strings.ToUpper(firstNonEmptyText(data.Priority, "-")), "", 0, "C", false, 0, "")
+
+	pdf.SetY(subjectY + subjectHeight + 5)
+	pdf.SetFont("Arial", "", 10)
+	pdf.SetTextColor(36, 52, 71)
+	for index, paragraph := range data.BodyParagraphs {
+		pdf.SetFont("Arial", "", 10)
+		align := "J"
+		if index == 0 || index == len(data.BodyParagraphs)-1 {
+			align = "L"
+			pdf.SetFont("Arial", "B", 10)
+		}
+		ensurePDFSpace(pdf, measurePDFTextHeight(pdf, paragraph, contentWidth, 6)+2)
+		pdf.MultiCell(0, 6, paragraph, "", align, false)
+		pdf.Ln(1)
+	}
+
+	noteWidth := contentWidth - 50
+	pdf.SetFont("Arial", "", 9)
+	noteTextHeight := measurePDFTextHeight(pdf, firstNonEmptyText(data.DispositionNote, "-"), noteWidth-8, 4.5)
+	noteHeight := 13.0 + noteTextHeight
+	if noteHeight < 22 {
+		noteHeight = 22
+	}
+
+	signX := left + noteWidth + 6
+	signWidth := contentWidth - noteWidth - 6
+	pdf.SetFont("Arial", "", 8.8)
+	signMetaHeight := measurePDFTextHeight(pdf, firstNonEmptyText(data.SenderDivision, "-")+" - PT. Lintas Data Prima", signWidth, 4.5)
+	signHeight := 20.0 + signMetaHeight
+	if signHeight < noteHeight {
+		signHeight = noteHeight
+	}
+
+	ensurePDFSpace(pdf, signHeight+8)
+	signatureY := pdf.GetY() + 2
+	pdf.SetDrawColor(183, 235, 207)
+	pdf.SetFillColor(236, 253, 243)
+	pdf.Rect(left, signatureY, noteWidth, noteHeight, "FD")
+	pdf.SetXY(left+4, signatureY+4)
+	pdf.SetFont("Arial", "B", 9.5)
+	pdf.SetTextColor(16, 91, 60)
+	pdf.CellFormat(noteWidth-8, 4, "Catatan disposisi:", "", 0, "L", false, 0, "")
+	pdf.SetXY(left+4, signatureY+9)
+	pdf.SetFont("Arial", "", 9)
+	pdf.MultiCell(noteWidth-8, 4.5, firstNonEmptyText(data.DispositionNote, "-"), "", "L", false)
+
+	pdf.SetDrawColor(217, 224, 234)
+	pdf.Line(signX, signatureY+16, signX+signWidth, signatureY+16)
+	pdf.SetXY(signX, signatureY+17.5)
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetTextColor(19, 34, 56)
+	pdf.CellFormat(signWidth, 4, firstNonEmptyText(data.Sender, "-"), "", 0, "L", false, 0, "")
+	pdf.SetXY(signX, signatureY+22)
+	pdf.SetFont("Arial", "", 8.8)
+	pdf.SetTextColor(102, 112, 133)
+	pdf.MultiCell(signWidth, 4.5, firstNonEmptyText(data.SenderDivision, "-")+" - PT. Lintas Data Prima", "", "L", false)
+
+	signatureBottom := signatureY + noteHeight
+	if signCandidate := signatureY + signHeight; signCandidate > signatureBottom {
+		signatureBottom = signCandidate
+	}
+
+	pdf.SetY(signatureBottom + 6)
+	leftDispWidth := contentWidth * 0.62
+	pdf.SetFont("Arial", "", 9)
+	dispositionTextHeight := measurePDFTextHeight(pdf, firstNonEmptyText(data.DispositionNote, "-"), leftDispWidth-14, 4.5)
+	leftDispositionBoxHeight := 9.0 + dispositionTextHeight
+	if leftDispositionBoxHeight < 21 {
+		leftDispositionBoxHeight = 21
+	}
+	rightBoxHeight := 14.0
+	rightColumnHeight := (rightBoxHeight * 3) + 5.0
+	dispositionHeight := 16.0 + leftDispositionBoxHeight
+	if calculated := 12.0 + rightColumnHeight; calculated > dispositionHeight {
+		dispositionHeight = calculated
+	}
+	ensurePDFSpace(pdf, dispositionHeight+8)
+	dispositionY := pdf.GetY()
+	pdf.SetDrawColor(217, 224, 234)
+	pdf.Rect(left, dispositionY, contentWidth, dispositionHeight, "D")
+	pdf.SetFillColor(248, 250, 252)
+	pdf.Rect(left, dispositionY, contentWidth, 9, "FD")
+	pdf.SetXY(left+4, dispositionY+3)
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetTextColor(19, 34, 56)
+	pdf.CellFormat(60, 3, "Catatan Disposisi", "", 0, "L", false, 0, "")
+	pdf.SetFillColor(239, 233, 248)
+	pdf.Rect(left+contentWidth-36, dispositionY+2, 32, 5, "FD")
+	pdf.SetXY(left+contentWidth-36, dispositionY+3.5)
+	pdf.SetFont("Arial", "B", 7)
+	pdf.SetTextColor(91, 59, 140)
+	pdf.CellFormat(32, 2, "INTERNAL FOLLOW-UP", "", 0, "C", false, 0, "")
+
+	contentY := dispositionY + 12
+	pdf.SetXY(left+4, contentY)
+	pdf.SetFont("Arial", "B", 8)
+	pdf.SetTextColor(102, 112, 133)
+	pdf.CellFormat(leftDispWidth-8, 4, "ARAHAN / TINDAK LANJUT", "", 0, "L", false, 0, "")
+	pdf.SetDrawColor(200, 210, 223)
+	pdf.SetFillColor(251, 252, 254)
+	pdf.Rect(left+4, contentY+5, leftDispWidth-8, leftDispositionBoxHeight, "FD")
+	pdf.SetXY(left+7, contentY+9)
+	pdf.SetFont("Arial", "", 9)
+	pdf.SetTextColor(36, 52, 71)
+	pdf.MultiCell(leftDispWidth-14, 4.5, firstNonEmptyText(data.DispositionNote, "-"), "", "L", false)
+
+	boxX := left + leftDispWidth + 2
+	boxWidth := contentWidth - leftDispWidth - 6
+	drawMiniInfoBox(pdf, boxX, contentY, boxWidth, rightBoxHeight, "Tanggal Disposisi", data.DispositionDate)
+	drawMiniInfoBox(pdf, boxX, contentY+rightBoxHeight+2.5, boxWidth, rightBoxHeight, "Diproses oleh", data.ProcessedBy)
+	drawMiniInfoBox(pdf, boxX, contentY+(rightBoxHeight*2)+5, boxWidth, rightBoxHeight, "Prioritas", strings.ToUpper(firstNonEmptyText(data.Priority, "-")))
+
+	pdf.SetY(dispositionY + dispositionHeight + 5)
+	if len(data.FooterLines) > 0 {
+		ensurePDFSpace(pdf, 12)
+		pdf.SetDrawColor(217, 224, 234)
+		pdf.Line(left, pdf.GetY(), pageWidth-right, pdf.GetY())
+		pdf.Ln(4)
+		pdf.SetFont("Arial", "B", 8.5)
+		pdf.SetTextColor(52, 64, 84)
+		pdf.CellFormat(contentWidth*0.62, 4, data.FooterLines[0], "", 0, "L", false, 0, "")
+		pdf.SetFont("Arial", "", 8.5)
+		pdf.SetTextColor(102, 112, 133)
+		remainingFooter := ""
+		if len(data.FooterLines) > 1 {
+			remainingFooter = strings.Join(data.FooterLines[1:], "\n")
+		}
+		pdf.MultiCell(contentWidth-(contentWidth*0.62), 4, remainingFooter, "", "R", false)
+	}
 }

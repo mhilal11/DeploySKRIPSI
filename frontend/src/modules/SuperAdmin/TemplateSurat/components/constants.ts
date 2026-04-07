@@ -8,11 +8,12 @@ export const DEFAULT_TEMPLATE_CONTENT = [
     '{{penerima}}',
     '',
     'Perihal: {{perihal}}',
+    'Prioritas: {{prioritas}}',
     '',
     'Dengan hormat,',
     '{{isi_surat}}',
     '',
-    'Prioritas: {{prioritas}}',
+    'Demikian disampaikan. Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.',
     '',
     'Catatan Disposisi:',
     '{{catatan_disposisi}}',
@@ -21,10 +22,16 @@ export const DEFAULT_TEMPLATE_CONTENT = [
     'Diproses oleh: {{oleh}}',
 ].join('\n');
 
-export const DEFAULT_HEADER_TEXT = 'PT. Lintas Data Prima\nDivisi Human Capital';
+export const DEFAULT_HEADER_TEXT = [
+    'PT. Lintas Data Prima',
+    'Divisi Human Capital • Template Surat Resmi / Disposisi Internal',
+    'Jl. Contoh Kantor No. 88, Jakarta • human.capital@ldp.co.id • +62 21 5555 8888',
+].join('\n');
 
-export const DEFAULT_FOOTER_TEXT =
-    'Dokumen ini diproses secara elektronik oleh sistem HRIS LDP.';
+export const DEFAULT_FOOTER_TEXT = [
+    'Dokumen elektronik. Template ini dapat dipakai untuk kebutuhan surat resmi internal maupun eksternal.',
+    'Diproses melalui sistem HRIS LDP',
+].join('\n');
 
 export const NON_BODY_PLACEHOLDERS = new Set([
     '{{logo}}',
@@ -33,19 +40,19 @@ export const NON_BODY_PLACEHOLDERS = new Set([
 ]);
 
 export const PREVIEW_VALUES: Record<string, string> = {
-    '{{nomor_surat}}': '001/HC/LDP/IV/2026',
-    '{{tanggal}}': '01 April 2026',
-    '{{pengirim}}': 'Alya Putri',
-    '{{divisi_pengirim}}': 'Human Capital',
-    '{{penerima}}': 'Divisi Operasional',
-    '{{perihal}}': 'Tindak Lanjut Kebutuhan Personel',
+    '{{nomor_surat}}': '003/COR/2026',
+    '{{tanggal}}': '07 Februari 2026',
+    '{{pengirim}}': 'Akbar',
+    '{{divisi_pengirim}}': 'Corporate',
+    '{{penerima}}': 'Government and Partner',
+    '{{perihal}}': 'Undangan Kolaborasi',
     '{{isi_surat}}':
-        'Mohon menindaklanjuti kebutuhan personel untuk area operasional sesuai prioritas yang telah disepakati pada rapat koordinasi minggu ini.',
-    '{{prioritas}}': 'Tinggi',
+        'Sehubungan dengan rencana sinergi antara PT. Lintas Data Prima dan pihak Government and Partner, kami mengundang Bapak/Ibu untuk mendiskusikan peluang kolaborasi, ruang lingkup kerja sama, serta rencana tindak lanjut yang dapat memberikan nilai tambah bagi kedua belah pihak.\n\nWaktu pelaksanaan dan detail agenda dapat disesuaikan dengan ketersediaan pihak terkait. Template ini dapat dipakai ulang untuk surat undangan, nota dinas, surat pengantar, maupun disposisi internal hanya dengan mengganti metadata dan isi utama surat.',
+    '{{prioritas}}': 'High',
     '{{catatan_disposisi}}':
-        'Harap diproses maksimal 2 hari kerja dan koordinasikan hasilnya kembali ke Human Capital.',
-    '{{tanggal_disposisi}}': '02 April 2026 09:30',
-    '{{oleh}}': 'Nadia Rahma',
+        'OK, lanjutkan ke Government and Partner untuk koordinasi agenda dan tindak lanjut awal.',
+    '{{tanggal_disposisi}}': '-',
+    '{{oleh}}': 'HR Admin',
     '{{header}}': DEFAULT_HEADER_TEXT,
     '{{footer}}': DEFAULT_FOOTER_TEXT,
     '{{logo}}': '',

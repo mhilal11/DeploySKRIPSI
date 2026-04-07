@@ -29,3 +29,19 @@ export type TemplateForm = InertiaFormProps<TemplateFormData>;
 export type TemplateMutationResponse = {
     status?: string;
 };
+
+export type TemplatePreviewModel = {
+    bodyParagraphs: string[];
+    dispositionDate: string;
+    dispositionNote: string;
+    footerLines: string[];
+    headerLines: string[];
+    priority: string;
+    processedBy: string;
+    recipient: string;
+    sender: string;
+    senderDivision: string;
+    subject: string;
+    tanggal: string;
+    nomorSurat: string;
+};

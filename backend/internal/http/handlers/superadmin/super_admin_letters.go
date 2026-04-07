@@ -21,8 +21,8 @@ import (
 	"hris-backend/internal/services"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jung-kurt/gofpdf"
 	"github.com/jmoiron/sqlx"
+	"github.com/jung-kurt/gofpdf"
 )
 
 func SuperAdminLettersIndex(c *gin.Context) {
@@ -608,33 +608,14 @@ func generateDispositionFinalPDFDocument(c *gin.Context, db *sqlx.DB, surat *mod
 		defer cleanupLogo()
 	}
 
-	renderedContent := renderDispositionPDFText(templateContent, placeholders)
-	renderedHeader := renderDispositionPDFText(headerText, placeholders)
-	renderedFooter := renderDispositionPDFText(footerText, placeholders)
+	previewData := buildModernLetterPreviewData(templateContent, headerText, footerText, placeholders)
 
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.SetMargins(16, 16, 16)
 	pdf.SetAutoPageBreak(true, 16)
 	pdf.AddPage()
 
-	drawTemplatePreviewPDFHeader(pdf, logoPath, renderedHeader)
-
-	pdf.SetFont("Arial", "", 11)
-	pdf.SetTextColor(51, 65, 85)
-	pdf.MultiCell(0, 7.5, firstNonEmptyText(renderedContent, "-"), "", "L", false)
-
-	if strings.TrimSpace(renderedFooter) != "" {
-		pdf.Ln(6)
-		left, _, right, _ := pdf.GetMargins()
-		pageWidth, _ := pdf.GetPageSize()
-		lineY := pdf.GetY()
-		pdf.SetDrawColor(226, 232, 240)
-		pdf.Line(left, lineY, pageWidth-right, lineY)
-		pdf.Ln(4)
-		pdf.SetFont("Arial", "", 10)
-		pdf.SetTextColor(100, 116, 139)
-		pdf.MultiCell(0, 6, renderedFooter, "", "L", false)
-	}
+	drawModernLetterPDF(pdf, logoPath, previewData)
 
 	var out bytes.Buffer
 	if err := pdf.Output(&out); err != nil {

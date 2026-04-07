@@ -27,7 +27,7 @@ import {
 } from '@/modules/SuperAdmin/TemplateSurat/components/constants';
 import {
     buildInitialFormState,
-    renderTemplateText,
+    buildTemplatePreviewModel,
 } from '@/modules/SuperAdmin/TemplateSurat/components/utils';
 import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
 import { Head, router, useForm, usePage, usePageManager } from '@/shared/lib/inertia';
@@ -134,17 +134,15 @@ export default function TemplateSuratIndex() {
         };
     }, [pdfPreviewUrl]);
 
-    const renderedHeader = useMemo(
-        () => renderTemplateText(form.data.header_text, PREVIEW_VALUES),
-        [form.data.header_text],
-    );
-    const renderedContent = useMemo(
-        () => renderTemplateText(form.data.template_content, PREVIEW_VALUES),
-        [form.data.template_content],
-    );
-    const renderedFooter = useMemo(
-        () => renderTemplateText(form.data.footer_text, PREVIEW_VALUES),
-        [form.data.footer_text],
+    const previewModel = useMemo(
+        () =>
+            buildTemplatePreviewModel(
+                form.data.template_content,
+                form.data.header_text,
+                form.data.footer_text,
+                PREVIEW_VALUES,
+            ),
+        [form.data.footer_text, form.data.header_text, form.data.template_content],
     );
 
     const isBusy =
@@ -748,9 +746,7 @@ export default function TemplateSuratIndex() {
                 open={hasPreviewAccess && isPreviewVisible}
                 onOpenChange={setIsPreviewVisible}
                 logoPreview={logoPreview}
-                renderedContent={renderedContent}
-                renderedFooter={renderedFooter}
-                renderedHeader={renderedHeader}
+                previewModel={previewModel}
             />
 
             <TemplatePdfPreviewDialog
