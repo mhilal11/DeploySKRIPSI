@@ -274,9 +274,9 @@ func sendGooglePasswordSetupEmail(c *gin.Context, email string) error {
 
 	cfg := middleware.GetConfig(c)
 	resetURL := frontendURL(cfg, "/set-password/"+token+"?email="+url.QueryEscape(email))
-	logoURL := frontendURL(cfg, "/img/LogoLDP.png")
-	textBody, htmlBody := buildGoogleSetPasswordEmailTemplate(resetURL, logoURL)
-	return services.SendEmailMultipart(cfg, email, "Atur Kata Sandi Akun", textBody, htmlBody)
+	logoSrc, inlineAssets := resolveAuthEmailLogo(cfg)
+	textBody, htmlBody := buildGoogleSetPasswordEmailTemplate(resetURL, logoSrc)
+	return sendAuthEmailMultipart(cfg, email, "Atur Kata Sandi Akun", textBody, htmlBody, inlineAssets)
 }
 
 func buildGoogleSetPasswordEmailTemplate(resetURL string, logoURL string) (string, string) {

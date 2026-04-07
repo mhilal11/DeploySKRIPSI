@@ -2,6 +2,7 @@ package services
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"net/smtp"
 	"os"
@@ -11,6 +12,13 @@ import (
 
 	"hris-backend/internal/config"
 )
+
+type InlineAsset struct {
+	CID         string
+	ContentType string
+	Data        []byte
+	Filename    string
+}
 
 func SendEmail(cfg config.Config, to string, subject string, body string) error {
 	message := buildMessage(resolveFrom(cfg), to, subject, body)
@@ -28,6 +36,25 @@ func SendEmailMultipart(cfg config.Config, to string, subject string, textBody s
 		subject,
 		textBody,
 		htmlBody,
+	)
+	return sendMessage(cfg, to, subject, message)
+}
+
+func SendEmailMultipartWithInline(cfg config.Config, to string, subject string, textBody string, htmlBody string, inlineAssets []InlineAsset) error {
+	if strings.TrimSpace(htmlBody) == "" {
+		return SendEmail(cfg, to, subject, textBody)
+	}
+	if len(inlineAssets) == 0 {
+		return SendEmailMultipart(cfg, to, subject, textBody, htmlBody)
+	}
+
+	message := buildMultipartRelatedMessage(
+		resolveFrom(cfg),
+		to,
+		subject,
+		textBody,
+		htmlBody,
+		inlineAssets,
 	)
 	return sendMessage(cfg, to, subject, message)
 }
@@ -150,6 +177,87 @@ func buildMultipartAlternativeMessage(from string, to string, subject string, te
 		"--" + boundary + "--",
 		"",
 	}, "\r\n")
+}
+
+func buildMultipartRelatedMessage(from string, to string, subject string, textBody string, htmlBody string, inlineAssets []InlineAsset) string {
+	cleanText := strings.ReplaceAll(textBody, "\r\n", "\n")
+	cleanHTML := strings.ReplaceAll(htmlBody, "\r\n", "\n")
+	relatedBoundary := fmt.Sprintf("hris-related-%d", time.Now().UnixNano())
+	alternativeBoundary := fmt.Sprintf("hris-alt-%d", time.Now().UnixNano())
+
+	lines := []string{
+		"From: " + from,
+		"To: " + to,
+		"Subject: " + subject,
+		"MIME-Version: 1.0",
+		fmt.Sprintf("Content-Type: multipart/related; boundary=%q", relatedBoundary),
+		"",
+		"--" + relatedBoundary,
+		fmt.Sprintf("Content-Type: multipart/alternative; boundary=%q", alternativeBoundary),
+		"",
+		"--" + alternativeBoundary,
+		"Content-Type: text/plain; charset=UTF-8",
+		"Content-Transfer-Encoding: 8bit",
+		"",
+		cleanText,
+		"",
+		"--" + alternativeBoundary,
+		"Content-Type: text/html; charset=UTF-8",
+		"Content-Transfer-Encoding: 8bit",
+		"",
+		cleanHTML,
+		"",
+		"--" + alternativeBoundary + "--",
+	}
+
+	for _, asset := range inlineAssets {
+		if strings.TrimSpace(asset.CID) == "" || len(asset.Data) == 0 {
+			continue
+		}
+
+		contentType := strings.TrimSpace(asset.ContentType)
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+		filename := strings.TrimSpace(asset.Filename)
+		if filename == "" {
+			filename = asset.CID
+		}
+
+		lines = append(lines,
+			"",
+			"--"+relatedBoundary,
+			fmt.Sprintf("Content-Type: %s; name=%q", contentType, filename),
+			"Content-Transfer-Encoding: base64",
+			fmt.Sprintf("Content-ID: <%s>", asset.CID),
+			fmt.Sprintf("Content-Disposition: inline; filename=%q", filename),
+			"",
+		)
+		lines = append(lines, wrapBase64Lines(asset.Data)...)
+	}
+
+	lines = append(lines,
+		"",
+		"--"+relatedBoundary+"--",
+		"",
+	)
+
+	return strings.Join(lines, "\r\n")
+}
+
+func wrapBase64Lines(data []byte) []string {
+	if len(data) == 0 {
+		return []string{""}
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(data)
+	lines := make([]string, 0, (len(encoded)/76)+1)
+	for len(encoded) > 76 {
+		lines = append(lines, encoded[:76])
+		encoded = encoded[76:]
+	}
+	lines = append(lines, encoded)
+	return lines
 }
 
 func writeOutboxRaw(cfg config.Config, to string, subject string, message string) error {

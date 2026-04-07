@@ -8,10 +8,13 @@ import (
 	"html"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
+	"hris-backend/internal/config"
 	"hris-backend/internal/dto"
 	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/http/middleware"
@@ -386,9 +389,9 @@ func ForgotPassword(c *gin.Context) {
 
 	cfg := middleware.GetConfig(c)
 	resetURL := frontendURL(cfg, "/reset-password/"+token+"?email="+url.QueryEscape(req.Email))
-	logoURL := frontendURL(cfg, "/img/LogoLDP.png")
-	textBody, htmlBody := buildForgotPasswordEmailTemplate(resetURL, logoURL)
-	_ = services.SendEmailMultipart(cfg, req.Email, "Reset Kata Sandi", textBody, htmlBody)
+	logoSrc, inlineAssets := resolveAuthEmailLogo(cfg)
+	textBody, htmlBody := buildForgotPasswordEmailTemplate(resetURL, logoSrc)
+	_ = sendAuthEmailMultipart(cfg, req.Email, "Reset Kata Sandi", textBody, htmlBody, inlineAssets)
 
 	statusMessage := "Link reset password telah dikirim ke email Anda."
 	redirectURL := "/forgot-password?status=" + url.QueryEscape(statusMessage)
@@ -725,9 +728,56 @@ func sendVerificationEmail(c *gin.Context, user *models.User) {
 		return
 	}
 	cfg := middleware.GetConfig(c)
-	logoURL := frontendURL(cfg, "/img/LogoLDP.png")
-	textBody, htmlBody := buildVerificationEmailTemplate(user.Name, link, logoURL)
-	_ = services.SendEmailMultipart(cfg, user.Email, "Verifikasi Email", textBody, htmlBody)
+	logoSrc, inlineAssets := resolveAuthEmailLogo(cfg)
+	textBody, htmlBody := buildVerificationEmailTemplate(user.Name, link, logoSrc)
+	_ = sendAuthEmailMultipart(cfg, user.Email, "Verifikasi Email", textBody, htmlBody, inlineAssets)
+}
+
+func resolveAuthEmailLogo(cfg config.Config) (string, []services.InlineAsset) {
+	data, filename, contentType, err := loadAuthEmailLogoAsset()
+	if err == nil && len(data) > 0 {
+		return "cid:ldp-logo", []services.InlineAsset{
+			{
+				CID:         "ldp-logo",
+				ContentType: contentType,
+				Data:        data,
+				Filename:    filename,
+			},
+		}
+	}
+
+	return frontendURL(cfg, "/img/LogoLDP.png"), nil
+}
+
+func sendAuthEmailMultipart(cfg config.Config, to string, subject string, textBody string, htmlBody string, inlineAssets []services.InlineAsset) error {
+	if len(inlineAssets) > 0 {
+		return services.SendEmailMultipartWithInline(cfg, to, subject, textBody, htmlBody, inlineAssets)
+	}
+	return services.SendEmailMultipart(cfg, to, subject, textBody, htmlBody)
+}
+
+func loadAuthEmailLogoAsset() ([]byte, string, string, error) {
+	candidates := []string{
+		filepath.Join("frontend", "public", "img", "LogoLDP.png"),
+		filepath.Join("frontend", "public", "LogoLDP.png"),
+		filepath.Join("..", "frontend", "public", "img", "LogoLDP.png"),
+		filepath.Join("..", "frontend", "public", "LogoLDP.png"),
+	}
+
+	var lastErr error
+	for _, candidate := range candidates {
+		data, err := os.ReadFile(candidate)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		return data, filepath.Base(candidate), "image/png", nil
+	}
+
+	if lastErr == nil {
+		lastErr = os.ErrNotExist
+	}
+	return nil, "", "", lastErr
 }
 
 func buildForgotPasswordEmailTemplate(resetURL string, logoURL string) (string, string) {
