@@ -174,3 +174,30 @@ func TestGetEmailVerificationTokenByHash_Success(t *testing.T) {
 		t.Fatalf("unmet expectations: %v", err)
 	}
 }
+
+func TestGetEmailVerificationTokenByUserID_Success(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	now := time.Date(2026, 3, 11, 10, 0, 0, 0, time.UTC)
+	expiresAt := now.Add(60 * time.Minute)
+	rows := sqlmock.NewRows([]string{"user_id", "token_hash", "expires_at", "created_at"}).
+		AddRow(int64(9), "hash999", expiresAt, now)
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT user_id, token_hash, expires_at, created_at FROM email_verification_tokens WHERE user_id = ? LIMIT 1")).
+		WithArgs(int64(9)).
+		WillReturnRows(rows)
+
+	record, err := repository.GetEmailVerificationTokenByUserID(db, 9)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if record == nil {
+		t.Fatalf("expected record, got nil")
+	}
+	if record.TokenHash != "hash999" {
+		t.Fatalf("expected token hash hash999, got %s", record.TokenHash)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}

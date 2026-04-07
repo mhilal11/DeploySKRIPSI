@@ -16,6 +16,7 @@ import {
 } from '@/shared/components/ui/alert-dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
+import { api, apiUrl, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
 import { Head, useForm } from '@/shared/lib/inertia';
 import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
 
@@ -41,10 +42,16 @@ export default function Login({
     type ExtendedErrors = typeof errors & {
         credentials?: string;
         account_status?: string;
+        verification_email?: string;
+        verification_resend_available?: string;
     };
     const typedErrors = errors as ExtendedErrors;
     const credentialError = typedErrors.credentials;
     const inactiveMessage = typedErrors.account_status;
+    const verificationEmail = typedErrors.verification_email?.trim() || data.email.trim();
+    const canResendVerification =
+        typedErrors.verification_resend_available === '1' &&
+        verificationEmail !== '';
     const normalizedStatus = status?.trim().toLowerCase() ?? '';
     const statusMessage =
         normalizedStatus === 'email-verified'
@@ -52,6 +59,7 @@ export default function Login({
             : status;
     const [showInactiveDialog, setShowInactiveDialog] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [isResendingVerification, setIsResendingVerification] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
 
@@ -151,10 +159,12 @@ export default function Login({
                 });
             },
             onError: (formErrors) => {
-                const firstError = Object.values(formErrors).find(
-                    (message) =>
-                        typeof message === 'string' && message.trim() !== ''
-                );
+                const firstError = Object.entries(formErrors).find(
+                    ([key, message]) =>
+                        !['verification_email', 'verification_resend_available'].includes(key) &&
+                        typeof message === 'string' &&
+                        message.trim() !== '',
+                )?.[1];
 
                 toast.error('Login gagal.', {
                     description:
@@ -165,6 +175,43 @@ export default function Login({
             },
             onFinish: () => reset('password'),
         });
+    };
+
+    const handleResendVerification = async () => {
+        if (!canResendVerification || isResendingVerification) {
+            return;
+        }
+
+        setIsResendingVerification(true);
+        try {
+            await ensureCsrfToken();
+            const { data: responseData } = await api.post(
+                apiUrl('/email/verification-notification'),
+                { email: verificationEmail },
+            );
+            toast.success('Email verifikasi dikirim ulang.', {
+                description:
+                    responseData?.email_target
+                        ? `Tautan verifikasi baru telah dikirim ke ${responseData.email_target}.`
+                        : 'Silakan cek inbox email Anda.',
+            });
+        } catch (error) {
+            const responseData = isAxiosError(error) ? error.response?.data as { errors?: Record<string, string>; message?: string } | undefined : undefined;
+            const firstError = responseData?.errors
+                ? Object.values(responseData.errors).find(
+                    (message) => typeof message === 'string' && message.trim() !== '',
+                )
+                : undefined;
+
+            toast.error('Gagal mengirim ulang verifikasi.', {
+                description:
+                    firstError ||
+                    responseData?.message ||
+                    'Silakan coba lagi dalam beberapa saat.',
+            });
+        } finally {
+            setIsResendingVerification(false);
+        }
     };
 
     return (
@@ -222,7 +269,25 @@ export default function Login({
 
                             {credentialError && (
                                 <div className="mb-4 rounded-lg border border-red-400/40 bg-red-500/15 px-4 py-3 text-sm text-red-200">
-                                    {credentialError}
+                                    <p>{credentialError}</p>
+                                    {canResendVerification && (
+                                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                                            <p className="text-xs text-red-100/90">
+                                                Link verifikasi sebelumnya sudah lebih dari 1 jam.
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={handleResendVerification}
+                                                disabled={isResendingVerification}
+                                                className="border-red-200/40 bg-transparent text-red-100 hover:bg-red-400/10 hover:text-white"
+                                            >
+                                                {isResendingVerification
+                                                    ? 'Mengirim ulang...'
+                                                    : 'Verifikasi Ulang Email'}
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

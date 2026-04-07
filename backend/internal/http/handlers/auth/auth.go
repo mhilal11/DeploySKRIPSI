@@ -54,6 +54,10 @@ type confirmPasswordRequest struct {
 	Password string `form:"password" json:"password"`
 }
 
+type verificationNotificationRequest struct {
+	Email string `form:"email" json:"email"`
+}
+
 type authRepository interface {
 	GetUserByEmail(email string) (*models.User, error)
 	SetUserLastLogin(userID int64, at time.Time) error
@@ -64,6 +68,7 @@ type authRepository interface {
 	DeletePasswordResetTokenByEmail(email string) error
 	SaveEmailVerificationToken(userID int64, tokenHash string, expiresAt, now time.Time) error
 	GetEmailVerificationTokenByHash(tokenHash string) (*dbrepo.EmailVerificationTokenRecord, error)
+	GetEmailVerificationTokenByUserID(userID int64) (*dbrepo.EmailVerificationTokenRecord, error)
 	DeleteEmailVerificationTokenByUserID(userID int64) error
 	DeleteEmailVerificationTokenByHash(tokenHash string) error
 	UpdateUserPasswordByEmail(email, passwordHash string) error
@@ -113,6 +118,10 @@ func (r *sqlAuthRepository) SaveEmailVerificationToken(userID int64, tokenHash s
 
 func (r *sqlAuthRepository) GetEmailVerificationTokenByHash(tokenHash string) (*dbrepo.EmailVerificationTokenRecord, error) {
 	return dbrepo.GetEmailVerificationTokenByHash(r.db, tokenHash)
+}
+
+func (r *sqlAuthRepository) GetEmailVerificationTokenByUserID(userID int64) (*dbrepo.EmailVerificationTokenRecord, error) {
+	return dbrepo.GetEmailVerificationTokenByUserID(r.db, userID)
 }
 
 func (r *sqlAuthRepository) DeleteEmailVerificationTokenByUserID(userID int64) error {
@@ -237,9 +246,15 @@ func Login(c *gin.Context) {
 	}
 
 	if user.Role == models.RolePelamar && user.EmailVerifiedAt == nil {
-		handlers.ValidationErrors(c, handlers.FieldErrors{
+		resendAvailable := canResendVerificationEmail(repo, user.ID, time.Now())
+		fieldErrors := handlers.FieldErrors{
 			"credentials": "Email belum diverifikasi. Silakan cek inbox Anda dan klik tautan verifikasi terlebih dahulu.",
-		})
+		}
+		if resendAvailable {
+			fieldErrors["verification_resend_available"] = "1"
+			fieldErrors["verification_email"] = user.Email
+		}
+		handlers.ValidationErrors(c, fieldErrors)
 		return
 	}
 
@@ -454,45 +469,91 @@ func ConfirmPassword(c *gin.Context) {
 
 func VerificationNotification(c *gin.Context) {
 	user := middleware.CurrentUser(c)
-	if user == nil {
-		handlers.JSONError(c, http.StatusUnauthorized, "Unauthenticated")
-		return
-	}
-	if user.EmailVerifiedAt != nil {
-		c.JSON(http.StatusOK, gin.H{"redirect_to": "/dashboard"})
-		return
-	}
+	repo := newAuthRepository(middleware.GetDB(c))
 
-	session := sessions.Default(c)
-	if lastSentRaw := session.Get("verification_sent_at"); lastSentRaw != nil {
-		var lastSent int64
-		switch v := lastSentRaw.(type) {
-		case int64:
-			lastSent = v
-		case int:
-			lastSent = int64(v)
-		case float64:
-			lastSent = int64(v)
-		}
-		if lastSent > 0 && time.Since(time.Unix(lastSent, 0)) < time.Minute {
-			handlers.JSONError(c, http.StatusTooManyRequests, "Terlalu banyak permintaan. Coba lagi sebentar.")
+	if user != nil {
+		if user.EmailVerifiedAt != nil {
+			c.JSON(http.StatusOK, gin.H{"redirect_to": "/dashboard"})
 			return
 		}
-	}
 
-	sendVerificationEmail(c, user)
-	session.Set("verification_sent_at", time.Now().Unix())
-	if err := session.Save(); err != nil {
-		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui status verifikasi.")
+		session := sessions.Default(c)
+		if lastSentRaw := session.Get("verification_sent_at"); lastSentRaw != nil {
+			var lastSent int64
+			switch v := lastSentRaw.(type) {
+			case int64:
+				lastSent = v
+			case int:
+				lastSent = int64(v)
+			case float64:
+				lastSent = int64(v)
+			}
+			if lastSent > 0 && time.Since(time.Unix(lastSent, 0)) < time.Minute {
+				handlers.JSONError(c, http.StatusTooManyRequests, "Terlalu banyak permintaan. Coba lagi sebentar.")
+				return
+			}
+		}
+
+		sendVerificationEmail(c, user)
+		session.Set("verification_sent_at", time.Now().Unix())
+		if err := session.Save(); err != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui status verifikasi.")
+			return
+		}
+
+		redirectURL := statusRedirectFromReferer(c, "verification-link-sent", "/verify-email")
+		c.JSON(http.StatusOK, gin.H{
+			"status":       "verification-link-sent",
+			"redirect_to":  redirectURL,
+			"email_target": user.Email,
+		})
 		return
 	}
 
-	redirectURL := statusRedirectFromReferer(c, "verification-link-sent", "/verify-email")
+	var req verificationNotificationRequest
+	if err := c.ShouldBind(&req); err != nil || strings.TrimSpace(req.Email) == "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email wajib diisi."})
+		return
+	}
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": msg})
+		return
+	}
+
+	targetUser, err := repo.GetUserByEmail(req.Email)
+	if err != nil || targetUser == nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email tidak ditemukan."})
+		return
+	}
+	if targetUser.EmailVerifiedAt != nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email sudah diverifikasi."})
+		return
+	}
+	if !canResendVerificationEmail(repo, targetUser.ID, time.Now()) {
+		handlers.JSONError(c, http.StatusTooManyRequests, "Link verifikasi sebelumnya masih aktif. Silakan cek inbox Anda terlebih dahulu.")
+		return
+	}
+
+	sendVerificationEmail(c, targetUser)
 	c.JSON(http.StatusOK, gin.H{
 		"status":       "verification-link-sent",
-		"redirect_to":  redirectURL,
-		"email_target": user.Email,
+		"email_target": targetUser.Email,
 	})
+}
+
+func canResendVerificationEmail(repo authRepository, userID int64, now time.Time) bool {
+	if repo == nil || userID <= 0 {
+		return false
+	}
+	record, err := repo.GetEmailVerificationTokenByUserID(userID)
+	if err != nil || record == nil {
+		return true
+	}
+	if now.IsZero() {
+		now = time.Now()
+	}
+	return !now.Before(record.ExpiresAt)
 }
 
 func VerifyEmail(c *gin.Context) {

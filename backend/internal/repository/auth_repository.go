@@ -175,6 +175,24 @@ func GetEmailVerificationTokenByHash(db *sqlx.DB, tokenHash string) (*EmailVerif
 	return &record, nil
 }
 
+func GetEmailVerificationTokenByUserID(db *sqlx.DB, userID int64) (*EmailVerificationTokenRecord, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	var record EmailVerificationTokenRecord
+	if err := db.Get(
+		&record,
+		"SELECT user_id, token_hash, expires_at, created_at FROM email_verification_tokens WHERE user_id = ? LIMIT 1",
+		userID,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, wrapRepoErr("get email verification token by user id", err)
+	}
+	return &record, nil
+}
+
 func DeleteEmailVerificationTokenByUserID(db *sqlx.DB, userID int64) error {
 	if db == nil {
 		return errors.New("database tidak tersedia")
