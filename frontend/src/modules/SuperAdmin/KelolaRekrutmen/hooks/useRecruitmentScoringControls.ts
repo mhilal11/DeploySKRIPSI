@@ -1,31 +1,22 @@
-import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
 import { router } from '@/shared/lib/inertia';
 
 import {
-  MINIMUM_SCORE_MAX,
-  MINIMUM_SCORE_MIN,
-  TOP_LOWONGAN_MIN,
   clampSLAValue,
-  countUniquePositions,
   defaultSLASettings,
   getFirstErrorMessage,
   normalizeSLASettings,
-  parseTopLowonganValue,
-  sanitizeMinimumScoreInput,
-  sanitizeTopLowonganInput,
 } from '../components/recruitment-index/utils';
 import {
-  ApplicantRecord,
   RecruitmentSLAOverview,
   RecruitmentSLAReminder,
   RecruitmentSLASettings,
 } from '../types';
 
 interface UseRecruitmentScoringControlsParams {
-  applicationRows: ApplicantRecord[];
   statusFilter: string;
   slaSettings: RecruitmentSLASettings;
   slaOverview: RecruitmentSLAOverview;
@@ -33,33 +24,15 @@ interface UseRecruitmentScoringControlsParams {
 }
 
 export function useRecruitmentScoringControls({
-  applicationRows,
   statusFilter,
   slaSettings,
   slaOverview,
   slaReminders,
 }: UseRecruitmentScoringControlsParams) {
-  const [autoShortlistTopN, setAutoShortlistTopN] = useState('3');
-  const [autoShortlistMinScore, setAutoShortlistMinScore] = useState('70');
-  const [autoShortlistEligibleOnly, setAutoShortlistEligibleOnly] = useState(true);
-  const [isRunningAutoShortlist, setIsRunningAutoShortlist] = useState(false);
   const [slaSettingsForm, setSlaSettingsForm] = useState<RecruitmentSLASettings>(slaSettings);
   const [slaOverviewState, setSlaOverviewState] = useState<RecruitmentSLAOverview>(slaOverview);
   const [slaReminderRows, setSlaReminderRows] = useState<RecruitmentSLAReminder[]>(slaReminders);
   const [isSavingSLA, setIsSavingSLA] = useState(false);
-
-  const totalLowonganAvailable = useMemo(
-    () => countUniquePositions(applicationRows),
-    [applicationRows],
-  );
-  const autoShortlistTopNMax = Math.max(TOP_LOWONGAN_MIN, totalLowonganAvailable);
-
-  useEffect(() => {
-    setAutoShortlistTopN((previous) => {
-      if (previous.trim() === '') return previous;
-      return String(parseTopLowonganValue(previous, autoShortlistTopNMax));
-    });
-  }, [autoShortlistTopNMax]);
 
   useEffect(() => {
     setSlaSettingsForm(slaSettings);
@@ -72,77 +45,6 @@ export function useRecruitmentScoringControls({
   useEffect(() => {
     setSlaReminderRows(slaReminders);
   }, [slaReminders]);
-
-  const handleRunAutoShortlist = async () => {
-    if (isRunningAutoShortlist) return;
-
-    const topN = parseTopLowonganValue(autoShortlistTopN, autoShortlistTopNMax);
-    const minScore = Math.max(
-      MINIMUM_SCORE_MIN,
-      Math.min(MINIMUM_SCORE_MAX, Number(autoShortlistMinScore) || 0),
-    );
-
-    setIsRunningAutoShortlist(true);
-    try {
-      const response = await api.post(apiUrl('/super-admin/recruitment/auto-shortlist'), {
-        top_n: topN,
-        eligible_only: autoShortlistEligibleOnly,
-        min_score: minScore,
-      });
-      const data = response.data ?? {};
-      const summary = data.summary ?? {};
-      const shortlistedCount = Number(summary.shortlisted_count ?? 0);
-      const updatedCount = Number(summary.updated_count ?? 0);
-      const groupCount = Number(summary.group_count ?? 0);
-
-      toast.success(data.status || 'Auto-shortlist selesai.', {
-        description:
-          updatedCount > 0
-            ? `Terpilih ${shortlistedCount} kandidat dari ${groupCount} kelompok lowongan. ${updatedCount} kandidat dipindahkan ke status Screening.`
-            : `Terpilih ${shortlistedCount} kandidat dari ${groupCount} kelompok lowongan, tetapi belum ada perubahan status (umumnya karena kandidat sudah di tahap Screening).`,
-      });
-
-      router.reload({
-        preserveScroll: true,
-      });
-    } catch (error) {
-      if (isAxiosError(error)) {
-        const message =
-          (error.response?.data as any)?.message ||
-          (error.response?.data as any)?.status ||
-          'Gagal menjalankan auto-shortlist.';
-        toast.error(message);
-      } else {
-        toast.error('Gagal menjalankan auto-shortlist.');
-      }
-    } finally {
-      setIsRunningAutoShortlist(false);
-    }
-  };
-
-  const handleMinimumScoreChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setAutoShortlistMinScore(sanitizeMinimumScoreInput(event.target.value));
-  };
-
-  const handleMinimumScoreBlur = () => {
-    setAutoShortlistMinScore((previous) => {
-      const normalized = sanitizeMinimumScoreInput(previous);
-      return normalized === '' ? String(MINIMUM_SCORE_MIN) : normalized;
-    });
-  };
-
-  const handleTopLowonganChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setAutoShortlistTopN(
-      sanitizeTopLowonganInput(event.target.value, autoShortlistTopNMax),
-    );
-  };
-
-  const handleTopLowonganBlur = () => {
-    setAutoShortlistTopN((previous) => {
-      const normalized = sanitizeTopLowonganInput(previous, autoShortlistTopNMax);
-      return normalized === '' ? String(TOP_LOWONGAN_MIN) : normalized;
-    });
-  };
 
   const handleExportScoreReport = () => {
     const params = new URLSearchParams();
@@ -232,17 +134,6 @@ export function useRecruitmentScoringControls({
   };
 
   return {
-    autoShortlistTopN,
-    autoShortlistTopNMax,
-    autoShortlistMinScore,
-    autoShortlistEligibleOnly,
-    setAutoShortlistEligibleOnly,
-    isRunningAutoShortlist,
-    handleRunAutoShortlist,
-    handleTopLowonganChange,
-    handleTopLowonganBlur,
-    handleMinimumScoreChange,
-    handleMinimumScoreBlur,
     handleExportScoreReport,
     handleExportScoreReportPDF,
     slaOverviewState,

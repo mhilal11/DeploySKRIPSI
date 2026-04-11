@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import {
     extractChanges,
-    formatObjectLabel,
 } from '@/modules/SuperAdmin/AuditLog/audit-log-utils';
 import type {
     AuditChange,
@@ -204,15 +203,15 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
         >
             <Head title="Log Aktivitas" />
 
-            <Card className="space-y-4 p-4 md:p-6">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+            <Card className="space-y-4 overflow-hidden p-3 sm:p-4 md:p-5 xl:p-6">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12">
                     <Input
                         placeholder="Cari user, deskripsi, entity ID..."
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
-                        className="md:col-span-2 xl:col-span-4"
+                        className="sm:col-span-2 xl:col-span-4"
                     />
-                    <div className="xl:col-span-2">
+                    <div className="sm:col-span-1 xl:col-span-2">
                         <Select value={module} onValueChange={setModule}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Semua Modul" />
@@ -227,7 +226,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="xl:col-span-2">
+                    <div className="sm:col-span-1 xl:col-span-2">
                         <Select value={action} onValueChange={setAction}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Semua Aksi" />
@@ -242,7 +241,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-2 xl:col-span-3">
+                    <div className="grid grid-cols-1 gap-2 sm:col-span-2 sm:grid-cols-2 xl:col-span-3">
                         <Input
                             type="date"
                             value={dateFrom}
@@ -254,11 +253,27 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                             onChange={(event) => setDateTo(event.target.value)}
                         />
                     </div>
+                    <div className="sm:col-span-2 xl:col-span-1">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => {
+                                setSearch('');
+                                setModule('all');
+                                setAction('all');
+                                setDateFrom('');
+                                setDateTo('');
+                            }}
+                        >
+                            Reset
+                        </Button>
+                    </div>
                 </div>
 
-                <div className="space-y-3 lg:hidden">
+                <div className="grid gap-3 xl:hidden md:grid-cols-2">
                     {auditLogs.data.length === 0 && (
-                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500 md:col-span-2">
                             Belum ada data log aktivitas.
                         </div>
                     )}
@@ -278,8 +293,8 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                                     <div className="min-w-0">
                                         <p className="text-[10px] text-slate-400">No. {rowNumber}</p>
                                         <p className="text-xs text-slate-500">{item.created_at}</p>
-                                        <p className="text-sm font-semibold text-slate-900">{item.user_name ?? '-'}</p>
-                                        <p className="text-xs text-slate-500">{item.user_email ?? '-'}</p>
+                                        <p className="break-words text-sm font-semibold text-slate-900">{item.user_name ?? '-'}</p>
+                                        <p className="break-all text-xs text-slate-500">{item.user_email ?? '-'}</p>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-1 sm:justify-end">
                                         {!viewed && (
@@ -299,12 +314,13 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
 
                                 <div className="mb-2 flex flex-wrap items-center gap-2">
                                     <Badge variant="outline">{item.module}</Badge>
-                                    <span
-                                        title={formatObjectLabel(item)}
-                                        className="inline-flex max-w-full rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-600 break-words"
+                                    <Badge
+                                        variant="outline"
+                                        title={item.action}
+                                        className="max-w-[12rem] truncate border-blue-200 bg-blue-50 text-blue-700"
                                     >
-                                        {formatObjectLabel(item)}
-                                    </span>
+                                        {item.action}
+                                    </Badge>
                                 </div>
 
                                 <div className="mb-2 rounded-md border border-slate-200 bg-slate-50 p-2">
@@ -318,24 +334,22 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                     })}
                 </div>
 
-                <div className="hidden overflow-x-auto rounded-xl border border-slate-200 lg:block">
-                    <Table className="min-w-[900px]">
+                <div className="hidden overflow-x-auto rounded-xl border border-slate-200 xl:block">
+                    <Table className="min-w-[1180px] table-fixed">
                         <TableHeader className="bg-slate-50">
                             <TableRow>
                                 <TableHead className="whitespace-nowrap w-12">No</TableHead>
-                                <TableHead className="whitespace-nowrap">Waktu</TableHead>
-                                <TableHead className="whitespace-nowrap">Aktor</TableHead>
-                                <TableHead className="whitespace-nowrap">Modul</TableHead>
-                                <TableHead className="whitespace-nowrap">Aksi</TableHead>
-                                <TableHead className="whitespace-nowrap">Objek</TableHead>
-                                <TableHead className="min-w-[200px]">Deskripsi</TableHead>
-                                <TableHead className="min-w-[220px]">Perubahan</TableHead>
+                                <TableHead className="w-[132px] whitespace-nowrap">Waktu</TableHead>
+                                <TableHead className="w-[172px] whitespace-nowrap">Aktor</TableHead>
+                                <TableHead className="w-[116px] whitespace-nowrap">Modul</TableHead>
+                                <TableHead className="w-[360px] whitespace-normal">Deskripsi</TableHead>
+                                <TableHead className="w-[320px] whitespace-normal">Perubahan</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {auditLogs.data.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="py-8 text-center text-sm text-slate-500">
+                                    <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-500">
                                         Belum ada data log aktivitas.
                                     </TableCell>
                                 </TableRow>
@@ -345,7 +359,7 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                                 const viewed = isViewed(item);
                                 const rowNumber = (page - 1) * (auditLogs.per_page || 20) + index + 1;
                                 return (
-                                    <TableRow key={item.id} className={viewed ? '' : 'bg-amber-50/40'}>
+                                    <TableRow key={item.id} className={viewed ? 'align-top' : 'bg-amber-50/40 align-top'}>
                                         <TableCell className="whitespace-nowrap text-xs text-slate-600">
                                             {rowNumber}
                                         </TableCell>
@@ -358,26 +372,16 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            <p className="text-sm font-medium text-slate-900">{item.user_name ?? '-'}</p>
-                                            <p className="text-xs text-slate-500">{item.user_email ?? '-'}</p>
+                                            <p className="break-words text-sm font-medium text-slate-900">{item.user_name ?? '-'}</p>
+                                            <p className="break-all text-xs text-slate-500">{item.user_email ?? '-'}</p>
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="outline">{item.module}</Badge>
                                         </TableCell>
-                                        <TableCell>
-                                            <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
-                                                <span title={item.action} className="inline-block max-w-[11rem] truncate align-bottom">
-                                                    {item.action}
-                                                </span>
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="max-w-[240px] break-words text-xs text-slate-600">
-                                            {formatObjectLabel(item)}
-                                        </TableCell>
-                                        <TableCell className="min-w-[200px] max-w-[260px] break-words text-xs text-slate-700">
+                                        <TableCell className="whitespace-normal break-words text-xs leading-relaxed text-slate-700 align-top">
                                             {item.description ?? '-'}
                                         </TableCell>
-                                        <TableCell className="min-w-[220px] max-w-[420px]">
+                                        <TableCell className="whitespace-normal align-top">
                                             <AuditChangesPreview itemId={item.id} changes={changes} onOpenDetail={() => handleOpenDetail(item, changes)} />
                                         </TableCell>
                                     </TableRow>
@@ -391,23 +395,25 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
                     <p className="text-xs text-slate-500">
                         Total {auditLogs.total} log.
                     </p>
-                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-start">
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
+                            className="w-full sm:w-auto"
                             disabled={page <= 1}
                             onClick={() => visitPage(page - 1)}
                         >
                             Sebelumnya
                         </Button>
-                        <span className="text-xs text-slate-600">
+                        <span className="text-center text-xs text-slate-600">
                             Halaman {page} / {lastPage}
                         </span>
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
+                            className="w-full sm:w-auto"
                             disabled={page >= lastPage}
                             onClick={() => visitPage(page + 1)}
                         >

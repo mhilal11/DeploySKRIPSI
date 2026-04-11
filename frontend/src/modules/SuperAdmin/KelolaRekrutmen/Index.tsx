@@ -9,7 +9,6 @@ import ApplicantsTab from './components/ApplicantsTab';
 import InterviewDetailDialog from './components/InterviewDetailDialog';
 import InterviewsTab from './components/InterviewsTab';
 import OnboardingTab from './components/OnboardingTab';
-import { RecruitmentApplicantsControls } from './components/recruitment-index/RecruitmentApplicantsControls';
 import { RecruitmentTabsHeader } from './components/recruitment-index/RecruitmentTabsHeader';
 import { defaultSLASettings, statusOrder } from './components/recruitment-index/utils';
 import { RecruitmentCalendar } from './components/RecruitmentCalendar';
@@ -48,7 +47,6 @@ export default function KelolaRekrutmenIndex({
   });
 
   const scoring = useRecruitmentScoringControls({
-    applicationRows: pipeline.applicationRows,
     statusFilter: pipeline.statusFilter,
     slaSettings,
     slaOverview,
@@ -90,27 +88,6 @@ export default function KelolaRekrutmenIndex({
           />
 
           <TabsContent value="applicants">
-            <RecruitmentApplicantsControls
-              slaOverviewState={scoring.slaOverviewState}
-              slaSettingsForm={scoring.slaSettingsForm}
-              slaReminderRows={scoring.slaReminderRows}
-              onSLASettingChange={scoring.handleSLASettingChange}
-              onSaveSLASettings={scoring.handleSaveSLASettings}
-              isSavingSLA={scoring.isSavingSLA}
-              autoShortlistTopN={scoring.autoShortlistTopN}
-              autoShortlistTopNMax={scoring.autoShortlistTopNMax}
-              onTopLowonganChange={scoring.handleTopLowonganChange}
-              onTopLowonganBlur={scoring.handleTopLowonganBlur}
-              autoShortlistMinScore={scoring.autoShortlistMinScore}
-              onMinimumScoreChange={scoring.handleMinimumScoreChange}
-              onMinimumScoreBlur={scoring.handleMinimumScoreBlur}
-              autoShortlistEligibleOnly={scoring.autoShortlistEligibleOnly}
-              onAutoShortlistEligibleOnlyChange={scoring.setAutoShortlistEligibleOnly}
-              onRunAutoShortlist={scoring.handleRunAutoShortlist}
-              isRunningAutoShortlist={scoring.isRunningAutoShortlist}
-              onExportScoreReport={scoring.handleExportScoreReport}
-              onExportScoreReportPDF={scoring.handleExportScoreReportPDF}
-            />
             <ApplicantsTab
               searchTerm={pipeline.searchTerm}
               onSearchTermChange={pipeline.setSearchTerm}
@@ -127,6 +104,14 @@ export default function KelolaRekrutmenIndex({
               updatingApplicantId={pipeline.updatingApplicantId}
               onScheduleInterview={pipeline.handleOpenScheduleDialog}
               onViewProfile={pipeline.handleViewProfile}
+              slaOverviewState={scoring.slaOverviewState}
+              slaSettingsForm={scoring.slaSettingsForm}
+              slaReminderRows={scoring.slaReminderRows}
+              onSLASettingChange={scoring.handleSLASettingChange}
+              onSaveSLASettings={scoring.handleSaveSLASettings}
+              isSavingSLA={scoring.isSavingSLA}
+              onExportScoreReport={scoring.handleExportScoreReport}
+              onExportScoreReportPDF={scoring.handleExportScoreReportPDF}
             />
           </TabsContent>
 

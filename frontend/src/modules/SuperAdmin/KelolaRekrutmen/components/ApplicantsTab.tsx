@@ -1,16 +1,43 @@
 ﻿// src/Pages/SuperAdmin/Recruitment/components/ApplicantsTab.tsx
 
 import { format } from 'date-fns';
+import {
+    AlertTriangle,
+    Clock3,
+    Download,
+    FileSpreadsheet,
+    FileText,
+    Save,
+    Settings2,
+} from 'lucide-react';
 import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/shared/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/shared/components/ui/dropdown-menu';
+import { Input } from '@/shared/components/ui/input';
 
 import {
     ApplicantActionHandler,
     ApplicantRecord,
     ApplicantRejectHandler,
     ApplicantStatus,
+    RecruitmentSLAOverview,
+    RecruitmentSLAReminder,
+    RecruitmentSLASettings,
     StatusSummary,
 } from '../types';
 import { ApplicantsFiltersPanel } from './applicants-tab/ApplicantsFiltersPanel';
@@ -41,6 +68,14 @@ interface ApplicantsTabProps {
     updatingApplicantId: number | null;
     onScheduleInterview: (application: ApplicantRecord) => void;
     onViewProfile?: (application: ApplicantRecord) => void;
+    slaOverviewState: RecruitmentSLAOverview;
+    slaSettingsForm: RecruitmentSLASettings;
+    slaReminderRows: RecruitmentSLAReminder[];
+    onSLASettingChange: (stage: keyof RecruitmentSLASettings, value: string) => void;
+    onSaveSLASettings: () => void;
+    isSavingSLA: boolean;
+    onExportScoreReport: () => void;
+    onExportScoreReportPDF: () => void;
 }
 
 export default function ApplicantsTab({
@@ -59,6 +94,14 @@ export default function ApplicantsTab({
     updatingApplicantId,
     onScheduleInterview,
     onViewProfile,
+    slaOverviewState,
+    slaSettingsForm,
+    slaReminderRows,
+    onSLASettingChange,
+    onSaveSLASettings,
+    isSavingSLA,
+    onExportScoreReport,
+    onExportScoreReportPDF,
 }: ApplicantsTabProps) {
     const [divisionFilter, setDivisionFilter] = useState('all');
     const [positionFilter, setPositionFilter] = useState('all');
@@ -67,6 +110,7 @@ export default function ApplicantsTab({
     const [scoreBandFilter, setScoreBandFilter] = useState<'all' | 'excellent' | 'strong' | 'moderate' | 'low' | 'unscored'>('all');
     const [sortFilter, setSortFilter] = useState<'newest' | 'oldest' | 'score_desc' | 'score_asc' | 'name_asc'>('newest');
     const [isPreferenceHydrated, setIsPreferenceHydrated] = useState(false);
+    const [isSLAModalOpen, setIsSLAModalOpen] = useState(false);
 
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
@@ -448,6 +492,43 @@ export default function ApplicantsTab({
     return (
         <>
             <Card className="space-y-4 p-4 md:p-5">
+                <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-1">
+                        <p className="text-sm font-semibold text-slate-900">Daftar Pelamar</p>
+                        <p className="text-xs leading-relaxed text-slate-600">
+                            Kelola pelamar aktif, filter kandidat, atur SLA, dan export data skor dari satu card.
+                        </p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsSLAModalOpen(true)}
+                            className="justify-start border-slate-300 bg-white"
+                        >
+                            <Settings2 className="mr-2 h-4 w-4" />
+                            Pengaturan SLA
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="justify-start border-slate-300 bg-white">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Export Skor Pelamar
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52 bg-white">
+                                <DropdownMenuItem onClick={onExportScoreReport}>
+                                    <FileSpreadsheet className="h-4 w-4" />
+                                    Export Excel (.csv)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={onExportScoreReportPDF}>
+                                    <FileText className="h-4 w-4" />
+                                    Export PDF
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
+
                 <ApplicantsFiltersPanel
                     insights={insights}
                     statusSummary={statusSummary}
@@ -493,6 +574,150 @@ export default function ApplicantsTab({
                     setCurrentPage={setCurrentPage}
                 />
             </Card>
+
+            <Dialog open={isSLAModalOpen} onOpenChange={setIsSLAModalOpen}>
+                <DialogContent className="max-h-[90vh] overflow-y-auto bg-white sm:max-w-4xl">
+                    <DialogHeader className="border-b border-slate-100 px-5 py-4 sm:px-6">
+                        <DialogTitle>SLA Tracker & Reminder</DialogTitle>
+                        <DialogDescription className="text-slate-600">
+                            Atur target durasi tiap stage dan pantau kandidat yang mendekati atau melewati SLA.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-5 px-5 pb-5 sm:px-6 sm:pb-6">
+                        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <p className="text-[11px] text-slate-500">Aktif</p>
+                                <p className="text-lg font-semibold text-slate-900">
+                                    {slaOverviewState.active_applications}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                                <p className="text-[11px] text-emerald-700">On Track</p>
+                                <p className="text-lg font-semibold text-emerald-700">
+                                    {slaOverviewState.on_track_count}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                                <p className="text-[11px] text-amber-700">Mendekati SLA</p>
+                                <p className="text-lg font-semibold text-amber-700">
+                                    {slaOverviewState.warning_count}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                                <p className="text-[11px] text-rose-700">Overdue</p>
+                                <p className="text-lg font-semibold text-rose-700">
+                                    {slaOverviewState.overdue_count}
+                                </p>
+                            </div>
+                        </div>
+
+                        <p className="text-xs text-slate-600">
+                            Compliance rate:{' '}
+                            <span className="font-semibold text-slate-900">
+                                {Number(slaOverviewState.compliance_rate || 0).toFixed(1)}%
+                            </span>
+                        </p>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1">
+                                <p className="text-xs text-slate-500">Applied (hari)</p>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={30}
+                                    value={slaSettingsForm.Applied}
+                                    onChange={(event) => onSLASettingChange('Applied', event.target.value)}
+                                    className="h-9"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs text-slate-500">Screening (hari)</p>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={30}
+                                    value={slaSettingsForm.Screening}
+                                    onChange={(event) => onSLASettingChange('Screening', event.target.value)}
+                                    className="h-9"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs text-slate-500">Interview (hari)</p>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={30}
+                                    value={slaSettingsForm.Interview}
+                                    onChange={(event) => onSLASettingChange('Interview', event.target.value)}
+                                    className="h-9"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs text-slate-500">Offering (hari)</p>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    max={30}
+                                    value={slaSettingsForm.Offering}
+                                    onChange={(event) => onSLASettingChange('Offering', event.target.value)}
+                                    className="h-9"
+                                />
+                            </div>
+                        </div>
+
+                        <Button
+                            variant="outline"
+                            onClick={onSaveSLASettings}
+                            disabled={isSavingSLA}
+                            className="justify-start border-slate-300"
+                        >
+                            <Save className="mr-2 h-4 w-4" />
+                            {isSavingSLA ? 'Menyimpan SLA...' : 'Simpan Konfigurasi SLA'}
+                        </Button>
+
+                        <div className="space-y-2">
+                            <p className="text-xs font-medium text-slate-700">Reminder Prioritas</p>
+                            {slaReminderRows.length === 0 ? (
+                                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                                    Tidak ada kandidat yang overdue atau mendekati SLA.
+                                </p>
+                            ) : (
+                                <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+                                    {slaReminderRows.map((item) => (
+                                        <div
+                                            key={item.application_id}
+                                            className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-xs font-semibold text-slate-900">
+                                                        {item.name}
+                                                    </p>
+                                                    <p className="truncate text-[11px] text-slate-500">
+                                                        {item.position} - {item.stage}
+                                                    </p>
+                                                </div>
+                                                {item.state === 'overdue' ? (
+                                                    <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700">
+                                                        <AlertTriangle className="mr-1 h-3 w-3" />
+                                                        Overdue {item.overdue_days} hari
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                                        <Clock3 className="mr-1 h-3 w-3" />
+                                                        Sisa {item.remaining_days} hari
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
