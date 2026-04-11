@@ -6,16 +6,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/jmoiron/sqlx"
+	"golang.org/x/crypto/bcrypt"
 	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
 	dbrepo "hris-backend/internal/repository"
 	"hris-backend/internal/services"
-	"hris-backend/internal/utils"
-
-	"github.com/gin-gonic/gin"
-	"github.com/jmoiron/sqlx"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func SuperAdminAccountsStore(c *gin.Context) {
@@ -359,9 +357,9 @@ func SuperAdminAccountsResetPassword(c *gin.Context) {
 		return
 	}
 
-	plain, _ := utils.RandomToken(8)
-	if plain == "" {
-		plain = "Temp1234"
+	plain, err := handlers.GeneratePolicyCompliantPassword(12)
+	if err != nil || plain == "" {
+		plain = "TempPass1!"
 	}
 	hash, _ := bcrypt.GenerateFromPassword([]byte(plain), bcrypt.DefaultCost)
 
@@ -446,6 +444,7 @@ func validateAccountInput(
 		}
 		handlers.ValidateFieldLength(fieldErrors, "password", "Password", password, 128)
 		handlers.ValidateFieldLength(fieldErrors, "password_confirmation", "Konfirmasi password", passwordConfirmation, 128)
+		handlers.ValidatePasswordPolicy(fieldErrors, "password", password)
 	}
 
 	if role == models.RoleAdmin || role == models.RoleStaff {

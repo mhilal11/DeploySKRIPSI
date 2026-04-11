@@ -305,6 +305,10 @@ func Register(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"password": msg})
 		return
 	}
+	if !handlers.PasswordMeetsPolicy(req.Password) {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"password": handlers.PasswordPolicyMessage})
+		return
+	}
 	if field, msg := validateAuthFieldLengths(req.PasswordConfirmation, maxPasswordLength, "Konfirmasi password"); field != "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"password_confirmation": msg})
 		return
@@ -415,6 +419,10 @@ func ResetPassword(c *gin.Context) {
 	}
 	if field, msg := validateAuthFieldLengths(req.Password, maxPasswordLength, "Password"); field != "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"password": msg})
+		return
+	}
+	if !handlers.PasswordMeetsPolicy(req.Password) {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"password": handlers.PasswordPolicyMessage})
 		return
 	}
 	if field, msg := validateAuthFieldLengths(req.PasswordConfirmation, maxPasswordLength, "Konfirmasi password"); field != "" {

@@ -5,6 +5,7 @@ import { FormEventHandler, useEffect, useRef, useState } from "react";
 import { Toaster, toast } from "sonner";
 
 import InputError from "@/shared/components/InputError";
+import PasswordRequirementChecklist from "@/shared/components/PasswordRequirementChecklist";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -19,6 +20,10 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Head, useForm } from "@/shared/lib/inertia";
 import { markLandingSplashSkipOnce } from "@/shared/lib/landing-splash";
+import {
+    PASSWORD_POLICY_ERROR_MESSAGE,
+    passwordViolatesPolicy,
+} from "@/shared/lib/password-policy";
 
 const logo = "/img/LogoLDP.png";
 const REGISTER_SUCCESS_TOAST_KEY = "auth_register_success_toast";
@@ -43,7 +48,7 @@ export default function Register({
     oauth_error_code?: string;
 }) {
     const googleRegisterUrl = buildGoogleRegisterUrl();
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors, reset, setError, clearErrors } = useForm({
         name: "",
         email: "",
         password: "",
@@ -100,6 +105,12 @@ export default function Register({
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+
+        if (passwordViolatesPolicy(data.password)) {
+            setError("password", PASSWORD_POLICY_ERROR_MESSAGE);
+            return;
+        }
+
         post("/register", {
             onSuccess: (responseData: any) => {
                 const title = "Pendaftaran berhasil.";
@@ -286,12 +297,10 @@ export default function Register({
                                             value={data.password}
                                             autoComplete="new-password"
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
-                                            onChange={(e) =>
-                                                setData(
-                                                    "password",
-                                                    e.target.value
-                                                )
-                                            }
+                                            onChange={(e) => {
+                                                clearErrors("password");
+                                                setData("password", e.target.value);
+                                            }}
                                             required
                                         />
                                         <button
@@ -311,6 +320,10 @@ export default function Register({
                                     <InputError
                                         message={errors.password}
                                         className="text-sm text-red-300"
+                                    />
+                                    <PasswordRequirementChecklist
+                                        password={data.password}
+                                        variant="dark"
                                     />
                                 </div>
 

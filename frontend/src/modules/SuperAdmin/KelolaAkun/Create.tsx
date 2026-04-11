@@ -4,6 +4,10 @@ import { toast } from 'sonner';
 import AccountForm from '@/modules/SuperAdmin/components/accounts/AccountForm';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
 import { Head, Link, router, useForm } from '@/shared/lib/inertia';
+import {
+    PASSWORD_POLICY_ERROR_MESSAGE,
+    passwordViolatesPolicy,
+} from '@/shared/lib/password-policy';
 
 
 interface CreateProps {
@@ -71,8 +75,20 @@ export default function Create({
         }
     }, [role, religion, gender, education_level, setFormData]);
 
+    useEffect(() => {
+        if (form.errors.password && form.data.password.trim() !== '') {
+            form.clearErrors('password');
+        }
+    }, [form, form.data.password, form.errors.password]);
+
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+
+        if (passwordViolatesPolicy(form.data.password)) {
+            form.setError('password', PASSWORD_POLICY_ERROR_MESSAGE);
+            return;
+        }
+
         form.post(route('super-admin.accounts.store'), {
             forceFormData: true,
             onSuccess: (responseData) => {
@@ -149,8 +165,6 @@ function ButtonLink({ href, children }: { href: string; children: ReactNode }) {
         </Link>
     );
 }
-
-
 
 
 

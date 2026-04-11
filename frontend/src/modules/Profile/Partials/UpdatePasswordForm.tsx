@@ -3,9 +3,14 @@ import { FormEventHandler, useRef } from 'react';
 
 import InputError from '@/shared/components/InputError';
 import InputLabel from '@/shared/components/InputLabel';
+import PasswordRequirementChecklist from '@/shared/components/PasswordRequirementChecklist';
 import PrimaryButton from '@/shared/components/PrimaryButton';
 import TextInput from '@/shared/components/TextInput';
 import { useForm } from '@/shared/lib/inertia';
+import {
+    PASSWORD_POLICY_ERROR_MESSAGE,
+    passwordViolatesPolicy,
+} from '@/shared/lib/password-policy';
 
 
 export default function UpdatePasswordForm({
@@ -22,6 +27,8 @@ export default function UpdatePasswordForm({
         errors,
         put,
         reset,
+        setError,
+        clearErrors,
         processing,
         recentlySuccessful,
     } = useForm({
@@ -32,6 +39,12 @@ export default function UpdatePasswordForm({
 
     const updatePassword: FormEventHandler = (e) => {
         e.preventDefault();
+
+        if (passwordViolatesPolicy(data.password)) {
+            setError('password', PASSWORD_POLICY_ERROR_MESSAGE);
+            passwordInput.current?.focus();
+            return;
+        }
 
         put(route('password.update'), {
             preserveScroll: true,
@@ -95,13 +108,20 @@ export default function UpdatePasswordForm({
                         id="password"
                         ref={passwordInput}
                         value={data.password}
-                        onChange={(e) => setData('password', e.target.value)}
+                        onChange={(e) => {
+                            clearErrors('password');
+                            setData('password', e.target.value);
+                        }}
                         type="password"
                         className="mt-1 block w-full"
                         autoComplete="new-password"
                     />
 
                     <InputError message={errors.password} className="mt-2" />
+                    <PasswordRequirementChecklist
+                        password={data.password}
+                        className="mt-3"
+                    />
                 </div>
 
                 <div>

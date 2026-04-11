@@ -1,5 +1,7 @@
 ﻿import { FormEvent } from 'react';
 
+import PasswordRequirementChecklist from '@/shared/components/PasswordRequirementChecklist';
+
 interface AccountFormState {
     employee_code?: string | null;
     name: string;
@@ -388,6 +390,10 @@ export default function AccountForm({
                                 {errors.password}
                             </p>
                         )}
+                        <PasswordRequirementChecklist
+                            password={data.password ?? ''}
+                            className="mt-3"
+                        />
                     </div>
                     <div>
                         <label

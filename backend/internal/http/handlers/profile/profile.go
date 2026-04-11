@@ -538,7 +538,17 @@ func UpdatePassword(c *gin.Context) {
 		return
 	}
 
-	if req.Password == "" || req.Password != req.PasswordConfirmation {
+	if req.Password == "" {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"password": "Password wajib diisi."})
+		return
+	}
+
+	if !handlers.PasswordMeetsPolicy(req.Password) {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"password": handlers.PasswordPolicyMessage})
+		return
+	}
+
+	if req.Password != req.PasswordConfirmation {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"password_confirmation": "Konfirmasi password tidak sama."})
 		return
 	}

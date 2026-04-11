@@ -4,6 +4,10 @@ import { toast } from 'sonner';
 import AccountForm from '@/modules/SuperAdmin/components/accounts/AccountForm';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
 import { Head, Link, router, useForm } from '@/shared/lib/inertia';
+import {
+    PASSWORD_POLICY_ERROR_MESSAGE,
+    passwordViolatesPolicy,
+} from '@/shared/lib/password-policy';
 
 const ACCOUNT_TOAST_STORAGE_KEY = 'super-admin.accounts.toast';
 const DEFAULT_SUCCESS_MESSAGE = 'Akun berhasil diperbarui.';
@@ -108,8 +112,22 @@ export default function Edit({
         }
     }, [role, religion, gender, education_level, setFormData]);
 
+    useEffect(() => {
+        if (form.errors.password && form.data.password.trim() !== '') {
+            form.clearErrors('password');
+        }
+    }, [form, form.data.password, form.errors.password]);
+
     const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
+
+        if (
+            form.data.password.trim() !== '' &&
+            passwordViolatesPolicy(form.data.password)
+        ) {
+            form.setError('password', PASSWORD_POLICY_ERROR_MESSAGE);
+            return;
+        }
 
         form.put(route('super-admin.accounts.update', user.id), {
             forceFormData: true,

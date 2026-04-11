@@ -3,9 +3,14 @@ import Image from 'next/image';
 import { FormEventHandler, useEffect, useRef, useState } from 'react';
 
 import InputError from '@/shared/components/InputError';
+import PasswordRequirementChecklist from '@/shared/components/PasswordRequirementChecklist';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Head, useForm } from '@/shared/lib/inertia';
+import {
+    PASSWORD_POLICY_ERROR_MESSAGE,
+    passwordViolatesPolicy,
+} from '@/shared/lib/password-policy';
 
 const logo = '/img/LogoLDP.png';
 
@@ -16,7 +21,7 @@ export default function ResetPassword({
     token: string;
     email: string;
 }) {
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors, reset, setError, clearErrors } = useForm({
         token: token,
         email: email,
         password: '',
@@ -59,6 +64,11 @@ export default function ResetPassword({
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
+
+        if (passwordViolatesPolicy(data.password)) {
+            setError('password', PASSWORD_POLICY_ERROR_MESSAGE);
+            return;
+        }
 
         post('/reset-password', {
             onFinish: () => reset('password', 'password_confirmation'),
@@ -143,7 +153,10 @@ export default function ResetPassword({
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
                                             autoComplete="new-password"
                                             autoFocus
-                                            onChange={(e) => setData('password', e.target.value)}
+                                            onChange={(e) => {
+                                                clearErrors('password');
+                                                setData('password', e.target.value);
+                                            }}
                                         />
                                         <button
                                             type="button"
@@ -158,6 +171,10 @@ export default function ResetPassword({
                                         </button>
                                     </div>
                                     <InputError message={errors.password} className="text-sm text-red-300" />
+                                    <PasswordRequirementChecklist
+                                        password={data.password}
+                                        variant="dark"
+                                    />
                                 </div>
 
                                 <div className="space-y-2">
