@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS email_verification_tokens (
-  user_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL PRIMARY KEY,
   token_hash CHAR(64) NOT NULL,
   expires_at TIMESTAMP NOT NULL,
   created_at TIMESTAMP NULL,

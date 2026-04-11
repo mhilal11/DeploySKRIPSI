@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS recruitment_scoring_audits (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  actor_user_id BIGINT UNSIGNED NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  actor_user_id INT UNSIGNED NULL,
   action VARCHAR(64) NOT NULL,
   division_name VARCHAR(120) NULL,
   position_title VARCHAR(120) NULL,

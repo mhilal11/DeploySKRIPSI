@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS division_jobs (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  division_profile_id BIGINT UNSIGNED NOT NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  division_profile_id INT UNSIGNED NOT NULL,
   job_title VARCHAR(255) NOT NULL,
   job_description TEXT NOT NULL,
   job_requirements JSON NULL,

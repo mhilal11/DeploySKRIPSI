@@ -1,7 +1,7 @@
 -- 001_init.sql: initial schema
 
 CREATE TABLE IF NOT EXISTS users (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   employee_code VARCHAR(255) NULL,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS departemen (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   nama VARCHAR(255) NOT NULL,
   kode VARCHAR(10) NOT NULL,
   created_at TIMESTAMP NULL,
@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS departemen (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS applications (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT UNSIGNED NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NULL,
   full_name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL,
   phone VARCHAR(255) NULL,
@@ -64,8 +64,8 @@ CREATE TABLE IF NOT EXISTS applications (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS applicant_profiles (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT UNSIGNED NOT NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
   full_name VARCHAR(255) NULL,
   email VARCHAR(255) NULL,
   phone VARCHAR(255) NULL,
@@ -87,8 +87,8 @@ CREATE TABLE IF NOT EXISTS applicant_profiles (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS staff_profiles (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT UNSIGNED NOT NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
   religion VARCHAR(255) NULL,
   gender VARCHAR(255) NULL,
   education_level VARCHAR(255) NULL,
@@ -99,10 +99,10 @@ CREATE TABLE IF NOT EXISTS staff_profiles (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS staff_terminations (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   reference VARCHAR(255) NOT NULL,
-  user_id BIGINT UNSIGNED NULL,
-  requested_by BIGINT UNSIGNED NULL,
+  user_id INT UNSIGNED NULL,
+  requested_by INT UNSIGNED NULL,
   employee_code VARCHAR(255) NULL,
   employee_name VARCHAR(255) NOT NULL,
   division VARCHAR(255) NULL,
@@ -126,10 +126,10 @@ CREATE TABLE IF NOT EXISTS staff_terminations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS complaints (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   complaint_code VARCHAR(255) NOT NULL,
-  user_id BIGINT UNSIGNED NOT NULL,
-  handled_by_id BIGINT UNSIGNED NULL,
+  user_id INT UNSIGNED NOT NULL,
+  handled_by_id INT UNSIGNED NULL,
   category VARCHAR(150) NOT NULL,
   subject VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS complaints (
   attachment_path VARCHAR(255) NULL,
   attachment_name VARCHAR(255) NULL,
   attachment_mime VARCHAR(255) NULL,
-  attachment_size BIGINT NULL,
+  attachment_size INT NULL,
   submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   resolved_at TIMESTAMP NULL,
   resolution_notes TEXT NULL,
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS complaints (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS letter_templates (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   file_path VARCHAR(255) NOT NULL,
   file_name VARCHAR(255) NOT NULL,
@@ -160,7 +160,7 @@ CREATE TABLE IF NOT EXISTS letter_templates (
   footer_text TEXT NULL,
   logo_path VARCHAR(255) NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
-  created_by BIGINT UNSIGNED NULL,
+  created_by INT UNSIGNED NULL,
   created_at TIMESTAMP NULL,
   updated_at TIMESTAMP NULL,
   INDEX letter_templates_created_by_idx (created_by),
@@ -168,7 +168,7 @@ CREATE TABLE IF NOT EXISTS letter_templates (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS division_profiles (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   description TEXT NULL,
   manager_name VARCHAR(255) NULL,
@@ -184,9 +184,9 @@ CREATE TABLE IF NOT EXISTS division_profiles (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS surat (
-  surat_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT UNSIGNED NOT NULL,
-  departemen_id BIGINT UNSIGNED NULL,
+  surat_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  departemen_id INT UNSIGNED NULL,
   nomor_surat VARCHAR(255) NOT NULL,
   tipe_surat VARCHAR(255) NOT NULL DEFAULT 'keluar',
   jenis_surat VARCHAR(255) NOT NULL,
@@ -201,20 +201,20 @@ CREATE TABLE IF NOT EXISTS surat (
   target_division VARCHAR(255) NULL,
   previous_division VARCHAR(255) NULL,
   current_recipient ENUM('hr','division','archive') NOT NULL DEFAULT 'hr',
-  disposed_by BIGINT UNSIGNED NULL,
+  disposed_by INT UNSIGNED NULL,
   disposed_at TIMESTAMP NULL,
   disposition_note TEXT NULL,
   is_finalized TINYINT(1) NOT NULL DEFAULT 0,
   disposition_document_path VARCHAR(255) NULL,
   disposition_document_name VARCHAR(255) NULL,
   reply_note TEXT NULL,
-  reply_by BIGINT UNSIGNED NULL,
+  reply_by INT UNSIGNED NULL,
   reply_at TIMESTAMP NULL,
   alamat_pengirim TEXT NULL,
   lampiran_path VARCHAR(255) NULL,
   lampiran_nama VARCHAR(255) NULL,
   lampiran_mime VARCHAR(255) NULL,
-  lampiran_size BIGINT NULL,
+  lampiran_size INT NULL,
   created_at TIMESTAMP NULL,
   updated_at TIMESTAMP NULL,
   INDEX surat_user_id_idx (user_id),
@@ -228,16 +228,16 @@ CREATE TABLE IF NOT EXISTS surat (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS surat_reply_histories (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  surat_id BIGINT UNSIGNED NOT NULL,
-  replied_by BIGINT UNSIGNED NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  surat_id INT UNSIGNED NOT NULL,
+  replied_by INT UNSIGNED NULL,
   from_division VARCHAR(255) NULL,
   to_division VARCHAR(255) NULL,
   note TEXT NOT NULL,
   lampiran_path VARCHAR(255) NULL,
   lampiran_nama VARCHAR(255) NULL,
   lampiran_mime VARCHAR(255) NULL,
-  lampiran_size BIGINT NULL,
+  lampiran_size INT NULL,
   replied_at TIMESTAMP NULL,
   created_at TIMESTAMP NULL,
   updated_at TIMESTAMP NULL,
@@ -248,8 +248,8 @@ CREATE TABLE IF NOT EXISTS surat_reply_histories (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS onboarding_checklists (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  application_id BIGINT UNSIGNED NOT NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  application_id INT UNSIGNED NOT NULL,
   contract_signed TINYINT(1) NOT NULL DEFAULT 0,
   inventory_handover TINYINT(1) NOT NULL DEFAULT 0,
   training_orientation TINYINT(1) NOT NULL DEFAULT 0,
@@ -267,7 +267,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 
 CREATE TABLE IF NOT EXISTS sessions (
   id VARCHAR(255) NOT NULL PRIMARY KEY,
-  user_id BIGINT UNSIGNED NULL,
+  user_id INT UNSIGNED NULL,
   ip_address VARCHAR(45) NULL,
   user_agent TEXT NULL,
   payload LONGTEXT NOT NULL,
@@ -289,7 +289,7 @@ CREATE TABLE IF NOT EXISTS cache_locks (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS jobs (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   queue VARCHAR(255) NOT NULL,
   payload LONGTEXT NOT NULL,
   attempts TINYINT UNSIGNED NOT NULL,
@@ -312,7 +312,7 @@ CREATE TABLE IF NOT EXISTS job_batches (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS failed_jobs (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   uuid VARCHAR(255) NOT NULL,
   connection TEXT NOT NULL,
   queue TEXT NOT NULL,

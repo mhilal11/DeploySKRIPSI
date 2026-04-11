@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS recruitment_ai_screenings (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  application_id BIGINT UNSIGNED NOT NULL,
-  actor_user_id BIGINT UNSIGNED NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  application_id INT UNSIGNED NOT NULL,
+  actor_user_id INT UNSIGNED NULL,
   provider VARCHAR(32) NOT NULL DEFAULT 'groq',
   model_used VARCHAR(128) NULL,
   model_chain JSON NULL,

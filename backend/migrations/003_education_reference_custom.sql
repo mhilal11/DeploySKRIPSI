@@ -1,10 +1,10 @@
 CREATE TABLE IF NOT EXISTS education_reference_custom (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   institution VARCHAR(255) NULL,
   program VARCHAR(255) NULL,
   institution_normalized VARCHAR(255) NOT NULL DEFAULT '',
   program_normalized VARCHAR(255) NOT NULL DEFAULT '',
-  source_user_id BIGINT UNSIGNED NULL,
+  source_user_id INT UNSIGNED NULL,
   created_at TIMESTAMP NULL,
   updated_at TIMESTAMP NULL,
   UNIQUE KEY education_reference_custom_unique (institution_normalized, program_normalized),
