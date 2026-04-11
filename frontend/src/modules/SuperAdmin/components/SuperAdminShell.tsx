@@ -1,6 +1,6 @@
 ﻿import { Menu, Bell } from 'lucide-react';
 import { PropsWithChildren, useState, useEffect, useCallback, useMemo } from 'react';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 
 import NotificationDropdown from '@/modules/SuperAdmin/components/NotificationDropdown';
 import QuickActions from '@/modules/SuperAdmin/components/QuickActions';
@@ -9,6 +9,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { api, apiUrl } from '@/shared/lib/api';
 import { usePage } from '@/shared/lib/inertia';
+import { consumeLoginSuccessToast } from '@/shared/lib/login-success-toast';
 import { cn } from '@/shared/lib/utils';
 import { PageProps } from '@/shared/types';
 
@@ -44,6 +45,14 @@ export default function SuperAdminShell({ children }: PropsWithChildren) {
         (sum, count) => sum + count,
         0,
     );
+
+    useEffect(() => {
+        if (consumeLoginSuccessToast('superAdmin')) {
+            toast.success('Login berhasil.', {
+                description: 'Selamat datang kembali.',
+            });
+        }
+    }, []);
 
     // Sync when server props change (e.g. after a fresh pagedata load)
     useEffect(() => {

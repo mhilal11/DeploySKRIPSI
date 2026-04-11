@@ -19,6 +19,7 @@ import { Input } from '@/shared/components/ui/input';
 import { api, apiUrl, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
 import { Head, useForm } from '@/shared/lib/inertia';
 import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
+import { queueLoginSuccessToast } from '@/shared/lib/login-success-toast';
 
 
 
@@ -152,7 +153,32 @@ export default function Login({
                     (responseData?.user?.role === 'Pelamar' ||
                         responseData?.redirect_to === '/pelamar/dashboard')
                 ) {
-                    window.sessionStorage.setItem('pelamar_login_success_toast', '1');
+                    queueLoginSuccessToast('pelamar');
+                    return;
+                }
+                if (
+                    typeof window !== 'undefined' &&
+                    (responseData?.user?.role === 'Admin' ||
+                        String(responseData?.redirect_to ?? '').includes('/admin-staff'))
+                ) {
+                    queueLoginSuccessToast('adminStaff');
+                    return;
+                }
+                if (
+                    typeof window !== 'undefined' &&
+                    (responseData?.user?.role === 'Staff' ||
+                        String(responseData?.redirect_to ?? '').includes('/staff'))
+                ) {
+                    queueLoginSuccessToast('staff');
+                    return;
+                }
+                if (
+                    typeof window !== 'undefined' &&
+                    ((responseData?.user?.role === 'Super Admin' || responseData?.user?.role === 'SuperAdmin') ||
+                        String(responseData?.redirect_to ?? '').includes('/super-admin'))
+                ) {
+                    queueLoginSuccessToast('superAdmin');
+                    return;
                 }
                 toast.success('Login berhasil.', {
                     description: 'Selamat datang kembali.',

@@ -1,12 +1,11 @@
 ﻿// === [ AdminStaffLayout.tsx ] ===
 
-import { Toaster } from 'sonner';
+import { useEffect, type PropsWithChildren, type ReactNode } from 'react';
+import { Toaster, toast } from 'sonner';
 
 import Breadcrumbs, { BreadcrumbItem } from '@/modules/AdminStaff/components/Breadcrumbs';
 import Navbar from '@/modules/AdminStaff/components/Navbar';
-
-import type { PropsWithChildren, ReactNode } from 'react';
-
+import { consumeLoginSuccessToast } from '@/shared/lib/login-success-toast';
 
 interface AdminStaffLayoutProps {
     title: string;
@@ -21,6 +20,15 @@ export default function AdminStaffLayout({
     actions,
     children,
 }: PropsWithChildren<AdminStaffLayoutProps>) {
+    useEffect(() => {
+        if (!consumeLoginSuccessToast('adminStaff')) {
+            return;
+        }
+        toast.success('Login berhasil.', {
+            description: 'Selamat datang kembali.',
+        });
+    }, []);
+
     return (
         <div className="min-h-screen bg-slate-50 text-slate-900">
             {/* 1. NAVBAR (Pengganti Sidebar) */}

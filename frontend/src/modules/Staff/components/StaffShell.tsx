@@ -2,6 +2,7 @@ import { PropsWithChildren, useEffect } from "react";
 import { Toaster, toast } from "sonner";
 
 import { router, usePage } from "@/shared/lib/inertia";
+import { consumeLoginSuccessToast } from "@/shared/lib/login-success-toast";
 import { route } from "@/shared/lib/route";
 import type { PageProps } from "@/shared/types";
 
@@ -10,6 +11,14 @@ import Navbar from "./Navbar";
 export default function StaffShell({ children }: PropsWithChildren) {
     const page = usePage<PageProps>();
     const user = page.props.auth?.user;
+
+    useEffect(() => {
+        if (consumeLoginSuccessToast('staff')) {
+            toast.success('Login berhasil.', {
+                description: 'Selamat datang kembali.',
+            });
+        }
+    }, []);
 
     useEffect(() => {
         if (!user || !window.Echo) return;

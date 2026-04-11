@@ -3,6 +3,7 @@ import { Toaster, toast } from 'sonner';
 
 import Breadcrumbs from '@/modules/AdminStaff/components/Breadcrumbs';
 import Navbar from '@/modules/Pelamar/components/Navbar';
+import { consumeLoginSuccessToast } from '@/shared/lib/login-success-toast';
 
 import type { PropsWithChildren, ReactNode } from 'react';
 
@@ -21,16 +22,10 @@ export default function PelamarLayout({
     children,
 }: PropsWithChildren<PelamarLayoutProps>) {
     useEffect(() => {
-        if (typeof window === 'undefined') {
-            return;
-        }
-
-        const shouldShowToast = window.sessionStorage.getItem('pelamar_login_success_toast');
-        if (shouldShowToast === '1') {
+        if (consumeLoginSuccessToast('pelamar')) {
             toast.success('Login berhasil.', {
                 description: 'Selamat datang kembali.',
             });
-            window.sessionStorage.removeItem('pelamar_login_success_toast');
         }
     }, []);
 
