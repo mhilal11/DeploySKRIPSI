@@ -13,7 +13,6 @@ import {
     TemplatePageActions,
     TemplatePlaceholderCard,
     TemplatePdfPreviewDialog,
-    TemplatePreviewCard,
     TemplateStatsGrid,
     type ConfirmTemplateAction,
     type EditableField,
@@ -23,11 +22,9 @@ import {
 } from '@/modules/SuperAdmin/TemplateSurat/components';
 import {
     NON_BODY_PLACEHOLDERS,
-    PREVIEW_VALUES,
 } from '@/modules/SuperAdmin/TemplateSurat/components/constants';
 import {
     buildInitialFormState,
-    buildTemplatePreviewModel,
 } from '@/modules/SuperAdmin/TemplateSurat/components/utils';
 import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
 import { Head, router, useForm, usePage, usePageManager } from '@/shared/lib/inertia';
@@ -86,7 +83,6 @@ export default function TemplateSuratIndex() {
         useState<ConfirmTemplateAction>(null);
     const [isMutatingTemplate, setIsMutatingTemplate] = useState(false);
     const [isRefreshingTemplates, setIsRefreshingTemplates] = useState(false);
-    const [isPreviewVisible, setIsPreviewVisible] = useState(false);
     const [isPdfPreviewLoading, setIsPdfPreviewLoading] = useState(false);
     const [isPdfPreviewVisible, setIsPdfPreviewVisible] = useState(false);
     const [hasPreviewAccess, setHasPreviewAccess] = useState(
@@ -133,17 +129,6 @@ export default function TemplateSuratIndex() {
             }
         };
     }, [pdfPreviewUrl]);
-
-    const previewModel = useMemo(
-        () =>
-            buildTemplatePreviewModel(
-                form.data.template_content,
-                form.data.header_text,
-                form.data.footer_text,
-                PREVIEW_VALUES,
-            ),
-        [form.data.footer_text, form.data.header_text, form.data.template_content],
-    );
 
     const isBusy =
         form.processing || isMutatingTemplate || isRefreshingTemplates;
@@ -254,7 +239,6 @@ export default function TemplateSuratIndex() {
         setLogoPreview(null);
         setActiveField('template_content');
         setHasPreviewAccess(false);
-        setIsPreviewVisible(false);
         setIsPdfPreviewVisible(false);
         if (pdfPreviewUrl) {
             window.URL.revokeObjectURL(pdfPreviewUrl);
@@ -384,7 +368,6 @@ export default function TemplateSuratIndex() {
                 }
 
                 setHasPreviewAccess(true);
-                setIsPreviewVisible(true);
 
                 const refreshed = await refreshTemplates({
                     preferredTemplateId: editingTemplate?.id ?? null,
@@ -575,29 +558,6 @@ export default function TemplateSuratIndex() {
         }
     };
 
-    const openDownload = (template: Template) => {
-        const toastId = toast.loading('Menyiapkan file template...');
-        const downloadWindow = window.open(
-            apiUrl(
-                route('super-admin.letters.templates.download', {
-                    template: template.id,
-                }),
-            ),
-            '_blank',
-        );
-
-        if (!downloadWindow) {
-            toast.error('Browser memblokir jendela unduhan template.', {
-                id: toastId,
-            });
-            return;
-        }
-
-        toast.success(`File template "${template.name}" sedang diunduh.`, {
-            id: toastId,
-        });
-    };
-
     const openPdfPreview = async () => {
         if (!hasPreviewAccess) {
             return;
@@ -670,7 +630,7 @@ export default function TemplateSuratIndex() {
     return (
         <SuperAdminLayout
             title="Template Surat"
-            description="Edit template disposisi langsung dari UI dengan preview live tanpa proses download-edit-upload ulang."
+            description="Edit template disposisi langsung dari UI dengan preview PDF tanpa proses download-edit-upload ulang."
             breadcrumbs={breadcrumbs}
             actions={
                 <TemplatePageActions
@@ -695,7 +655,6 @@ export default function TemplateSuratIndex() {
                     selectedTemplateId={selectedTemplateId}
                     templates={templates}
                     onDeleteTemplate={handleDeleteRequest}
-                    onDownloadTemplate={openDownload}
                     onSelectTemplate={selectTemplate}
                     onToggleTemplate={handleToggleRequest}
                 />
@@ -718,7 +677,6 @@ export default function TemplateSuratIndex() {
                         isBusy={isBusy}
                         canPreview={hasPreviewAccess}
                         isPdfPreviewLoading={isPdfPreviewLoading}
-                        isPreviewVisible={isPreviewVisible}
                         logoInputRef={logoInputRef}
                         logoPreview={logoPreview}
                         templateContentRef={templateContentRef}
@@ -728,9 +686,6 @@ export default function TemplateSuratIndex() {
                         onResetEditor={handleCreateNew}
                         onSetActiveField={setActiveField}
                         onSubmit={handleSubmit}
-                        onTogglePreview={() =>
-                            setIsPreviewVisible((current) => !current)
-                        }
                     />
                 </div>
             </div>
@@ -740,13 +695,6 @@ export default function TemplateSuratIndex() {
                 isMutatingTemplate={isMutatingTemplate}
                 onConfirm={handleConfirmAction}
                 onOpenChange={handleConfirmDialogOpenChange}
-            />
-
-            <TemplatePreviewCard
-                open={hasPreviewAccess && isPreviewVisible}
-                onOpenChange={setIsPreviewVisible}
-                logoPreview={logoPreview}
-                previewModel={previewModel}
             />
 
             <TemplatePdfPreviewDialog

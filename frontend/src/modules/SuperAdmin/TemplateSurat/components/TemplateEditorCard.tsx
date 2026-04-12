@@ -1,4 +1,4 @@
-import { Eye, EyeOff, FileText, FilePlus2, Save, X } from 'lucide-react';
+import { FileText, FilePlus2, Save, X } from 'lucide-react';
 import Image from 'next/image';
 
 import { Badge } from '@/shared/components/ui/badge';
@@ -29,14 +29,12 @@ type TemplateEditorCardProps = {
     templateContentRef: RefObject<HTMLTextAreaElement>;
     canPreview: boolean;
     isPdfPreviewLoading: boolean;
-    isPreviewVisible: boolean;
     onClearLogo: () => void;
     onLogoChange: (event: ChangeEvent<HTMLInputElement>) => void;
     onOpenPdfPreview: () => void;
     onResetEditor: () => void;
     onSetActiveField: (field: EditableField) => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-    onTogglePreview: () => void;
 };
 
 export function TemplateEditorCard({
@@ -51,14 +49,12 @@ export function TemplateEditorCard({
     templateContentRef,
     canPreview,
     isPdfPreviewLoading,
-    isPreviewVisible,
     onClearLogo,
     onLogoChange,
     onOpenPdfPreview,
     onResetEditor,
     onSetActiveField,
     onSubmit,
-    onTogglePreview,
 }: TemplateEditorCardProps) {
     const isEditing = editorMode === 'edit';
 
@@ -228,17 +224,6 @@ export function TemplateEditorCard({
                             <FilePlus2 />
                             Reset Editor
                         </Button>
-                        {canPreview && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={onTogglePreview}
-                                disabled={isBusy}
-                            >
-                                {isPreviewVisible ? <EyeOff /> : <Eye />}
-                                {isPreviewVisible ? 'Sembunyikan Preview' : 'Preview'}
-                            </Button>
-                        )}
                         {canPreview && (
                             <Button
                                 type="button"

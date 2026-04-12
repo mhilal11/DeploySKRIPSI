@@ -1,5 +1,4 @@
 ﻿import {
-    Download,
     FileText,
     Info,
     Upload,
@@ -272,21 +271,6 @@ export default function TemplateDialog({ open, onOpenChange }: TemplateDialogPro
                                     onEdit={handleEdit}
                                     onDelete={handleDelete}
                                 />
-                            </div>
-
-                            <div className="flex justify-center pt-2">
-                                <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="gap-2 text-xs text-blue-600 sm:text-sm"
-                                    asChild
-                                >
-                                    <a href={apiUrl(route('super-admin.letters.templates.sample'))}>
-                                        <Download className="h-3 w-3 sm:h-4 sm:w-4" />
-                                        <span className="hidden sm:inline">Unduh Template Contoh untuk diedit</span>
-                                        <span className="sm:hidden">Unduh Contoh</span>
-                                    </a>
-                                </Button>
                             </div>
 
                             <div className="border-t pt-3 sm:pt-4">

@@ -1,6 +1,5 @@
 import {
     Check,
-    Download,
     FileText,
     Pencil,
     Trash2,
@@ -10,10 +9,8 @@ import Image from 'next/image';
 
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
-import { apiUrl } from '@/shared/lib/api';
 
 import type { Template } from './types';
-import type { MouseEvent } from 'react';
 
 type TemplateListSectionProps = {
     loading: boolean;
@@ -38,30 +35,10 @@ export function TemplateListSection({
         return (
             <div className="py-6 text-center text-sm text-slate-500">
                 <FileText className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-                <p className="mb-3">Belum ada template</p>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2"
-                    asChild
-                >
-                    <a href={apiUrl(route('super-admin.letters.templates.sample'))}>
-                        <Download className="h-4 w-4" />
-                        Unduh Template Contoh
-                    </a>
-                </Button>
+                <p>Belum ada template</p>
             </div>
         );
     }
-
-    const handleDownload = (event: MouseEvent, templateId: number) => {
-        event.preventDefault();
-        event.stopPropagation();
-        window.open(
-            apiUrl(route('super-admin.letters.templates.download', { template: templateId })),
-            '_blank',
-        );
-    };
 
     return (
         <div className="space-y-2 sm:space-y-3">
@@ -117,15 +94,6 @@ export function TemplateListSection({
                                     title="Edit Template"
                                 >
                                     <Pencil className="h-3 w-3 text-blue-600 sm:h-4 sm:w-4" />
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 sm:h-8 sm:w-8"
-                                    onClick={(event) => handleDownload(event, template.id)}
-                                    title="Download Template (dengan header/footer/logo)"
-                                >
-                                    <Download className="h-3 w-3 sm:h-4 sm:w-4" />
                                 </Button>
                                 <Button
                                     variant="ghost"

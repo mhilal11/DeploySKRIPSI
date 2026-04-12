@@ -1,4 +1,4 @@
-import { Check, Download, PencilLine, Trash2 } from 'lucide-react';
+import { Check, PencilLine, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 
 import type { Template } from '@/modules/SuperAdmin/KelolaSurat/components/template-dialog/types';
@@ -22,7 +22,6 @@ type TemplateListPanelProps = {
     selectedTemplateId: number | null;
     templates: Template[];
     onDeleteTemplate: (template: Template) => void;
-    onDownloadTemplate: (template: Template) => void;
     onSelectTemplate: (template: Template) => void;
     onToggleTemplate: (template: Template) => void;
 };
@@ -34,7 +33,6 @@ export function TemplateListPanel({
     selectedTemplateId,
     templates,
     onDeleteTemplate,
-    onDownloadTemplate,
     onSelectTemplate,
     onToggleTemplate,
 }: TemplateListPanelProps) {
@@ -125,16 +123,6 @@ export function TemplateListPanel({
                                     >
                                         <PencilLine />
                                         Edit
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => onDownloadTemplate(template)}
-                                        disabled={isBusy}
-                                    >
-                                        <Download />
-                                        Download
                                     </Button>
                                     <Button
                                         type="button"

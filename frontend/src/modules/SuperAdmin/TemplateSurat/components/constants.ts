@@ -38,22 +38,3 @@ export const NON_BODY_PLACEHOLDERS = new Set([
     '{{header}}',
     '{{footer}}',
 ]);
-
-export const PREVIEW_VALUES: Record<string, string> = {
-    '{{nomor_surat}}': '003/COR/2026',
-    '{{tanggal}}': '07 Februari 2026',
-    '{{pengirim}}': 'Akbar',
-    '{{divisi_pengirim}}': 'Corporate',
-    '{{penerima}}': 'Government and Partner',
-    '{{perihal}}': 'Undangan Kolaborasi',
-    '{{isi_surat}}':
-        'Sehubungan dengan rencana sinergi antara PT. Lintas Data Prima dan pihak Government and Partner, kami mengundang Bapak/Ibu untuk mendiskusikan peluang kolaborasi, ruang lingkup kerja sama, serta rencana tindak lanjut yang dapat memberikan nilai tambah bagi kedua belah pihak.\n\nWaktu pelaksanaan dan detail agenda dapat disesuaikan dengan ketersediaan pihak terkait. Template ini dapat dipakai ulang untuk surat undangan, nota dinas, surat pengantar, maupun disposisi internal hanya dengan mengganti metadata dan isi utama surat.',
-    '{{prioritas}}': 'High',
-    '{{catatan_disposisi}}':
-        'OK, lanjutkan ke Government and Partner untuk koordinasi agenda dan tindak lanjut awal.',
-    '{{tanggal_disposisi}}': '-',
-    '{{oleh}}': 'HR Admin',
-    '{{header}}': DEFAULT_HEADER_TEXT,
-    '{{footer}}': DEFAULT_FOOTER_TEXT,
-    '{{logo}}': '',
-};

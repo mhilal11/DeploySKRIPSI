@@ -4,6 +4,5 @@ export * from './TemplateListPanel';
 export * from './TemplatePageActions';
 export * from './TemplatePlaceholderCard';
 export * from './TemplatePdfPreviewDialog';
-export * from './TemplatePreviewCard';
 export * from './TemplateStatsGrid';
 export * from './types';
