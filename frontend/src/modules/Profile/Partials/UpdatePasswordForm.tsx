@@ -1,5 +1,6 @@
-﻿import { Transition } from '@headlessui/react';
-import { FormEventHandler, useRef } from 'react';
+import { Transition } from '@headlessui/react';
+import { Eye, EyeOff } from 'lucide-react';
+import { FormEventHandler, useRef, useState } from 'react';
 
 import InputError from '@/shared/components/InputError';
 import InputLabel from '@/shared/components/InputLabel';
@@ -12,7 +13,6 @@ import {
     passwordViolatesPolicy,
 } from '@/shared/lib/password-policy';
 
-
 export default function UpdatePasswordForm({
     className = '',
 }: {
@@ -20,6 +20,10 @@ export default function UpdatePasswordForm({
 }) {
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showPasswordConfirmation, setShowPasswordConfirmation] =
+        useState(false);
 
     const {
         data,
@@ -83,17 +87,37 @@ export default function UpdatePasswordForm({
                         value="Current Password"
                     />
 
-                    <TextInput
-                        id="current_password"
-                        ref={currentPasswordInput}
-                        value={data.current_password}
-                        onChange={(e) =>
-                            setData('current_password', e.target.value)
-                        }
-                        type="password"
-                        className="mt-1 block w-full"
-                        autoComplete="current-password"
-                    />
+                    <div className="relative mt-1">
+                        <TextInput
+                            id="current_password"
+                            ref={currentPasswordInput}
+                            value={data.current_password}
+                            onChange={(e) =>
+                                setData('current_password', e.target.value)
+                            }
+                            type={showCurrentPassword ? 'text' : 'password'}
+                            className="block w-full pr-10"
+                            autoComplete="current-password"
+                        />
+                        <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                            onClick={() =>
+                                setShowCurrentPassword((value) => !value)
+                            }
+                            aria-label={
+                                showCurrentPassword
+                                    ? 'Sembunyikan password saat ini'
+                                    : 'Tampilkan password saat ini'
+                            }
+                        >
+                            {showCurrentPassword ? (
+                                <EyeOff className="h-5 w-5" />
+                            ) : (
+                                <Eye className="h-5 w-5" />
+                            )}
+                        </button>
+                    </div>
 
                     <InputError
                         message={errors.current_password}
@@ -104,18 +128,36 @@ export default function UpdatePasswordForm({
                 <div>
                     <InputLabel htmlFor="password" value="New Password" />
 
-                    <TextInput
-                        id="password"
-                        ref={passwordInput}
-                        value={data.password}
-                        onChange={(e) => {
-                            clearErrors('password');
-                            setData('password', e.target.value);
-                        }}
-                        type="password"
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                    />
+                    <div className="relative mt-1">
+                        <TextInput
+                            id="password"
+                            ref={passwordInput}
+                            value={data.password}
+                            onChange={(e) => {
+                                clearErrors('password');
+                                setData('password', e.target.value);
+                            }}
+                            type={showPassword ? 'text' : 'password'}
+                            className="block w-full pr-10"
+                            autoComplete="new-password"
+                        />
+                        <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                            onClick={() => setShowPassword((value) => !value)}
+                            aria-label={
+                                showPassword
+                                    ? 'Sembunyikan password baru'
+                                    : 'Tampilkan password baru'
+                            }
+                        >
+                            {showPassword ? (
+                                <EyeOff className="h-5 w-5" />
+                            ) : (
+                                <Eye className="h-5 w-5" />
+                            )}
+                        </button>
+                    </div>
 
                     <InputError message={errors.password} className="mt-2" />
                     <PasswordRequirementChecklist
@@ -130,16 +172,38 @@ export default function UpdatePasswordForm({
                         value="Confirm Password"
                     />
 
-                    <TextInput
-                        id="password_confirmation"
-                        value={data.password_confirmation}
-                        onChange={(e) =>
-                            setData('password_confirmation', e.target.value)
-                        }
-                        type="password"
-                        className="mt-1 block w-full"
-                        autoComplete="new-password"
-                    />
+                    <div className="relative mt-1">
+                        <TextInput
+                            id="password_confirmation"
+                            value={data.password_confirmation}
+                            onChange={(e) =>
+                                setData('password_confirmation', e.target.value)
+                            }
+                            type={
+                                showPasswordConfirmation ? 'text' : 'password'
+                            }
+                            className="block w-full pr-10"
+                            autoComplete="new-password"
+                        />
+                        <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
+                            onClick={() =>
+                                setShowPasswordConfirmation((value) => !value)
+                            }
+                            aria-label={
+                                showPasswordConfirmation
+                                    ? 'Sembunyikan konfirmasi password'
+                                    : 'Tampilkan konfirmasi password'
+                            }
+                        >
+                            {showPasswordConfirmation ? (
+                                <EyeOff className="h-5 w-5" />
+                            ) : (
+                                <Eye className="h-5 w-5" />
+                            )}
+                        </button>
+                    </div>
 
                     <InputError
                         message={errors.password_confirmation}
@@ -166,6 +230,3 @@ export default function UpdatePasswordForm({
         </section>
     );
 }
-
-
-

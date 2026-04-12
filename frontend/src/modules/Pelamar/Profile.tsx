@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import PelamarLayout from '@/modules/Pelamar/Layout';
+import UpdatePasswordForm from '@/modules/Profile/Partials/UpdatePasswordForm';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -45,6 +46,7 @@ type ProfilePageProps = PageProps<{
 }>;
 
 const AVATAR_SIZE = 160;
+type ApplicantTab = Exclude<SectionKey, 'photo'> | 'password';
 
 export default function Profile({
     profile,
@@ -80,6 +82,7 @@ export default function Profile({
         Boolean(profileReminderMessage),
     );
     const [isEditing, setIsEditing] = useState(false);
+    const [activeTab, setActiveTab] = useState<ApplicantTab>('personal');
     const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
     const [pendingSaveSection, setPendingSaveSection] = useState<SectionKey | null>(null);
     const editSnapshotRef = useRef<{
@@ -242,48 +245,55 @@ export default function Profile({
                     </div>
                 )}
 
-                {/* Edit Mode Toggle Button */}
-                <div className="mb-6 flex justify-end">
-                    {isProfileLocked ? (
-                        <Button disabled variant="outline" className="cursor-not-allowed opacity-60">
-                            <Lock className="mr-2 h-4 w-4" />
-                            Profil Terkunci
-                        </Button>
-                    ) : (
-                        <Button
-                            onClick={handleToggleEdit}
-                            variant={isEditing ? "destructive" : "default"}
-                            className={isEditing ? "" : "bg-blue-900 hover:bg-blue-800"}
-                        >
-                            {isEditing ? (
-                                <>
-                                    <X className="mr-2 h-4 w-4" />
-                                    Batalkan Edit
-                                </>
+                {activeTab !== 'password' && (
+                    <>
+                        {/* Edit Mode Toggle Button */}
+                        <div className="mb-6 flex justify-end">
+                            {isProfileLocked ? (
+                                <Button disabled variant="outline" className="cursor-not-allowed opacity-60">
+                                    <Lock className="mr-2 h-4 w-4" />
+                                    Profil Terkunci
+                                </Button>
                             ) : (
-                                <>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit Profil
-                                </>
+                                <Button
+                                    onClick={handleToggleEdit}
+                                    variant={isEditing ? "destructive" : "default"}
+                                    className={isEditing ? "" : "bg-blue-900 hover:bg-blue-800"}
+                                >
+                                    {isEditing ? (
+                                        <>
+                                            <X className="mr-2 h-4 w-4" />
+                                            Batalkan Edit
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            Edit Profil
+                                        </>
+                                    )}
+                                </Button>
                             )}
-                        </Button>
-                    )}
-                </div>
-
-                <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
-                    <div className="flex items-start gap-3">
-                        <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-700" />
-                        <div>
-                            <p className="font-medium text-blue-900">Petunjuk Kelengkapan Profil</p>
-                            <p className="text-sm text-blue-800">
-                                Data Pribadi dan Pendidikan wajib diisi. Pengalaman Kerja/Magang dan Sertifikasi bersifat opsional.
-                            </p>
                         </div>
-                    </div>
-                </div>
+                        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                            <div className="flex items-start gap-3">
+                                <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-700" />
+                                <div>
+                                    <p className="font-medium text-blue-900">Petunjuk Kelengkapan Profil</p>
+                                    <p className="text-sm text-blue-800">
+                                        Data Pribadi dan Pendidikan wajib diisi. Pengalaman Kerja/Magang dan Sertifikasi bersifat opsional.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
 
-                <Tabs defaultValue="personal" className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-4 gap-1 bg-transparent">
+                <Tabs
+                    value={activeTab}
+                    onValueChange={(value) => setActiveTab(value as ApplicantTab)}
+                    className="space-y-6"
+                >
+                    <TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-transparent sm:grid-cols-3 xl:grid-cols-5">
                         <TabsTrigger value="personal" className={getTabClassName(isPersonalComplete ? 'complete' : 'incomplete')}>
                             Data Pribadi
                         </TabsTrigger>
@@ -313,6 +323,9 @@ export default function Profile({
                             )}
                         >
                             Sertifikasi
+                        </TabsTrigger>
+                        <TabsTrigger value="password" className={getTabClassName('neutral')}>
+                            Update Password
                         </TabsTrigger>
                     </TabsList>
 
@@ -378,6 +391,12 @@ export default function Profile({
                             }
                             disabled={!isEditing || isProfileLocked}
                         />
+                    </TabsContent>
+
+                    <TabsContent value="password">
+                        <div className="rounded-lg border border-slate-200 bg-white p-6">
+                            <UpdatePasswordForm className="max-w-none" />
+                        </div>
                     </TabsContent>
                 </Tabs>
             </PelamarLayout>
