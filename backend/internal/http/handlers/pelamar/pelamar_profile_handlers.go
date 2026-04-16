@@ -61,6 +61,11 @@ func PelamarProfileUpdate(c *gin.Context) {
 	if section == "" {
 		section = "all"
 	}
+	section = strings.ToLower(strings.TrimSpace(section))
+	if !handlers.IsAllowedValue(section, []string{"all", "personal", "photo", "education", "experience", "certification"}) {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"section": "Section tidak valid."})
+		return
+	}
 
 	if section == "personal" || section == "all" {
 		personalJSON := c.PostForm("personal")
@@ -73,7 +78,7 @@ func PelamarProfileUpdate(c *gin.Context) {
 				shouldSyncUserAccount = true
 			}
 			if v, ok := personal["email"]; ok {
-				trimmed := strings.TrimSpace(v)
+				trimmed := handlers.NormalizeEmail(v)
 				profile.Email = &trimmed
 				shouldSyncUserAccount = true
 			}
@@ -101,7 +106,7 @@ func PelamarProfileUpdate(c *gin.Context) {
 				profile.Gender = &trimmed
 			}
 			if v, ok := personal["religion"]; ok {
-				trimmed := strings.TrimSpace(v)
+				trimmed := normalizeApplicantReligion(v)
 				profile.Religion = &trimmed
 			}
 			if v, ok := personal["address"]; ok {
@@ -130,10 +135,12 @@ func PelamarProfileUpdate(c *gin.Context) {
 
 	if section == "photo" || section == "personal" {
 		if _, err := c.FormFile("profile_photo"); err == nil {
-			path, _, err := handlers.SaveUploadedFile(c, "profile_photo", "applicant-profiles")
-			if err == nil {
-				profile.ProfilePhotoPath = &path
+			path, _, saveErr := handlers.SaveValidatedUploadedFile(c, "profile_photo", "applicant-profiles", handlers.ImageUploadRules())
+			if saveErr != nil {
+				handlers.ValidationErrors(c, handlers.FieldErrors{"profile_photo": "Foto profil harus berupa PNG atau JPG/JPEG dengan ukuran maksimal 5MB."})
+				return
 			}
+			profile.ProfilePhotoPath = &path
 		}
 	}
 
@@ -199,17 +206,21 @@ func PelamarProfileUpdate(c *gin.Context) {
 		for i := range certs {
 			key := "certification_files." + strconv.Itoa(i)
 			if _, err := c.FormFile(key); err == nil {
-				path, _, err := handlers.SaveUploadedFile(c, key, "applicant-certifications")
-				if err == nil {
-					certs[i]["file_path"] = path
+				path, _, saveErr := handlers.SaveValidatedUploadedFile(c, key, "applicant-certifications", handlers.ImageOrPDFUploadRules())
+				if saveErr != nil {
+					handlers.ValidationErrors(c, handlers.FieldErrors{key: "File sertifikasi harus berupa PNG, JPG/JPEG, atau PDF dengan ukuran maksimal 5MB."})
+					return
 				}
+				certs[i]["file_path"] = path
 			} else {
 				key2 := "certification_files_" + strconv.Itoa(i)
 				if _, err2 := c.FormFile(key2); err2 == nil {
-					path, _, err2 := handlers.SaveUploadedFile(c, key2, "applicant-certifications")
-					if err2 == nil {
-						certs[i]["file_path"] = path
+					path, _, saveErr := handlers.SaveValidatedUploadedFile(c, key2, "applicant-certifications", handlers.ImageOrPDFUploadRules())
+					if saveErr != nil {
+						handlers.ValidationErrors(c, handlers.FieldErrors{key2: "File sertifikasi harus berupa PNG, JPG/JPEG, atau PDF dengan ukuran maksimal 5MB."})
+						return
 					}
+					certs[i]["file_path"] = path
 				}
 			}
 		}

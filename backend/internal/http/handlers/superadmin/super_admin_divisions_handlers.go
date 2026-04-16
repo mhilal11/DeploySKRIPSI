@@ -193,6 +193,9 @@ func SuperAdminDivisionsStore(c *gin.Context) {
 	if name == "" {
 		validationErrors["name"] = "Nama divisi wajib diisi."
 	}
+	handlers.ValidateFieldLength(validationErrors, "name", "Nama divisi", name, 120)
+	handlers.ValidateFieldLength(validationErrors, "description", "Deskripsi divisi", handlers.FirstString(descriptionValue, ""), 1000)
+	handlers.ValidateFieldLength(validationErrors, "manager_name", "Ketua divisi", handlers.FirstString(managerValue, ""), 120)
 	if capacity < 0 {
 		validationErrors["capacity"] = "Kapasitas divisi tidak boleh kurang dari 0."
 	}
@@ -325,6 +328,13 @@ func SuperAdminDivisionsUpdate(c *gin.Context) {
 	managerValue := profile.ManagerName
 	if req.ManagerName != nil {
 		managerValue = normalizeOptionalText(req.ManagerName)
+	}
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidateFieldLength(validationErrors, "description", "Deskripsi divisi", handlers.FirstString(descriptionValue, ""), 1000)
+	handlers.ValidateFieldLength(validationErrors, "manager_name", "Ketua divisi", handlers.FirstString(managerValue, ""), 120)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
 	}
 
 	err = dbrepo.UpdateDivisionProfile(db, dbrepo.UpdateDivisionProfileInput{

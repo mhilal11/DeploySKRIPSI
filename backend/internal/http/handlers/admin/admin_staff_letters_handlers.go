@@ -30,6 +30,10 @@ type sqlAdminLettersRepository struct {
 	db *sqlx.DB
 }
 
+var adminLetterTypes = []string{"Permohonan", "Undangan", "Laporan", "Pemberitahuan", "Surat Tugas", "Surat Cuti", "Surat Peringatan", "Surat Kerjasama"}
+var adminLetterCategories = []string{"Internal", "Eksternal", "Keuangan", "Operasional"}
+var adminLetterPriorities = []string{"high", "medium", "low"}
+
 func newAdminLettersRepository(db *sqlx.DB) adminLettersRepository {
 	return &sqlAdminLettersRepository{db: db}
 }
@@ -133,8 +137,8 @@ func AdminStaffLettersStore(c *gin.Context) {
 	perihal := c.PostForm("perihal")
 	isiSurat := c.PostForm("isi_surat")
 	kategori := c.PostForm("kategori")
-	prioritas := c.PostForm("prioritas")
-	penerima := c.PostForm("penerima")
+	prioritas := strings.ToLower(strings.TrimSpace(c.PostForm("prioritas")))
+	penerima := strings.TrimSpace(c.PostForm("penerima"))
 
 	targetDivisions := c.PostFormArray("target_divisions[]")
 	if len(targetDivisions) == 0 {
@@ -144,6 +148,35 @@ func AdminStaffLettersStore(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"target_divisions": "Divisi tujuan tidak tersedia."})
 		return
 	}
+	validationErrors := handlers.FieldErrors{}
+	if strings.TrimSpace(jenisSurat) == "" {
+		validationErrors["jenis_surat"] = "Jenis surat wajib diisi."
+	}
+	if strings.TrimSpace(perihal) == "" {
+		validationErrors["perihal"] = "Perihal wajib diisi."
+	}
+	if strings.TrimSpace(isiSurat) == "" {
+		validationErrors["isi_surat"] = "Isi surat wajib diisi."
+	}
+	if strings.TrimSpace(kategori) == "" {
+		validationErrors["kategori"] = "Kategori wajib diisi."
+	}
+	if prioritas == "" {
+		validationErrors["prioritas"] = "Prioritas wajib diisi."
+	}
+	handlers.ValidateFieldLength(validationErrors, "jenis_surat", "Jenis surat", jenisSurat, 80)
+	handlers.ValidateFieldLength(validationErrors, "perihal", "Perihal", perihal, 220)
+	handlers.ValidateFieldLength(validationErrors, "isi_surat", "Isi surat", isiSurat, 8000)
+	handlers.ValidateFieldLength(validationErrors, "kategori", "Kategori", kategori, 80)
+	handlers.ValidateFieldLength(validationErrors, "prioritas", "Prioritas", prioritas, 24)
+	handlers.ValidateFieldLength(validationErrors, "penerima", "Penerima", penerima, 120)
+	handlers.ValidateAllowedValue(validationErrors, "jenis_surat", "Jenis surat", jenisSurat, adminLetterTypes)
+	handlers.ValidateAllowedValue(validationErrors, "kategori", "Kategori", kategori, adminLetterCategories)
+	handlers.ValidateAllowedValue(validationErrors, "prioritas", "Prioritas", prioritas, adminLetterPriorities)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
+		return
+	}
 
 	departemenID := ensureDepartemen(db, user.Division)
 
@@ -151,15 +184,19 @@ func AdminStaffLettersStore(c *gin.Context) {
 	var attachmentName *string
 	var attachmentMime *string
 	var attachmentSize *int64
-	if _, err := c.FormFile("lampiran"); err == nil {
-		path, meta, err := handlers.SaveUploadedFile(c, "lampiran", "letters")
-		if err == nil {
-			attachmentPath = &path
-			attachmentName = &meta.OriginalName
-			attachmentMime = &meta.Mime
-			attachmentSize = &meta.Size
-		}
+	if _, err := c.FormFile("lampiran"); err != nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"lampiran": "Lampiran wajib diunggah."})
+		return
 	}
+	path, meta, err := handlers.SaveValidatedUploadedFile(c, "lampiran", "letters", handlers.DocumentUploadRules())
+	if err != nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"lampiran": "Lampiran harus berupa PDF, DOC, atau DOCX dengan ukuran maksimal 5MB."})
+		return
+	}
+	attachmentPath = &path
+	attachmentName = &meta.OriginalName
+	attachmentMime = &meta.Mime
+	attachmentSize = &meta.Size
 
 	now := time.Now()
 	for _, target := range targetDivisions {
@@ -240,15 +277,19 @@ func AdminStaffLettersReply(c *gin.Context) {
 		return
 	}
 	replyNote = strings.TrimSpace(replyNote)
+	if len([]rune(replyNote)) > 3000 {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"reply_note": "Balasan melebihi batas maksimum 3000 karakter."})
+		return
+	}
 
 	var attachmentPath *string
 	var attachmentName *string
 	var attachmentMime *string
 	var attachmentSize *int64
 	if _, err := c.FormFile("lampiran"); err == nil {
-		path, meta, saveErr := handlers.SaveUploadedFile(c, "lampiran", "letters")
+		path, meta, saveErr := handlers.SaveValidatedUploadedFile(c, "lampiran", "letters", handlers.DocumentUploadRules())
 		if saveErr != nil {
-			handlers.ValidationErrors(c, handlers.FieldErrors{"lampiran": "Lampiran balasan gagal diunggah."})
+			handlers.ValidationErrors(c, handlers.FieldErrors{"lampiran": "Lampiran balasan harus berupa PDF, DOC, atau DOCX dengan ukuran maksimal 5MB."})
 			return
 		}
 		attachmentPath = &path

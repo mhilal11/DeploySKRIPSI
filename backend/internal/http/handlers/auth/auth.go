@@ -216,13 +216,17 @@ func Login(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email wajib diisi.", "password": "Password wajib diisi."})
 		return
 	}
-	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Email = handlers.NormalizeEmail(req.Email)
 	if req.Email == "" || req.Password == "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"credentials": "Email atau kata sandi salah."})
 		return
 	}
 	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": msg})
+		return
+	}
+	if !handlers.IsValidEmail(req.Email) {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Format email tidak valid."})
 		return
 	}
 	if field, msg := validateAuthFieldLengths(req.Password, maxPasswordLength, "Password"); field != "" {
@@ -292,13 +296,18 @@ func Register(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"name": "Nama wajib diisi.", "email": "Email wajib diisi.", "password": "Password wajib diisi."})
 		return
 	}
-	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Name = strings.TrimSpace(req.Name)
+	req.Email = handlers.NormalizeEmail(req.Email)
 	if field, msg := validateAuthFieldLengths(req.Name, maxNameLength, "Nama"); field != "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"name": msg})
 		return
 	}
 	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": msg})
+		return
+	}
+	if !handlers.IsValidEmail(req.Email) {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Format email tidak valid."})
 		return
 	}
 	if field, msg := validateAuthFieldLengths(req.Password, maxPasswordLength, "Password"); field != "" {
@@ -367,9 +376,13 @@ func ForgotPassword(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email wajib diisi."})
 		return
 	}
-	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Email = handlers.NormalizeEmail(req.Email)
 	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": msg})
+		return
+	}
+	if !handlers.IsValidEmail(req.Email) {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Format email tidak valid."})
 		return
 	}
 
@@ -408,9 +421,13 @@ func ResetPassword(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email wajib diisi.", "token": "Token wajib diisi."})
 		return
 	}
-	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Email = handlers.NormalizeEmail(req.Email)
 	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": msg})
+		return
+	}
+	if !handlers.IsValidEmail(req.Email) {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Format email tidak valid."})
 		return
 	}
 	if field, msg := validateAuthFieldLengths(req.Token, maxTokenLength, "Token"); field != "" {
@@ -526,9 +543,13 @@ func VerificationNotification(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email wajib diisi."})
 		return
 	}
-	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Email = handlers.NormalizeEmail(req.Email)
 	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": msg})
+		return
+	}
+	if !handlers.IsValidEmail(req.Email) {
+		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Format email tidak valid."})
 		return
 	}
 

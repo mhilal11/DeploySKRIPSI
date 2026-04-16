@@ -37,6 +37,15 @@ type sqlStaffRepository struct {
 	db *sqlx.DB
 }
 
+var allowedComplaintCategories = []string{
+	"Lingkungan Kerja",
+	"Kompensasi & Benefit",
+	"Fasilitas",
+	"Relasi Kerja",
+	"Kebijakan Perusahaan",
+	"Lainnya",
+}
+
 func newStaffRepository(db *sqlx.DB) staffRepository {
 	return &sqlStaffRepository{db: db}
 }
@@ -330,7 +339,7 @@ func StaffComplaintsStore(c *gin.Context) {
 	category := strings.TrimSpace(c.PostForm("category"))
 	subject := strings.TrimSpace(c.PostForm("subject"))
 	description := strings.TrimSpace(c.PostForm("description"))
-	priority := strings.TrimSpace(c.PostForm("priority"))
+	priority := strings.ToLower(strings.TrimSpace(c.PostForm("priority")))
 	isAnonymous := c.PostForm("anonymous") == "true" || c.PostForm("anonymous") == "1"
 
 	if category == "" || subject == "" || description == "" {
@@ -342,6 +351,12 @@ func StaffComplaintsStore(c *gin.Context) {
 	handlers.ValidateFieldLength(validationErrors, "subject", "Subjek", subject, 160)
 	handlers.ValidateFieldLength(validationErrors, "description", "Deskripsi", description, 4000)
 	handlers.ValidateFieldLength(validationErrors, "priority", "Prioritas", priority, 24)
+	handlers.ValidateAllowedValue(validationErrors, "category", "Kategori", category, allowedComplaintCategories)
+	handlers.ValidateAllowedValue(validationErrors, "priority", "Prioritas", priority, []string{
+		models.ComplaintPriorityHigh,
+		models.ComplaintPriorityMedium,
+		models.ComplaintPriorityLow,
+	})
 	if len(validationErrors) > 0 {
 		handlers.ValidationErrors(c, validationErrors)
 		return
@@ -363,13 +378,15 @@ func StaffComplaintsStore(c *gin.Context) {
 	var attachmentSize *int64
 
 	if _, err := c.FormFile("attachment"); err == nil {
-		path, meta, err := handlers.SaveUploadedFile(c, "attachment", "complaints")
-		if err == nil {
-			attachmentPath = &path
-			attachmentName = &meta.OriginalName
-			attachmentMime = &meta.Mime
-			attachmentSize = &meta.Size
+		path, meta, err := handlers.SaveValidatedUploadedFile(c, "attachment", "complaints", handlers.ImageOrPDFUploadRules())
+		if err != nil {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"attachment": "Lampiran harus berupa PNG, JPG/JPEG, atau PDF dengan ukuran maksimal 5MB."})
+			return
 		}
+		attachmentPath = &path
+		attachmentName = &meta.OriginalName
+		attachmentMime = &meta.Mime
+		attachmentSize = &meta.Size
 	}
 
 	now := time.Now().UTC()
@@ -485,6 +502,18 @@ func StaffResignationStore(c *gin.Context) {
 	handlers.ValidateFieldLength(validationErrors, "effective_date", "Tanggal efektif", effectiveDate, 30)
 	handlers.ValidateFieldLength(validationErrors, "reason", "Alasan", reason, 3000)
 	handlers.ValidateFieldLength(validationErrors, "suggestion", "Saran", suggestion, 3000)
+	if effectiveDate != "" {
+		parsedDate, err := handlers.ParseDateStrict(effectiveDate, "2006-01-02")
+		if err != nil {
+			validationErrors["effective_date"] = "Format tanggal efektif tidak valid."
+		} else {
+			now := time.Now()
+			minEffectiveDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, 30)
+			if parsedDate.Before(minEffectiveDate) {
+				validationErrors["effective_date"] = "Tanggal efektif resign minimal 30 hari dari hari ini."
+			}
+		}
+	}
 	if len(validationErrors) > 0 {
 		handlers.ValidationErrors(c, validationErrors)
 		return

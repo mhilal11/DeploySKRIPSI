@@ -430,6 +430,19 @@ func validateAccountInput(
 	handlers.ValidateFieldLength(fieldErrors, "status", "Status", status, 24)
 	handlers.ValidateFieldLength(fieldErrors, "registered_at", "Tanggal registrasi", registeredAt, 30)
 	handlers.ValidateFieldLength(fieldErrors, "inactive_at", "Tanggal nonaktif", inactiveAt, 30)
+	handlers.ValidateEmail(fieldErrors, "email", email)
+	handlers.ValidateAllowedValue(fieldErrors, "role", "Role", role, models.UserRoles)
+	handlers.ValidateAllowedValue(fieldErrors, "status", "Status", status, models.UserStatuses)
+	if registeredAt != "" {
+		if _, err := handlers.ParseDateStrict(registeredAt, "2006-01-02"); err != nil {
+			fieldErrors["registered_at"] = "Format tanggal registrasi tidak valid."
+		}
+	}
+	if inactiveAt != "" {
+		if _, err := handlers.ParseDateStrict(inactiveAt, "2006-01-02"); err != nil {
+			fieldErrors["inactive_at"] = "Format tanggal nonaktif tidak valid."
+		}
+	}
 
 	checkPassword := password != "_skip_password_" || passwordConfirmation != "_skip_password_"
 	if checkPassword {
@@ -473,6 +486,9 @@ func validateAccountInput(
 		handlers.ValidateFieldLength(fieldErrors, "religion", "Agama", religion, 50)
 		handlers.ValidateFieldLength(fieldErrors, "gender", "Jenis kelamin", gender, 20)
 		handlers.ValidateFieldLength(fieldErrors, "education_level", "Tingkat pendidikan", educationLevel, 80)
+		handlers.ValidateAllowedValue(fieldErrors, "religion", "Agama", religion, models.StaffReligions)
+		handlers.ValidateAllowedValue(fieldErrors, "gender", "Jenis kelamin", gender, models.StaffGenders)
+		handlers.ValidateAllowedValue(fieldErrors, "education_level", "Tingkat pendidikan", educationLevel, models.StaffEducationLevels)
 	}
 
 	return fieldErrors, nil

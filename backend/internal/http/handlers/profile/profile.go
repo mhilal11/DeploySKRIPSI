@@ -130,7 +130,7 @@ func UpdateProfile(c *gin.Context) {
 		return
 	}
 	req.Name = strings.TrimSpace(req.Name)
-	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Email = handlers.NormalizeEmail(req.Email)
 	req.Phone = strings.TrimSpace(req.Phone)
 	req.DateOfBirth = strings.TrimSpace(req.DateOfBirth)
 	req.Gender = strings.TrimSpace(req.Gender)
@@ -177,12 +177,11 @@ func UpdateProfile(c *gin.Context) {
 		handlers.ValidateFieldLength(fieldErrors, "domicile_address", "Alamat domisili", req.DomicileAddress, 1000)
 		handlers.ValidateFieldLength(fieldErrors, "city", "Kota", req.City, 120)
 		handlers.ValidateFieldLength(fieldErrors, "province", "Provinsi", req.Province, 120)
-		if req.Email != "" && !isValidEmail(req.Email) {
-			fieldErrors["email"] = "Format email tidak valid."
-		}
+		handlers.ValidateEmail(fieldErrors, "email", req.Email)
 	}
 	if updateEducation {
 		handlers.ValidateFieldLength(fieldErrors, "education_level", "Tingkat pendidikan", req.EducationLevel, 80)
+		handlers.ValidateAllowedValue(fieldErrors, "education_level", "Tingkat pendidikan", req.EducationLevel, models.StaffEducationLevels)
 	}
 
 	var staffDateOfBirth *time.Time
@@ -215,6 +214,8 @@ func UpdateProfile(c *gin.Context) {
 			if req.Province == "" {
 				fieldErrors["province"] = "Provinsi wajib diisi."
 			}
+			handlers.ValidateAllowedValue(fieldErrors, "gender", "Jenis kelamin", req.Gender, models.StaffGenders)
+			handlers.ValidateAllowedValue(fieldErrors, "religion", "Agama", req.Religion, models.StaffReligions)
 
 			dateOfBirth, dateOfBirthErr := parseStaffDate(req.DateOfBirth)
 			if dateOfBirthErr != "" {
@@ -300,12 +301,12 @@ func UpdateProfile(c *gin.Context) {
 		}
 		if updatePhoto || updatePersonal {
 			if _, fileErr := c.FormFile("profile_photo"); fileErr == nil {
-				path, _, saveErr := handlers.SaveUploadedFile(c, "profile_photo", "staff-profiles")
+				path, _, saveErr := handlers.SaveValidatedUploadedFile(c, "profile_photo", "staff-profiles", handlers.ImageUploadRules())
 				if saveErr != nil {
-					handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyimpan foto profil")
-					return
+					fieldErrors["profile_photo"] = "Foto profil harus berupa PNG atau JPG/JPEG dengan ukuran maksimal 5MB."
+				} else {
+					profilePhotoPath = &path
 				}
-				profilePhotoPath = &path
 			}
 		}
 		if updatePhoto && removePhotoRequested {
@@ -456,7 +457,7 @@ func isValidGPA(value string) bool {
 }
 
 func isValidEmail(value string) bool {
-	return strings.Contains(value, "@")
+	return handlers.IsValidEmail(value)
 }
 
 func isValidStaffPhone(value string) bool {

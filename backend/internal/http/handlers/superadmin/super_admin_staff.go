@@ -33,6 +33,8 @@ type sqlStaffListRepository struct {
 	db *sqlx.DB
 }
 
+var allowedTerminationTypes = []string{"Resign", "PHK", "Pensiun"}
+
 func newStaffListRepository(db *sqlx.DB) staffListRepository {
 	return &sqlStaffListRepository{db: db}
 }
@@ -195,6 +197,19 @@ func SuperAdminStaffStore(c *gin.Context) {
 	handlers.ValidateFieldLength(validationErrors, "effective_date", "Tanggal efektif", effectiveDate, 30)
 	handlers.ValidateFieldLength(validationErrors, "reason", "Alasan", reason, 3000)
 	handlers.ValidateFieldLength(validationErrors, "suggestion", "Saran", suggestion, 3000)
+	handlers.ValidateAllowedValue(validationErrors, "type", "Tipe termination", terminationType, allowedTerminationTypes)
+	if effectiveDate != "" {
+		parsedDate, parseErr := handlers.ParseDateStrict(effectiveDate, "2006-01-02")
+		if parseErr != nil {
+			validationErrors["effective_date"] = "Format tanggal efektif tidak valid."
+		} else {
+			today := time.Now()
+			startOfToday := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
+			if parsedDate.Before(startOfToday) {
+				validationErrors["effective_date"] = "Tanggal efektif tidak boleh di masa lalu."
+			}
+		}
+	}
 	if len(validationErrors) > 0 {
 		handlers.ValidationErrors(c, validationErrors)
 		return

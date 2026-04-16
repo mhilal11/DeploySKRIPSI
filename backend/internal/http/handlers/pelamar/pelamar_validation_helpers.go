@@ -9,14 +9,16 @@ import (
 	"time"
 )
 
+var applicantEducationLevels = []string{"SD", "SMP", "SMA/SMK", "D3", "D4", "S1", "S2", "S3"}
+
 func validatePersonalRequired(profile *models.ApplicantProfile) handlers.FieldErrors {
 	errs := handlers.FieldErrors{}
 
 	fullName := strings.TrimSpace(handlers.FirstString(profile.FullName, ""))
-	email := strings.TrimSpace(handlers.FirstString(profile.Email, ""))
+	email := handlers.NormalizeEmail(handlers.FirstString(profile.Email, ""))
 	phone := normalizePhoneNumber(handlers.FirstString(profile.Phone, ""))
 	gender := strings.TrimSpace(handlers.FirstString(profile.Gender, ""))
-	religion := strings.TrimSpace(handlers.FirstString(profile.Religion, ""))
+	religion := normalizeApplicantReligion(handlers.FirstString(profile.Religion, ""))
 	address := strings.TrimSpace(handlers.FirstString(profile.Address, ""))
 	domicileAddress := strings.TrimSpace(handlers.FirstString(profile.DomicileAddress, ""))
 	city := strings.TrimSpace(handlers.FirstString(profile.City, ""))
@@ -27,8 +29,8 @@ func validatePersonalRequired(profile *models.ApplicantProfile) handlers.FieldEr
 	}
 	if email == "" {
 		errs["personal.email"] = "Email wajib diisi."
-	} else if !strings.Contains(email, "@") {
-		errs["personal.email"] = "Format email tidak valid."
+	} else {
+		handlers.ValidateEmail(errs, "personal.email", email)
 	}
 	if phone == "" {
 		errs["personal.phone"] = "Nomor telepon wajib diisi."
@@ -37,12 +39,21 @@ func validatePersonalRequired(profile *models.ApplicantProfile) handlers.FieldEr
 	}
 	if profile.DateOfBirth == nil {
 		errs["personal.date_of_birth"] = "Tanggal lahir wajib diisi."
+	} else {
+		today := time.Now().Truncate(24 * time.Hour)
+		if !profile.DateOfBirth.Before(today) {
+			errs["personal.date_of_birth"] = "Tanggal lahir tidak boleh hari ini atau di masa depan."
+		}
 	}
 	if gender == "" {
 		errs["personal.gender"] = "Jenis kelamin wajib diisi."
+	} else {
+		handlers.ValidateAllowedValue(errs, "personal.gender", "Jenis kelamin", gender, models.StaffGenders)
 	}
 	if religion == "" {
 		errs["personal.religion"] = "Agama wajib diisi."
+	} else {
+		handlers.ValidateAllowedValue(errs, "personal.religion", "Agama", religion, models.StaffReligions)
 	}
 	if address == "" {
 		errs["personal.address"] = "Alamat lengkap wajib diisi."
@@ -56,6 +67,13 @@ func validatePersonalRequired(profile *models.ApplicantProfile) handlers.FieldEr
 	if city == "" {
 		errs["personal.city"] = "Kota/Kabupaten wajib diisi."
 	}
+	handlers.ValidateFieldLength(errs, "personal.full_name", "Nama lengkap", fullName, 255)
+	handlers.ValidateFieldLength(errs, "personal.email", "Email", email, 254)
+	handlers.ValidateFieldLength(errs, "personal.phone", "Nomor telepon", phone, 20)
+	handlers.ValidateFieldLength(errs, "personal.address", "Alamat lengkap", address, 1000)
+	handlers.ValidateFieldLength(errs, "personal.domicile_address", "Alamat domisili", domicileAddress, 1000)
+	handlers.ValidateFieldLength(errs, "personal.city", "Kota/Kabupaten", city, 120)
+	handlers.ValidateFieldLength(errs, "personal.province", "Provinsi", province, 120)
 
 	return errs
 }
@@ -81,6 +99,8 @@ func validateEducationRequired(educations []map[string]any) handlers.FieldErrors
 		}
 		if degree == "" {
 			errs[prefix+"degree"] = "Jenjang wajib diisi."
+		} else {
+			handlers.ValidateAllowedValue(errs, prefix+"degree", "Jenjang pendidikan", degree, applicantEducationLevels)
 		}
 		if fieldOfStudy == "" {
 			errs[prefix+"field_of_study"] = "Program studi wajib diisi."
@@ -105,6 +125,14 @@ func validateEducationRequired(educations []map[string]any) handlers.FieldErrors
 				errs[prefix+"gpa"] = "IPK harus antara 0.00 sampai 4.00."
 			}
 		}
+		handlers.ValidateFieldLength(errs, prefix+"institution", "Nama institusi", institution, 255)
+		handlers.ValidateFieldLength(errs, prefix+"degree", "Jenjang pendidikan", degree, 120)
+		handlers.ValidateFieldLength(errs, prefix+"field_of_study", "Program studi", fieldOfStudy, 255)
+		handlers.ValidateFieldLength(errs, prefix+"gpa", "IPK", gpa, 16)
+	}
+
+	if len(educations) > 20 {
+		errs["educations"] = "Maksimal 20 riwayat pendidikan."
 	}
 
 	return errs
@@ -137,6 +165,13 @@ func validateExperienceRequired(experiences []map[string]any) handlers.FieldErro
 		if description == "" {
 			errs[prefix+"description"] = "Deskripsi tugas wajib diisi."
 		}
+		handlers.ValidateFieldLength(errs, prefix+"company", "Nama perusahaan", company, 255)
+		handlers.ValidateFieldLength(errs, prefix+"position", "Posisi", position, 255)
+		handlers.ValidateFieldLength(errs, prefix+"description", "Deskripsi tugas", description, 2000)
+	}
+
+	if len(experiences) > 20 {
+		errs["experiences"] = "Maksimal 20 pengalaman kerja."
 	}
 
 	return errs
@@ -150,6 +185,7 @@ func validateCertificationRequired(certs []map[string]any) handlers.FieldErrors 
 		organization := strings.TrimSpace(anyToTrimmedString(cert["issuing_organization"]))
 		issueDate := strings.TrimSpace(anyToTrimmedString(cert["issue_date"]))
 		expiryDate := strings.TrimSpace(anyToTrimmedString(cert["expiry_date"]))
+		credentialID := strings.TrimSpace(anyToTrimmedString(cert["credential_id"]))
 
 		prefix := "certifications." + strconv.Itoa(i) + "."
 		if name == "" {
@@ -170,6 +206,13 @@ func validateCertificationRequired(certs []map[string]any) handlers.FieldErrors 
 		if issueDate != "" && expiryDate != "" && isValidYearMonth(issueDate) && isValidYearMonth(expiryDate) && expiryDate < issueDate {
 			errs[prefix+"expiry_date"] = "Tanggal kadaluarsa tidak boleh sebelum tanggal terbit."
 		}
+		handlers.ValidateFieldLength(errs, prefix+"name", "Nama sertifikasi", name, 255)
+		handlers.ValidateFieldLength(errs, prefix+"issuing_organization", "Organisasi penerbit", organization, 255)
+		handlers.ValidateFieldLength(errs, prefix+"credential_id", "Credential ID", credentialID, 120)
+	}
+
+	if len(certs) > 20 {
+		errs["certifications"] = "Maksimal 20 sertifikasi."
 	}
 
 	return errs
@@ -381,4 +424,14 @@ func expectedAgeText(minAge, maxAge int) string {
 		return fmt.Sprintf("Maksimal %d tahun", maxAge)
 	}
 	return "Tidak ada batas usia"
+}
+
+func normalizeApplicantReligion(value string) string {
+	trimmed := strings.TrimSpace(value)
+	switch strings.ToLower(trimmed) {
+	case "konghucu":
+		return "Kong Hu Chu"
+	default:
+		return trimmed
+	}
 }

@@ -447,6 +447,14 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"meeting_link": "Link meeting wajib diisi untuk interview Online."})
 		return
 	}
+	if mode == "Online" {
+		validationErrors := handlers.FieldErrors{}
+		handlers.ValidateURL(validationErrors, "meeting_link", "Link meeting", meetingLink, true)
+		if len(validationErrors) > 0 {
+			handlers.ValidationErrors(c, validationErrors)
+			return
+		}
+	}
 
 	if conflictInterview(middleware.GetDB(c), toInt64(id), date, timeStart, timeEnd) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"time": "Slot waktu ini sudah digunakan untuk interview lain pada tanggal tersebut."})

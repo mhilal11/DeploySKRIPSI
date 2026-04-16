@@ -88,16 +88,33 @@ func PelamarApplicationsStore(c *gin.Context) {
 
 	divisionID := c.PostForm("division_id")
 	fullName := strings.TrimSpace(c.PostForm("full_name"))
-	email := strings.TrimSpace(c.PostForm("email"))
+	email := handlers.NormalizeEmail(c.PostForm("email"))
 	phone := normalizePhoneNumber(c.PostForm("phone"))
 	skills := strings.TrimSpace(c.PostForm("skills"))
 
-	if divisionID == "" || fullName == "" || email == "" {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"division_id": "Divisi wajib diisi.", "full_name": "Nama wajib diisi.", "email": "Email wajib diisi."})
-		return
+	validationErrors := handlers.FieldErrors{}
+	if divisionID == "" {
+		validationErrors["division_id"] = "Divisi wajib diisi."
 	}
-	if !isValidPhoneNumber(phone) {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"phone": "Nomor telepon harus 8-13 digit angka."})
+	if fullName == "" {
+		validationErrors["full_name"] = "Nama wajib diisi."
+	}
+	if email == "" {
+		validationErrors["email"] = "Email wajib diisi."
+	}
+	if skills == "" {
+		validationErrors["skills"] = "Keahlian wajib diisi."
+	}
+	handlers.ValidateFieldLength(validationErrors, "full_name", "Nama", fullName, 255)
+	handlers.ValidateFieldLength(validationErrors, "email", "Email", email, 254)
+	handlers.ValidateFieldLength(validationErrors, "phone", "Nomor telepon", phone, 20)
+	handlers.ValidateFieldLength(validationErrors, "skills", "Keahlian", skills, 2000)
+	handlers.ValidateEmail(validationErrors, "email", email)
+	if phone == "" || !isValidPhoneNumber(phone) {
+		validationErrors["phone"] = "Nomor telepon harus 8-13 digit angka."
+	}
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
 		return
 	}
 
@@ -123,9 +140,9 @@ func PelamarApplicationsStore(c *gin.Context) {
 		return
 	}
 
-	cvPath, _, err := handlers.SaveUploadedFile(c, "cv", "applications/cv")
+	cvPath, _, err := handlers.SaveValidatedUploadedFile(c, "cv", "applications/cv", handlers.PDFUploadRules())
 	if err != nil {
-		handlers.ValidationErrors(c, handlers.FieldErrors{"cv": "CV wajib diunggah."})
+		handlers.ValidationErrors(c, handlers.FieldErrors{"cv": "CV harus berupa PDF dengan ukuran maksimal 5MB."})
 		return
 	}
 

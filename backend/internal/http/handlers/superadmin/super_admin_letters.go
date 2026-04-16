@@ -25,6 +25,10 @@ import (
 	"github.com/jung-kurt/gofpdf"
 )
 
+var superAdminLetterTypes = []string{"Permohonan", "Undangan", "Laporan", "Pemberitahuan", "Surat Tugas", "Surat Cuti", "Surat Peringatan", "Surat Kerjasama"}
+var superAdminLetterCategories = []string{"Internal", "Eksternal", "Kepegawaian", "Keuangan", "Operasional"}
+var superAdminLetterPriorities = []string{"high", "medium", "low"}
+
 func SuperAdminLettersIndex(c *gin.Context) {
 	user := middleware.CurrentUser(c)
 	if user == nil || !(user.Role == models.RoleSuperAdmin || user.IsHumanCapitalAdmin()) {
@@ -154,6 +158,9 @@ func SuperAdminLettersStore(c *gin.Context) {
 	handlers.ValidateFieldLength(validationErrors, "prioritas", "Prioritas", prioritas, 24)
 	handlers.ValidateFieldLength(validationErrors, "penerima", "Penerima", penerima, 120)
 	handlers.ValidateFieldLength(validationErrors, "target_division", "Divisi tujuan", targetDivision, 120)
+	handlers.ValidateAllowedValue(validationErrors, "jenis_surat", "Jenis surat", jenis, superAdminLetterTypes)
+	handlers.ValidateAllowedValue(validationErrors, "kategori", "Kategori", kategori, superAdminLetterCategories)
+	handlers.ValidateAllowedValue(validationErrors, "prioritas", "Prioritas", prioritas, superAdminLetterPriorities)
 	if len(validationErrors) > 0 {
 		handlers.ValidationErrors(c, validationErrors)
 		return
@@ -166,13 +173,15 @@ func SuperAdminLettersStore(c *gin.Context) {
 	var attachmentMime *string
 	var attachmentSize *int64
 	if _, err := c.FormFile("lampiran"); err == nil {
-		path, meta, err := handlers.SaveUploadedFile(c, "lampiran", "letters")
-		if err == nil {
-			attachmentPath = &path
-			attachmentName = &meta.OriginalName
-			attachmentMime = &meta.Mime
-			attachmentSize = &meta.Size
+		path, meta, saveErr := handlers.SaveValidatedUploadedFile(c, "lampiran", "letters", handlers.DocumentUploadRules())
+		if saveErr != nil {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"lampiran": "Lampiran harus berupa PDF, DOC, atau DOCX dengan ukuran maksimal 5MB."})
+			return
 		}
+		attachmentPath = &path
+		attachmentName = &meta.OriginalName
+		attachmentMime = &meta.Mime
+		attachmentSize = &meta.Size
 	}
 
 	now := time.Now()

@@ -336,6 +336,12 @@ func SuperAdminComplaintsUpdate(c *gin.Context) {
 	resolution := strings.TrimSpace(payload.ResolutionNotes)
 	validationErrors := handlers.FieldErrors{}
 	handlers.ValidateFieldLength(validationErrors, "resolution_notes", "Catatan penyelesaian", resolution, 4000)
+	if strings.TrimSpace(payload.Status) != "" && status == "" {
+		validationErrors["status"] = "Status tidak valid."
+	}
+	if strings.TrimSpace(payload.Priority) != "" && priority == "" {
+		validationErrors["priority"] = "Prioritas tidak valid."
+	}
 	if len(validationErrors) > 0 {
 		handlers.ValidationErrors(c, validationErrors)
 		return

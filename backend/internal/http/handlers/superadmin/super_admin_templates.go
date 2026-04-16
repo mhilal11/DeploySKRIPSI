@@ -223,9 +223,9 @@ func SuperAdminTemplatesStore(c *gin.Context) {
 	templatePath := ""
 	templateFileName := ""
 	if _, err := c.FormFile("template_file"); err == nil {
-		path, meta, saveErr := handlers.SaveUploadedFile(c, "template_file", "letter-templates")
+		path, meta, saveErr := handlers.SaveValidatedUploadedFile(c, "template_file", "letter-templates", handlers.TemplateUploadRules())
 		if saveErr != nil {
-			handlers.ValidationErrors(c, handlers.FieldErrors{"template_file": "File template tidak dapat diproses."})
+			handlers.ValidationErrors(c, handlers.FieldErrors{"template_file": "File template harus berupa DOCX dengan ukuran maksimal 5MB."})
 			return
 		}
 		templatePath = path
@@ -252,10 +252,12 @@ func SuperAdminTemplatesStore(c *gin.Context) {
 
 	var logoPath *string
 	if _, err := c.FormFile("logo_file"); err == nil {
-		path, _, err := handlers.SaveUploadedFile(c, "logo_file", "letter-templates/logos")
-		if err == nil {
-			logoPath = &path
+		path, _, saveErr := handlers.SaveValidatedUploadedFile(c, "logo_file", "letter-templates/logos", handlers.ImageUploadRules())
+		if saveErr != nil {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"logo_file": "Logo harus berupa PNG atau JPG/JPEG dengan ukuran maksimal 5MB."})
+			return
 		}
+		logoPath = &path
 	}
 
 	db := middleware.GetDB(c)
@@ -480,13 +482,15 @@ func SuperAdminTemplatesUpdate(c *gin.Context) {
 		templateContent = existingTemplateContent
 	}
 	if _, err := c.FormFile("template_file"); err == nil {
-		path, meta, err := handlers.SaveUploadedFile(c, "template_file", "letter-templates")
-		if err == nil {
-			filePath = path
-			fileName = meta.OriginalName
-			if templateContent == "" {
-				templateContent = resolveTemplateEditorContentFromStorage(c, filePath)
-			}
+		path, meta, saveErr := handlers.SaveValidatedUploadedFile(c, "template_file", "letter-templates", handlers.TemplateUploadRules())
+		if saveErr != nil {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"template_file": "File template harus berupa DOCX dengan ukuran maksimal 5MB."})
+			return
+		}
+		filePath = path
+		fileName = meta.OriginalName
+		if templateContent == "" {
+			templateContent = resolveTemplateEditorContentFromStorage(c, filePath)
 		}
 	} else if templateContent != "" && (templateContent != existingTemplateContent || filePath == "") {
 		path, generatedFileName, genErr := generateTemplateFileFromContent(c, name, templateContent)
@@ -508,10 +512,12 @@ func SuperAdminTemplatesUpdate(c *gin.Context) {
 	if removeLogo {
 		logoPath = nil
 	} else if _, err := c.FormFile("logo_file"); err == nil {
-		path, _, err := handlers.SaveUploadedFile(c, "logo_file", "letter-templates/logos")
-		if err == nil {
-			logoPath = &path
+		path, _, saveErr := handlers.SaveValidatedUploadedFile(c, "logo_file", "letter-templates/logos", handlers.ImageUploadRules())
+		if saveErr != nil {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"logo_file": "Logo harus berupa PNG atau JPG/JPEG dengan ukuran maksimal 5MB."})
+			return
 		}
+		logoPath = &path
 	}
 
 	_ = repo.UpdateLetterTemplate(dbrepo.LetterTemplateUpdateInput{
@@ -775,6 +781,9 @@ func resolveTemplatePreviewLogo(c *gin.Context, template *models.LetterTemplate)
 func savePreviewUploadToTemp(c *gin.Context, field string) (string, func(), error) {
 	fileHeader, err := c.FormFile(field)
 	if err != nil {
+		return "", nil, err
+	}
+	if _, err := handlers.ValidateUploadedFileHeader(fileHeader, handlers.ImageUploadRules()); err != nil {
 		return "", nil, err
 	}
 
