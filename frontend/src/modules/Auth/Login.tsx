@@ -245,10 +245,14 @@ export default function Login({
         <>
             <Head title="Masuk" />
 
-            <div className="relative min-h-screen bg-gradient-to-br from-[#0a0f1f] via-[#0b152b] to-[#060910] px-4 py-10 text-white overflow-hidden">
-                <div className="pointer-events-none absolute top-16 right-12 w-72 h-72 rounded-full bg-cyan-500/15 blur-3xl" />
+            <div className="relative min-h-screen bg-black px-4 py-10 text-white overflow-hidden">
+                <div className="pointer-events-none absolute right-4 top-20 h-40 w-40 animate-pulse rounded-full bg-cyan-500/20 blur-3xl sm:right-10 sm:h-48 sm:w-48 md:h-72 md:w-72" />
                 <div
-                    className="pointer-events-none absolute bottom-10 left-10 h-96 w-96 rounded-full bg-purple-500/15 blur-3xl"
+                    className="pointer-events-none absolute bottom-16 left-0 h-52 w-52 animate-pulse rounded-full bg-purple-500/20 blur-3xl sm:left-10 sm:h-64 sm:w-64 md:h-96 md:w-96"
+                    style={{ animationDelay: '1s' }}
+                />
+                <div
+                    className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-blue-500/10 blur-3xl sm:h-80 sm:w-80 md:h-96 md:w-96"
                     style={{ animationDelay: '0.5s' }}
                 />
 
@@ -340,7 +344,7 @@ export default function Login({
                                             name="email"
                                             value={data.email}
                                             autoComplete="username"
-                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
+                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-[#2F6DB5]/60 focus-visible:ring-[#2F6DB5]/60 backdrop-blur-sm"
                                             onChange={(e) =>
                                                 setData('email', normalizeEmail(e.target.value))
                                             }
@@ -364,7 +368,7 @@ export default function Login({
                                         {canResetPassword && (
                                             <Link
                                                 href="/forgot-password"
-                                                className="text-sm text-cyan-400 hover:text-cyan-300"
+                                                className="text-sm text-[#7DB6F5] hover:text-[#A9D0FF]"
                                             >
                                                 Lupa kata sandi?
                                             </Link>
@@ -378,7 +382,7 @@ export default function Login({
                                             name="password"
                                             value={data.password}
                                             autoComplete="current-password"
-                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
+                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-[#2F6DB5]/60 focus-visible:ring-[#2F6DB5]/60 backdrop-blur-sm"
                                             onChange={(e) =>
                                                 setData('password', e.target.value)
                                             }
@@ -414,7 +418,7 @@ export default function Login({
                                             onChange={(e) =>
                                                 setData('remember', e.target.checked)
                                             }
-                                            className="h-4 w-4 rounded border-white/40 bg-white/10 text-cyan-400 focus:ring-cyan-400"
+                                            className="h-4 w-4 rounded border-white/40 bg-white/10 text-[#4A90D9] focus:ring-[#2F6DB5]"
                                         />
                                         Ingat saya
                                     </label>
@@ -423,7 +427,7 @@ export default function Login({
                                 <Button
                                     type="submit"
                                     disabled={processing}
-                                    className="h-12 w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-base font-semibold text-white shadow-[0_8px_32px_rgba(34,211,238,0.5)] border border-cyan-400/30 rounded-[20px]"
+                                    className="h-12 w-full bg-[#0F4C81] hover:bg-[#0C3E6B] text-base font-semibold text-white shadow-[0_8px_32px_rgba(47,109,181,0.32)] border border-[#2F6DB5]/30 rounded-[20px]"
                                 >
                                     {processing ? 'Memproses...' : 'Masuk'}
                                 </Button>
@@ -434,7 +438,7 @@ export default function Login({
                                 Belum punya akun?{' '}
                                 <Link
                                     href="/register"
-                                    className="font-semibold text-cyan-300 hover:text-cyan-200"
+                                    className="font-semibold text-[#7DB6F5] hover:text-[#A9D0FF]"
                                 >
                                     Daftar sekarang
                                 </Link>

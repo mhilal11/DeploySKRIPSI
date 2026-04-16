@@ -155,10 +155,14 @@ export default function Register({
         <>
             <Head title="Daftar" />
 
-            <div className="relative min-h-screen bg-gradient-to-br from-[#0a0f1f] via-[#0b152b] to-[#060910] px-4 py-10 text-white overflow-hidden">
-                <div className="pointer-events-none absolute top-16 right-12 w-72 h-72 rounded-full bg-cyan-500/15 blur-3xl" />
+            <div className="relative min-h-screen bg-black px-4 py-10 text-white overflow-hidden">
+                <div className="pointer-events-none absolute right-4 top-20 h-40 w-40 animate-pulse rounded-full bg-cyan-500/20 blur-3xl sm:right-10 sm:h-48 sm:w-48 md:h-72 md:w-72" />
                 <div
-                    className="pointer-events-none absolute bottom-10 left-10 h-96 w-96 rounded-full bg-purple-500/15 blur-3xl"
+                    className="pointer-events-none absolute bottom-16 left-0 h-52 w-52 animate-pulse rounded-full bg-purple-500/20 blur-3xl sm:left-10 sm:h-64 sm:w-64 md:h-96 md:w-96"
+                    style={{ animationDelay: "1s" }}
+                />
+                <div
+                    className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-blue-500/10 blur-3xl sm:h-80 sm:w-80 md:h-96 md:w-96"
                     style={{ animationDelay: "0.5s" }}
                 />
 
@@ -228,7 +232,7 @@ export default function Register({
                                             name="name"
                                             value={data.name}
                                             autoComplete="name"
-                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
+                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-[#2F6DB5]/60 focus-visible:ring-[#2F6DB5]/60 backdrop-blur-sm"
                                             onChange={(e) => {
                                                 const value = e.target.value;
 
@@ -265,7 +269,7 @@ export default function Register({
                                             name="email"
                                             value={data.email}
                                             autoComplete="username"
-                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
+                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-[#2F6DB5]/60 focus-visible:ring-[#2F6DB5]/60 backdrop-blur-sm"
                                             onChange={(e) =>
                                                 setData("email", normalizeEmail(e.target.value))
                                             }
@@ -297,7 +301,7 @@ export default function Register({
                                             name="password"
                                             value={data.password}
                                             autoComplete="new-password"
-                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
+                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-[#2F6DB5]/60 focus-visible:ring-[#2F6DB5]/60 backdrop-blur-sm"
                                             onChange={(e) => {
                                                 clearErrors("password");
                                                 setData("password", e.target.value);
@@ -347,7 +351,7 @@ export default function Register({
                                             name="password_confirmation"
                                             value={data.password_confirmation}
                                             autoComplete="new-password"
-                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
+                                            className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-[#2F6DB5]/60 focus-visible:ring-[#2F6DB5]/60 backdrop-blur-sm"
                                             onChange={(e) =>
                                                 setData(
                                                     "password_confirmation",
@@ -380,11 +384,11 @@ export default function Register({
 
                                 <div className="text-xs text-white/70">
                                     Dengan mendaftar, Anda menyetujui{" "}
-                                    <span className="font-medium text-cyan-300">
+                                    <span className="font-medium text-[#7DB6F5]">
                                         Syarat & Ketentuan
                                     </span>{" "}
                                     dan{" "}
-                                    <span className="font-medium text-cyan-300">
+                                    <span className="font-medium text-[#7DB6F5]">
                                         Kebijakan Privasi
                                     </span>{" "}
                                     Lintas Data Prima.
@@ -393,7 +397,7 @@ export default function Register({
                                 <Button
                                     type="submit"
                                     disabled={processing}
-                                    className="h-12 w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-base font-semibold text-white shadow-[0_8px_32px_rgba(34,211,238,0.5)] border border-cyan-400/30 rounded-[20px]"
+                                    className="h-12 w-full bg-[#0F4C81] hover:bg-[#0C3E6B] text-base font-semibold text-white shadow-[0_8px_32px_rgba(47,109,181,0.32)] border border-[#2F6DB5]/30 rounded-[20px]"
                                 >
                                     {processing
                                         ? "Memproses..."
@@ -424,7 +428,7 @@ export default function Register({
                                 Sudah punya akun?{" "}
                                 <Link
                                     href="/login"
-                                    className="font-semibold text-cyan-300 hover:text-cyan-200"
+                                    className="font-semibold text-[#7DB6F5] hover:text-[#A9D0FF]"
                                 >
                                     Masuk di sini
                                 </Link>
