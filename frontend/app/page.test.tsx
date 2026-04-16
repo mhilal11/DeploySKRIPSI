@@ -3,6 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import LandingSSRPage from './page';
 
+vi.mock('@/shared/components/SplashScreen', () => ({
+  default: () => null,
+}));
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -14,8 +18,10 @@ describe('LandingSSRPage', () => {
     const ui = await LandingSSRPage();
     render(ui);
 
-    expect(screen.getByText('Platform SDM Terintegrasi')).toBeInTheDocument();
-    expect(screen.getByText('Belum ada lowongan aktif.')).toBeInTheDocument();
+    expect(screen.getByText('Bergabung dengan')).toBeInTheDocument();
+    expect(
+      screen.getByText('Belum ada data lowongan ditampilkan saat ini.'),
+    ).toBeInTheDocument();
   });
 
   it('renders jobs from API response', async () => {
@@ -30,6 +36,7 @@ describe('LandingSSRPage', () => {
             title: 'Backend Engineer',
             division: 'Engineering',
             description: 'Go, SQL, and distributed systems',
+            isHiring: true,
           },
         ],
       }),
@@ -39,6 +46,6 @@ describe('LandingSSRPage', () => {
     render(ui);
 
     expect(screen.getByText('Backend Engineer')).toBeInTheDocument();
-    expect(screen.getByText('Engineering')).toBeInTheDocument();
+    expect(screen.getAllByText('Engineering').length).toBeGreaterThan(0);
   });
 });
