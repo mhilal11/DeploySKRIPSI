@@ -215,6 +215,12 @@ func StaffComplaintsIndex(c *gin.Context) {
 	pagination := handlers.ParsePagination(c, 20, 100)
 	complaints, _ := repo.ListComplaintsByUserIDPaged(user.ID, pagination.Limit, pagination.Offset)
 	totalComplaints, _ := repo.CountComplaintsByUserID(user.ID)
+	complaintIDs := make([]int64, 0, len(complaints))
+	for _, complaint := range complaints {
+		complaintIDs = append(complaintIDs, complaint.ID)
+	}
+	complaintAttachments, _ := dbrepo.ListComplaintAttachmentsByComplaintIDs(db, complaintIDs)
+	attachmentsByComplaintID := handlers.GroupComplaintAttachmentsByComplaintID(complaintAttachments)
 
 	stats := map[string]int{
 		"new":          0,
@@ -246,6 +252,16 @@ func StaffComplaintsIndex(c *gin.Context) {
 				handler = handlerName
 			}
 		}
+		attachmentsPayload := handlers.BuildComplaintAttachmentPayloads(
+			c,
+			attachmentsByComplaintID[complaint.ID],
+			complaint.AttachmentName,
+			complaint.AttachmentPath,
+		)
+		var primaryAttachment any
+		if len(attachmentsPayload) > 0 {
+			primaryAttachment = attachmentsPayload[0]
+		}
 		complaintPayload = append(complaintPayload, map[string]any{
 			"id":           complaint.ID,
 			"letterNumber": complaint.ComplaintCode,
@@ -263,10 +279,8 @@ func StaffComplaintsIndex(c *gin.Context) {
 			"description":     complaint.Description,
 			"handler":         handler,
 			"resolutionNotes": complaint.ResolutionNotes,
-			"attachment": map[string]any{
-				"name": complaint.AttachmentName,
-				"url":  attachmentURL(c, complaint.AttachmentPath),
-			},
+			"attachment":      primaryAttachment,
+			"attachments":     attachmentsPayload,
 		})
 	}
 
@@ -372,24 +386,34 @@ func StaffComplaintsStore(c *gin.Context) {
 		return
 	}
 
-	var attachmentPath *string
-	var attachmentName *string
-	var attachmentMime *string
-	var attachmentSize *int64
-
-	if _, err := c.FormFile("attachment"); err == nil {
-		path, meta, err := handlers.SaveValidatedUploadedFile(c, "attachment", "complaints", handlers.ImageOrPDFUploadRules())
-		if err != nil {
-			handlers.ValidationErrors(c, handlers.FieldErrors{"attachment": "Lampiran harus berupa PNG, JPG/JPEG, atau PDF dengan ukuran maksimal 5MB."})
-			return
-		}
-		attachmentPath = &path
-		attachmentName = &meta.OriginalName
-		attachmentMime = &meta.Mime
-		attachmentSize = &meta.Size
+	savedAttachments, err := handlers.SaveValidatedUploadedFiles(
+		c,
+		"attachments",
+		"complaints",
+		handlers.ImageUploadRules(),
+		3,
+		handlers.MaxCommonUploadSizeBytes,
+	)
+	if err != nil {
+		handlers.ValidationErrors(c, handlers.FieldErrors{
+			"attachments": "Lampiran maksimal 3 gambar PNG, JPG, atau JPEG dengan total ukuran maksimal 5MB.",
+		})
+		return
+	}
+	now := time.Now().UTC()
+	attachmentInputs := make([]dbrepo.ComplaintAttachmentCreateInput, 0, len(savedAttachments))
+	for index, attachment := range savedAttachments {
+		attachmentInputs = append(attachmentInputs, dbrepo.ComplaintAttachmentCreateInput{
+			FilePath:  attachment.Path,
+			FileName:  attachment.Meta.OriginalName,
+			FileMime:  attachment.Meta.Mime,
+			FileSize:  attachment.Meta.Size,
+			SortOrder: index + 1,
+			CreatedAt: now,
+			UpdatedAt: now,
+		})
 	}
 
-	now := time.Now().UTC()
 	if err := repo.InsertStaffComplaint(dbrepo.StaffComplaintCreateInput{
 		ComplaintCode:  code,
 		UserID:         user.ID,
@@ -399,10 +423,7 @@ func StaffComplaintsStore(c *gin.Context) {
 		Status:         models.ComplaintStatusNew,
 		Priority:       priority,
 		IsAnonymous:    isAnonymous,
-		AttachmentPath: attachmentPath,
-		AttachmentName: attachmentName,
-		AttachmentMime: attachmentMime,
-		AttachmentSize: attachmentSize,
+		Attachments:    attachmentInputs,
 		SubmittedAt:    now,
 		CreatedAt:      now,
 		UpdatedAt:      now,

@@ -49,6 +49,11 @@ type validatedUpload struct {
 	meta       *UploadMeta
 }
 
+type SavedUpload struct {
+	Path string
+	Meta *UploadMeta
+}
+
 func ImageUploadRules() UploadValidationOptions {
 	return imageUploadRules
 }
@@ -90,6 +95,30 @@ func SaveValidatedUploadedFile(c *gin.Context, field string, subdir string, opti
 	return saveUploadedFileHeader(c, validated.fileHeader, subdir, validated.meta)
 }
 
+func SaveValidatedUploadedFiles(c *gin.Context, field string, subdir string, options UploadValidationOptions, maxFiles int, maxTotalSize int64) ([]SavedUpload, error) {
+	validatedUploads, err := ValidateUploadedFormFiles(c, field, options, maxFiles, maxTotalSize)
+	if err != nil {
+		return nil, err
+	}
+	if len(validatedUploads) == 0 {
+		return nil, nil
+	}
+
+	savedUploads := make([]SavedUpload, 0, len(validatedUploads))
+	for _, validated := range validatedUploads {
+		path, meta, saveErr := saveUploadedFileHeader(c, validated.fileHeader, subdir, validated.meta)
+		if saveErr != nil {
+			return nil, saveErr
+		}
+		savedUploads = append(savedUploads, SavedUpload{
+			Path: path,
+			Meta: meta,
+		})
+	}
+
+	return savedUploads, nil
+}
+
 func ValidateUploadedFormFile(c *gin.Context, field string, options UploadValidationOptions) (*validatedUpload, error) {
 	fileHeader, err := c.FormFile(field)
 	if err != nil {
@@ -100,6 +129,50 @@ func ValidateUploadedFormFile(c *gin.Context, field string, options UploadValida
 		return nil, err
 	}
 	return &validatedUpload{fileHeader: fileHeader, meta: meta}, nil
+}
+
+func ValidateUploadedFormFiles(c *gin.Context, field string, options UploadValidationOptions, maxFiles int, maxTotalSize int64) ([]validatedUpload, error) {
+	form, err := c.MultipartForm()
+	if err != nil {
+		return nil, err
+	}
+
+	fileHeaders := make([]*multipart.FileHeader, 0)
+	if matches := form.File[field]; len(matches) > 0 {
+		fileHeaders = append(fileHeaders, matches...)
+	}
+	arrayField := field + "[]"
+	if arrayField != field {
+		if matches := form.File[arrayField]; len(matches) > 0 {
+			fileHeaders = append(fileHeaders, matches...)
+		}
+	}
+
+	if len(fileHeaders) == 0 {
+		return nil, nil
+	}
+	if maxFiles > 0 && len(fileHeaders) > maxFiles {
+		return nil, ErrUploadContent
+	}
+
+	totalSize := int64(0)
+	validatedUploads := make([]validatedUpload, 0, len(fileHeaders))
+	for _, fileHeader := range fileHeaders {
+		totalSize += fileHeader.Size
+		if maxTotalSize > 0 && totalSize > maxTotalSize {
+			return nil, ErrUploadTooLarge
+		}
+		meta, validateErr := ValidateUploadedFileHeader(fileHeader, options)
+		if validateErr != nil {
+			return nil, validateErr
+		}
+		validatedUploads = append(validatedUploads, validatedUpload{
+			fileHeader: fileHeader,
+			meta:       meta,
+		})
+	}
+
+	return validatedUploads, nil
 }
 
 func ValidateUploadedFileHeader(file *multipart.FileHeader, options UploadValidationOptions) (*UploadMeta, error) {

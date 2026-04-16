@@ -23,9 +23,20 @@ type StaffComplaintCreateInput struct {
 	AttachmentName *string
 	AttachmentMime *string
 	AttachmentSize *int64
+	Attachments    []ComplaintAttachmentCreateInput
 	SubmittedAt    time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+type ComplaintAttachmentCreateInput struct {
+	FilePath  string
+	FileName  string
+	FileMime  string
+	FileSize  int64
+	SortOrder int
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type StaffTerminationCreateInput struct {
@@ -151,6 +162,29 @@ func ListStaffTerminationsByUserIDPaged(db *sqlx.DB, userID int64, limit, offset
 	return rows, wrapRepoErr("list staff terminations by user id paged", err)
 }
 
+func ListComplaintAttachmentsByComplaintIDs(db *sqlx.DB, complaintIDs []int64) ([]models.ComplaintAttachment, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if len(complaintIDs) == 0 {
+		return []models.ComplaintAttachment{}, nil
+	}
+	query, args, err := sqlx.In(
+		"SELECT * FROM complaint_attachments WHERE complaint_id IN (?) ORDER BY complaint_id ASC, sort_order ASC, id ASC",
+		complaintIDs,
+	)
+	if err != nil {
+		return nil, wrapRepoErr("build complaint attachments query", err)
+	}
+	query = db.Rebind(query)
+
+	rows := []models.ComplaintAttachment{}
+	if err := db.Select(&rows, query, args...); err != nil {
+		return nil, wrapRepoErr("list complaint attachments by complaint ids", err)
+	}
+	return rows, nil
+}
+
 func ListDivisionIncomingRegulations(db *sqlx.DB, division string, limit int) ([]models.Surat, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
@@ -189,7 +223,28 @@ func InsertStaffComplaint(db *sqlx.DB, input StaffComplaintCreateInput) error {
 	if input.UpdatedAt.IsZero() {
 		input.UpdatedAt = input.SubmittedAt
 	}
-	_, err := db.Exec(`INSERT INTO complaints (complaint_code, user_id, category, subject, description, status, priority, is_anonymous, attachment_path, attachment_name, attachment_mime, attachment_size, submitted_at, created_at, updated_at)
+	if len(input.Attachments) > 0 {
+		firstAttachment := input.Attachments[0]
+		if input.AttachmentPath == nil && strings.TrimSpace(firstAttachment.FilePath) != "" {
+			input.AttachmentPath = &firstAttachment.FilePath
+		}
+		if input.AttachmentName == nil && strings.TrimSpace(firstAttachment.FileName) != "" {
+			input.AttachmentName = &firstAttachment.FileName
+		}
+		if input.AttachmentMime == nil && strings.TrimSpace(firstAttachment.FileMime) != "" {
+			input.AttachmentMime = &firstAttachment.FileMime
+		}
+		if input.AttachmentSize == nil && firstAttachment.FileSize > 0 {
+			input.AttachmentSize = &firstAttachment.FileSize
+		}
+	}
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return wrapRepoErr("begin insert staff complaint transaction", err)
+	}
+
+	result, err := tx.Exec(`INSERT INTO complaints (complaint_code, user_id, category, subject, description, status, priority, is_anonymous, attachment_path, attachment_name, attachment_mime, attachment_size, submitted_at, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		input.ComplaintCode,
 		input.UserID,
@@ -207,7 +262,56 @@ func InsertStaffComplaint(db *sqlx.DB, input StaffComplaintCreateInput) error {
 		input.CreatedAt,
 		input.UpdatedAt,
 	)
-	return wrapRepoErr("insert staff complaint", err)
+	if err != nil {
+		_ = tx.Rollback()
+		return wrapRepoErr("insert staff complaint", err)
+	}
+
+	complaintID, err := result.LastInsertId()
+	if err != nil {
+		_ = tx.Rollback()
+		return wrapRepoErr("resolve inserted complaint id", err)
+	}
+
+	for index, attachment := range input.Attachments {
+		if attachment.CreatedAt.IsZero() {
+			attachment.CreatedAt = input.CreatedAt
+		}
+		if attachment.UpdatedAt.IsZero() {
+			attachment.UpdatedAt = input.UpdatedAt
+		}
+		if attachment.SortOrder <= 0 {
+			attachment.SortOrder = index + 1
+		}
+		if err := insertComplaintAttachmentTx(tx, complaintID, attachment); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return wrapRepoErr("commit insert staff complaint", err)
+	}
+	return nil
+}
+
+func insertComplaintAttachmentTx(tx *sqlx.Tx, complaintID int64, input ComplaintAttachmentCreateInput) error {
+	if tx == nil {
+		return errors.New("transaction tidak tersedia")
+	}
+	_, err := tx.Exec(
+		`INSERT INTO complaint_attachments (complaint_id, file_path, file_name, file_mime, file_size, sort_order, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		complaintID,
+		input.FilePath,
+		input.FileName,
+		input.FileMime,
+		input.FileSize,
+		input.SortOrder,
+		input.CreatedAt,
+		input.UpdatedAt,
+	)
+	return wrapRepoErr("insert complaint attachment", err)
 }
 
 func InsertStaffTermination(db *sqlx.DB, input StaffTerminationCreateInput) error {

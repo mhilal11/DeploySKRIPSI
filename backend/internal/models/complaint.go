@@ -3,6 +3,7 @@ package models
 import complaintmodel "hris-backend/internal/models/complaint"
 
 type Complaint = complaintmodel.Complaint
+type ComplaintAttachment = complaintmodel.ComplaintAttachment
 
 const (
 	ComplaintStatusNew        = complaintmodel.ComplaintStatusNew

@@ -36,8 +36,10 @@ func TestInsertStaffComplaint_ErrorWrapped(t *testing.T) {
 
 	execErr := errors.New("insert fail")
 	now := time.Date(2026, 3, 11, 10, 0, 0, 0, time.UTC)
+	mock.ExpectBegin()
 	mock.ExpectExec("(?s)INSERT INTO complaints").
 		WillReturnError(execErr)
+	mock.ExpectRollback()
 
 	err := repository.InsertStaffComplaint(db, repository.StaffComplaintCreateInput{
 		ComplaintCode: "CMP-001",

@@ -216,30 +216,39 @@ export default function ComplaintDetailDialog({
                                             {complaint.description ?? '-'}
                                         </p>
                                     </div>
-                                    {complaint.attachment?.url && (
-                                        <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                                            <div className="min-w-0">
-                                                <p className="text-xs uppercase tracking-wide text-slate-500">
-                                                    Lampiran
-                                                </p>
-                                                <p className="mt-1 font-medium text-slate-900">
-                                                    {complaint.attachment.name ?? 'File lampiran'}
-                                                </p>
-                                            </div>
-                                            <Button
-                                                asChild
-                                                size="sm"
-                                                variant="outline"
-                                                className="w-full border-blue-200 text-blue-900 hover:bg-blue-50 sm:w-auto"
-                                            >
-                                                <a
-                                                    href={complaint.attachment.url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                >
-                                                    Lihat
-                                                </a>
-                                            </Button>
+                                    {complaint.attachments && complaint.attachments.length > 0 && (
+                                        <div className="space-y-3">
+                                            {complaint.attachments.map((attachment, index) =>
+                                                attachment.url ? (
+                                                    <div
+                                                        key={`${attachment.url}-${index}`}
+                                                        className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                                                    >
+                                                        <div className="min-w-0">
+                                                            <p className="text-xs uppercase tracking-wide text-slate-500">
+                                                                Lampiran {index + 1}
+                                                            </p>
+                                                            <p className="mt-1 font-medium text-slate-900">
+                                                                {attachment.name ?? `File lampiran ${index + 1}`}
+                                                            </p>
+                                                        </div>
+                                                        <Button
+                                                            asChild
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="w-full border-blue-200 text-blue-900 hover:bg-blue-50 sm:w-auto"
+                                                        >
+                                                            <a
+                                                                href={attachment.url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                            >
+                                                                Lihat
+                                                            </a>
+                                                        </Button>
+                                                    </div>
+                                                ) : null,
+                                            )}
                                         </div>
                                     )}
                                 </section>

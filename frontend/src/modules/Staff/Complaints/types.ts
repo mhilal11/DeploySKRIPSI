@@ -14,6 +14,12 @@
         name?: string | null;
         url?: string | null;
     };
+    attachments?: Array<{
+        name?: string | null;
+        url?: string | null;
+        mime?: string | null;
+        size?: number | null;
+    }>;
 }
 
 export interface RegulationRecord {

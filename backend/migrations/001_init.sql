@@ -58,8 +58,10 @@ CREATE TABLE IF NOT EXISTS applications (
   interview_at TIMESTAMP NULL,
   offering_at TIMESTAMP NULL,
   hired_at TIMESTAMP NULL,
+  staff_assignment_selected TINYINT(1) NOT NULL DEFAULT 0,
   rejected_at TIMESTAMP NULL,
   INDEX applications_user_id_idx (user_id),
+  INDEX applications_user_staff_assignment_idx (user_id, staff_assignment_selected),
   CONSTRAINT applications_user_id_foreign FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -73,6 +75,7 @@ CREATE TABLE IF NOT EXISTS applicant_profiles (
   gender VARCHAR(255) NULL,
   religion VARCHAR(255) NULL,
   address TEXT NULL,
+  domicile_address TEXT NULL,
   city VARCHAR(255) NULL,
   province VARCHAR(255) NULL,
   profile_photo_path VARCHAR(255) NULL,
@@ -89,9 +92,17 @@ CREATE TABLE IF NOT EXISTS applicant_profiles (
 CREATE TABLE IF NOT EXISTS staff_profiles (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,
+  phone VARCHAR(255) NULL,
+  date_of_birth DATE NULL,
   religion VARCHAR(255) NULL,
   gender VARCHAR(255) NULL,
+  address TEXT NULL,
+  domicile_address TEXT NULL,
+  city VARCHAR(255) NULL,
+  province VARCHAR(255) NULL,
   education_level VARCHAR(255) NULL,
+  educations JSON NULL,
+  profile_photo_path VARCHAR(255) NULL,
   created_at TIMESTAMP NULL,
   updated_at TIMESTAMP NULL,
   UNIQUE KEY staff_profiles_user_id_unique (user_id),
@@ -151,11 +162,27 @@ CREATE TABLE IF NOT EXISTS complaints (
   CONSTRAINT complaints_handled_by_id_foreign FOREIGN KEY (handled_by_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS complaint_attachments (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  complaint_id BIGINT UNSIGNED NOT NULL,
+  file_path VARCHAR(255) NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  file_mime VARCHAR(255) NOT NULL,
+  file_size BIGINT NOT NULL,
+  sort_order INT NOT NULL DEFAULT 1,
+  created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX complaint_attachments_complaint_id_idx (complaint_id),
+  CONSTRAINT complaint_attachments_complaint_id_foreign
+    FOREIGN KEY (complaint_id) REFERENCES complaints(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS letter_templates (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   file_path VARCHAR(255) NOT NULL,
   file_name VARCHAR(255) NOT NULL,
+  template_content LONGTEXT NULL,
   header_text TEXT NULL,
   footer_text TEXT NULL,
   logo_path VARCHAR(255) NULL,
@@ -255,6 +282,7 @@ CREATE TABLE IF NOT EXISTS onboarding_checklists (
   training_orientation TINYINT(1) NOT NULL DEFAULT 0,
   created_at TIMESTAMP NULL,
   updated_at TIMESTAMP NULL,
+  UNIQUE KEY onboarding_checklists_application_id_unique (application_id),
   INDEX onboarding_checklists_application_id_idx (application_id),
   CONSTRAINT onboarding_checklists_application_id_foreign FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -325,5 +353,148 @@ CREATE TABLE IF NOT EXISTS failed_jobs (
 CREATE TABLE IF NOT EXISTS migrations (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   migration VARCHAR(255) NOT NULL,
-  batch INT NOT NULL
+  batch INT NOT NULL,
+  UNIQUE KEY migrations_migration_unique (migration),
+  INDEX migrations_batch_idx (batch)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS recruitment_scoring_audits (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  actor_user_id INT UNSIGNED NULL,
+  action VARCHAR(64) NOT NULL,
+  division_name VARCHAR(120) NULL,
+  position_title VARCHAR(120) NULL,
+  details_json JSON NULL,
+  created_at DATETIME NOT NULL,
+  INDEX idx_recruitment_scoring_audits_created_at (created_at),
+  INDEX idx_recruitment_scoring_audits_action (action),
+  CONSTRAINT fk_recruitment_scoring_audits_actor
+    FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS education_reference_custom (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  institution VARCHAR(255) NULL,
+  program VARCHAR(255) NULL,
+  institution_normalized VARCHAR(255) NOT NULL DEFAULT '',
+  program_normalized VARCHAR(255) NOT NULL DEFAULT '',
+  source_user_id INT UNSIGNED NULL,
+  created_at TIMESTAMP NULL,
+  updated_at TIMESTAMP NULL,
+  UNIQUE KEY education_reference_custom_unique (institution_normalized, program_normalized),
+  INDEX education_reference_custom_institution_idx (institution_normalized),
+  INDEX education_reference_custom_program_idx (program_normalized),
+  INDEX education_reference_custom_source_user_idx (source_user_id),
+  CONSTRAINT education_reference_custom_source_user_foreign
+    FOREIGN KEY (source_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS recruitment_sla_settings (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  stage VARCHAR(50) NOT NULL,
+  target_days INT NOT NULL DEFAULT 2,
+  created_at TIMESTAMP NULL,
+  updated_at TIMESTAMP NULL,
+  UNIQUE KEY recruitment_sla_settings_stage_unique (stage)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NULL,
+  user_name VARCHAR(255) NULL,
+  user_email VARCHAR(255) NULL,
+  user_role VARCHAR(100) NULL,
+  module VARCHAR(100) NOT NULL,
+  action VARCHAR(100) NOT NULL,
+  entity_type VARCHAR(100) NULL,
+  entity_id VARCHAR(100) NULL,
+  description TEXT NULL,
+  old_values JSON NULL,
+  new_values JSON NULL,
+  ip_address VARCHAR(45) NULL,
+  user_agent TEXT NULL,
+  created_at TIMESTAMP NULL,
+  INDEX idx_audit_logs_created_at (created_at),
+  INDEX idx_audit_logs_module (module),
+  INDEX idx_audit_logs_action (action),
+  INDEX idx_audit_logs_user_id (user_id),
+  CONSTRAINT fk_audit_logs_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS audit_log_views (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  audit_log_id INT UNSIGNED NOT NULL,
+  user_id INT UNSIGNED NOT NULL,
+  viewed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_audit_log_views_audit_user (audit_log_id, user_id),
+  INDEX idx_audit_log_views_user_id (user_id),
+  INDEX idx_audit_log_views_audit_log_id (audit_log_id),
+  CONSTRAINT fk_audit_log_views_audit
+    FOREIGN KEY (audit_log_id) REFERENCES audit_logs(id) ON DELETE CASCADE,
+  CONSTRAINT fk_audit_log_views_user
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS recruitment_ai_screenings (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  application_id INT UNSIGNED NOT NULL,
+  actor_user_id INT UNSIGNED NULL,
+  provider VARCHAR(32) NOT NULL DEFAULT 'groq',
+  model_used VARCHAR(128) NULL,
+  model_chain JSON NULL,
+  prompt_version VARCHAR(64) NOT NULL DEFAULT 'cv-screening-v1',
+  cv_file_path VARCHAR(255) NULL,
+  cv_text_chars INT NOT NULL DEFAULT 0,
+  match_score DECIMAL(5,2) NULL,
+  recommendation VARCHAR(64) NULL,
+  summary TEXT NULL,
+  strengths_json JSON NULL,
+  gaps_json JSON NULL,
+  red_flags_json JSON NULL,
+  interview_questions_json JSON NULL,
+  token_prompt INT NOT NULL DEFAULT 0,
+  token_completion INT NOT NULL DEFAULT 0,
+  token_total INT NOT NULL DEFAULT 0,
+  attempts_json JSON NULL,
+  raw_response JSON NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'success',
+  error_message TEXT NULL,
+  created_at TIMESTAMP NULL,
+  updated_at TIMESTAMP NULL,
+  INDEX idx_recruitment_ai_screenings_application (application_id),
+  INDEX idx_recruitment_ai_screenings_created_at (created_at),
+  CONSTRAINT fk_recruitment_ai_screenings_application
+    FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE,
+  CONSTRAINT fk_recruitment_ai_screenings_actor
+    FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS division_jobs (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  division_profile_id INT UNSIGNED NOT NULL,
+  job_title VARCHAR(255) NOT NULL,
+  job_description TEXT NOT NULL,
+  job_requirements JSON NULL,
+  job_eligibility_criteria JSON NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  opened_at TIMESTAMP NULL,
+  closed_at TIMESTAMP NULL,
+  created_at TIMESTAMP NULL,
+  updated_at TIMESTAMP NULL,
+  INDEX division_jobs_division_profile_id_idx (division_profile_id),
+  INDEX division_jobs_is_active_idx (is_active),
+  CONSTRAINT division_jobs_division_profile_id_foreign
+    FOREIGN KEY (division_profile_id) REFERENCES division_profiles(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  user_id INT UNSIGNED NOT NULL PRIMARY KEY,
+  token_hash CHAR(64) NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NULL,
+  UNIQUE KEY email_verification_tokens_token_hash_unique (token_hash),
+  INDEX email_verification_tokens_expires_at_idx (expires_at),
+  CONSTRAINT email_verification_tokens_user_id_foreign
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

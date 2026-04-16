@@ -24,6 +24,18 @@ type Complaint struct {
 	UpdatedAt       *time.Time `db:"updated_at" json:"updated_at"`
 }
 
+type ComplaintAttachment struct {
+	ID          int64      `db:"id" json:"id"`
+	ComplaintID int64      `db:"complaint_id" json:"complaint_id"`
+	FilePath    string     `db:"file_path" json:"file_path"`
+	FileName    string     `db:"file_name" json:"file_name"`
+	FileMime    string     `db:"file_mime" json:"file_mime"`
+	FileSize    int64      `db:"file_size" json:"file_size"`
+	SortOrder   int        `db:"sort_order" json:"sort_order"`
+	CreatedAt   *time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt   *time.Time `db:"updated_at" json:"updated_at"`
+}
+
 const (
 	ComplaintStatusNew        = "new"
 	ComplaintStatusInProgress = "in_progress"

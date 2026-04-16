@@ -95,6 +95,17 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		return
 	}
 
+	complaintIDs := make([]int64, 0, len(complaints))
+	for _, complaint := range complaints {
+		complaintIDs = append(complaintIDs, complaint.ID)
+	}
+	complaintAttachments, err := dbrepo.ListComplaintAttachmentsByComplaintIDs(db, complaintIDs)
+	if err != nil {
+		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memuat lampiran pengaduan")
+		return
+	}
+	attachmentsByComplaintID := handlers.GroupComplaintAttachmentsByComplaintID(complaintAttachments)
+
 	data := make([]map[string]any, 0, len(complaints))
 	for _, complaint := range complaints {
 		status := normalizeComplaintStatus(complaint.Status)
@@ -122,6 +133,16 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 		if complaint.ResolvedAt != nil && !complaint.ResolvedAt.IsZero() {
 			resolvedAt = handlers.FormatDateTime(complaint.ResolvedAt)
 		}
+		attachmentsPayload := handlers.BuildComplaintAttachmentPayloads(
+			c,
+			attachmentsByComplaintID[complaint.ID],
+			complaint.AttachmentName,
+			complaint.AttachmentPath,
+		)
+		var primaryAttachment any
+		if len(attachmentsPayload) > 0 {
+			primaryAttachment = attachmentsPayload[0]
+		}
 		data = append(data, map[string]any{
 			"id":              complaint.ID,
 			"code":            complaint.ComplaintCode,
@@ -139,10 +160,8 @@ func SuperAdminComplaintsIndex(c *gin.Context) {
 			"handler":         handlerName,
 			"resolutionNotes": complaint.ResolutionNotes,
 			"resolvedAt":      resolvedAt,
-			"attachment": map[string]any{
-				"name": complaint.AttachmentName,
-				"url":  handlers.AttachmentURL(c, complaint.AttachmentPath),
-			},
+			"attachment":      primaryAttachment,
+			"attachments":     attachmentsPayload,
 		})
 	}
 

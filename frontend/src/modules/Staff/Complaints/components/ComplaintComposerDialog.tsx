@@ -1,5 +1,4 @@
 import { Upload } from 'lucide-react';
-import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -20,9 +19,12 @@ import {
 } from '@/shared/components/ui/dialog';
 import { Label } from '@/shared/components/ui/label';
 import { router, useForm } from '@/shared/lib/inertia';
-import { imageOrPdfUploadRule, validateFile } from '@/shared/lib/input-validation';
+import {
+    imageUploadRule,
+    MAX_COMMON_UPLOAD_SIZE_BYTES,
+    validateFile,
+} from '@/shared/lib/input-validation';
 import { route } from '@/shared/lib/route';
-
 
 import type { ComplaintFiltersOptions } from '../types';
 import type { ChangeEvent, FormEvent } from 'react';
@@ -39,7 +41,7 @@ type ComplaintFormData = {
     subject: string;
     description: string;
     anonymous: boolean;
-    attachment: File | null;
+    attachments: File[];
 };
 
 export default function ComplaintComposerDialog({
@@ -63,7 +65,7 @@ export default function ComplaintComposerDialog({
         subject: '',
         description: '',
         anonymous: false,
-        attachment: null,
+        attachments: [],
     });
 
     const hasErrors = Object.keys(form.errors).length > 0;
@@ -97,32 +99,47 @@ export default function ComplaintComposerDialog({
         setIsPlaying(false);
     };
 
-    const applyAttachment = (file: File | null) => {
-        if (!file) {
-            form.setData('attachment', null);
-            return true;
-        }
-
-        const validationMessage = validateFile(file, imageOrPdfUploadRule);
-        if (validationMessage) {
+    const applyAttachments = (files: File[]) => {
+        if (files.length > 3) {
             toast.error('Lampiran tidak valid', {
-                description: validationMessage,
+                description: 'Maksimal 3 gambar dapat diunggah dalam satu pengaduan.',
             });
-            form.setData('attachment', null);
             return false;
         }
 
-        form.setData('attachment', file);
-        form.clearErrors('attachment');
+        let totalSize = 0;
+        for (const file of files) {
+            const validationMessage = validateFile(file, imageUploadRule);
+            if (validationMessage) {
+                toast.error('Lampiran tidak valid', {
+                    description: validationMessage,
+                });
+                return false;
+            }
+            totalSize += file.size;
+        }
+
+        if (totalSize > MAX_COMMON_UPLOAD_SIZE_BYTES) {
+            toast.error('Lampiran tidak valid', {
+                description: 'Total ukuran seluruh gambar maksimal 5MB.',
+            });
+            return false;
+        }
+
+        form.setData('attachments', files);
+        form.clearErrors('attachments');
         return true;
     };
 
     const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0] ?? null;
-        const applied = applyAttachment(file);
-        if (!applied && fileInputRef.current) {
+        const files = Array.from(event.target.files ?? []);
+        if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
+        if (files.length === 0) {
+            return;
+        }
+        applyAttachments([...form.data.attachments, ...files]);
     };
 
     useEffect(() => {
@@ -150,7 +167,7 @@ export default function ComplaintComposerDialog({
             setMediaStream(stream);
             setShowCamera(true);
             setIsPlaying(false);
-        } catch (error) {
+        } catch {
             setCameraError('Tidak dapat membuka kamera. Periksa izin kamera atau gunakan unggah file.');
         }
     };
@@ -171,19 +188,17 @@ export default function ComplaintComposerDialog({
         canvas.toBlob((blob) => {
             if (!blob) return;
             const file = new File([blob], `photo-${Date.now()}.png`, { type: 'image/png' });
-            if (applyAttachment(file)) {
+            if (applyAttachments([...form.data.attachments, file])) {
                 toast.success('Foto berhasil ditangkap dan dilampirkan.');
                 stopCameraStream();
             }
         }, 'image/png');
     };
 
-    const removeAttachment = () => {
-        form.setData('attachment', null);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
-        form.clearErrors('attachment');
+    const removeAttachment = (indexToRemove: number) => {
+        const nextAttachments = form.data.attachments.filter((_, index) => index !== indexToRemove);
+        form.setData('attachments', nextAttachments);
+        form.clearErrors('attachments');
     };
 
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -218,7 +233,6 @@ export default function ComplaintComposerDialog({
         };
     }, [stopCameraStream]);
 
-    // Bind stream to video and play when ready
     useEffect(() => {
         const video = videoRef.current;
         if (!video || !mediaStream || !showCamera) return;
@@ -228,7 +242,7 @@ export default function ComplaintComposerDialog({
             try {
                 await video.play();
                 setIsPlaying(true);
-            } catch (err) {
+            } catch {
                 setCameraError('Gagal memutar kamera. Coba izinkan kamera atau gunakan unggah file.');
                 setIsPlaying(false);
             }
@@ -257,7 +271,7 @@ export default function ComplaintComposerDialog({
                         <div className="flex items-start gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
                             <Checkbox
                                 id="anonymous"
-                                className="border-blue-400 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                className="border-blue-400 data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600"
                                 checked={form.data.anonymous}
                                 onCheckedChange={(checked) => form.setData('anonymous', Boolean(checked))}
                             />
@@ -331,13 +345,14 @@ export default function ComplaintComposerDialog({
                         />
 
                         <div>
-                            <Label>Lampiran (Opsional - PDF atau JPG, JPEG, PNG Max 5MB)</Label>
+                            <Label>Lampiran Gambar (Opsional - Maksimal 3 gambar, total 5MB)</Label>
                             <div className="space-y-2">
                                 <input
                                     ref={fileInputRef}
                                     type="file"
                                     className="hidden"
-                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    multiple
+                                    accept=".jpg,.jpeg,.png"
                                     onChange={handleFileChange}
                                 />
                                 <button
@@ -346,9 +361,9 @@ export default function ComplaintComposerDialog({
                                     className="flex w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 p-4 text-center text-sm text-slate-600 transition hover:border-blue-500 hover:text-blue-700"
                                 >
                                     <Upload className="mb-2 h-6 w-6" />
-                                    {form.data.attachment
-                                        ? 'Ganti lampiran'
-                                        : 'Upload bukti pendukung (foto, dokumen, dll)'}
+                                    {form.data.attachments.length > 0
+                                        ? 'Tambah atau ganti gambar pendukung'
+                                        : 'Upload bukti pendukung (JPG, JPEG, PNG)'}
                                 </button>
                                 <Button
                                     type="button"
@@ -358,14 +373,10 @@ export default function ComplaintComposerDialog({
                                 >
                                     Buka Kamera & Ambil Foto
                                 </Button>
-                                {cameraError && (
-                                    <p className="text-xs text-red-500">{cameraError}</p>
-                                )}
+                                {cameraError && <p className="text-xs text-red-500">{cameraError}</p>}
                                 {showCamera && (
-                                    <div className="space-y-2 rounded-lg border border-slate-200 p-3 bg-slate-50">
-                                        <p className="text-xs font-semibold text-slate-700">
-                                            Mode Kamera
-                                        </p>
+                                    <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                        <p className="text-xs font-semibold text-slate-700">Mode Kamera</p>
                                         <video
                                             ref={videoRef}
                                             className="w-full rounded-md bg-black"
@@ -396,61 +407,66 @@ export default function ComplaintComposerDialog({
                                         <canvas ref={canvasRef} className="hidden" />
                                     </div>
                                 )}
-                        {form.data.attachment && (
-                                    <div className="flex flex-col gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="max-w-[220px] truncate">
-                                                {form.data.attachment.name}
-                                            </span>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    type="button"
-                                                    className="font-semibold text-blue-900 hover:underline"
-                                                    onClick={() => {
-                                                        // Preview inline if image
-                                                        if (form.data.attachment?.type.startsWith('image/')) {
-                                                            const url = URL.createObjectURL(form.data.attachment);
-                                                            const preview = window.open(url, '_blank');
-                                                            if (preview) {
-                                                                preview.onload = () => URL.revokeObjectURL(url);
-                                                            }
-                                                        } else {
-                                                            toast.info('Pratinjau hanya tersedia untuk gambar.');
-                                                        }
-                                                    }}
-                                                >
-                                                    Lihat
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    className="font-semibold text-red-600 hover:underline"
-                                                    onClick={removeAttachment}
-                                                >
-                                                    Hapus
-                                                </button>
-                                            </div>
+                                {form.data.attachments.length > 0 && (
+                                    <div className="space-y-2 rounded-md border border-slate-200 bg-white px-3 py-3 text-xs text-slate-600">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="font-medium text-slate-900">
+                                                {form.data.attachments.length} gambar dipilih
+                                            </p>
+                                            <p>
+                                                {formatFileSize(
+                                                    form.data.attachments.reduce((total, file) => total + file.size, 0),
+                                                )}{' '}
+                                                / 5MB
+                                            </p>
                                         </div>
-                                        {form.data.attachment.type.startsWith('image/') && (
-                                            <div className="overflow-hidden rounded-lg border border-slate-100">
-                                                <Image
-                                                    src={URL.createObjectURL(form.data.attachment)}
-                                                    alt="Preview lampiran"
-                                                    width={512}
-                                                    height={192}
-                                                    unoptimized
-                                                    className="max-h-48 w-full object-cover"
-                                                    onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
-                                                />
-                                            </div>
-                                        )}
+                                        <div className="space-y-2">
+                                            {form.data.attachments.map((attachment, index) => (
+                                                <div
+                                                    key={`${attachment.name}-${attachment.size}-${index}`}
+                                                    className="flex items-center justify-between gap-3 rounded-md border border-slate-100 px-3 py-2"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <p className="truncate font-medium text-slate-900">
+                                                            {attachment.name}
+                                                        </p>
+                                                        <p className="text-[11px] text-slate-500">
+                                                            {formatFileSize(attachment.size)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            type="button"
+                                                            className="font-semibold text-blue-900 hover:underline"
+                                                            onClick={() => {
+                                                                const url = URL.createObjectURL(attachment);
+                                                                const preview = window.open(url, '_blank');
+                                                                if (preview) {
+                                                                    preview.onload = () => URL.revokeObjectURL(url);
+                                                                }
+                                                            }}
+                                                        >
+                                                            Lihat
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="font-semibold text-red-600 hover:underline"
+                                                            onClick={() => removeAttachment(index)}
+                                                        >
+                                                            Hapus
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                                 <p className="text-xs text-slate-500">
-                                    Format yang diterima: PDF, JPG, JPEG, PNG dengan ukuran maksimal 5 MB.
+                                    Format yang diterima: JPG, JPEG, PNG. Maksimal 3 gambar dengan total ukuran 5MB.
                                 </p>
                             </div>
-                            {form.errors.attachment && (
-                                <p className="mt-1 text-xs text-red-500">{form.errors.attachment}</p>
+                            {form.errors.attachments && (
+                                <p className="mt-1 text-xs text-red-500">{form.errors.attachments}</p>
                             )}
                         </div>
 
@@ -466,7 +482,7 @@ export default function ComplaintComposerDialog({
                             </Button>
                             <Button
                                 type="submit"
-                                className="w-full bg-blue-900 hover:bg-blue-800 text-white sm:w-auto"
+                                className="w-full bg-blue-900 text-white hover:bg-blue-800 sm:w-auto"
                                 disabled={form.processing}
                             >
                                 {form.processing ? 'Mengirim...' : 'Kirim Pengaduan/Saran'}
@@ -479,6 +495,6 @@ export default function ComplaintComposerDialog({
     );
 }
 
-
-
-
+function formatFileSize(size: number) {
+    return `${(size / 1024 / 1024).toFixed(2)} MB`;
+}

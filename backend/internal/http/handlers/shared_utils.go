@@ -40,6 +40,45 @@ func FirstString(ptr *string, fallback string) string {
 	return *ptr
 }
 
+func BuildComplaintAttachmentPayloads(c *gin.Context, attachments []models.ComplaintAttachment, legacyName, legacyPath *string) []map[string]any {
+	payloads := make([]map[string]any, 0, len(attachments))
+	for _, attachment := range attachments {
+		path := attachment.FilePath
+		url := AttachmentURL(c, &path)
+		if url == nil {
+			continue
+		}
+		payloads = append(payloads, map[string]any{
+			"name": attachment.FileName,
+			"url":  *url,
+			"mime": attachment.FileMime,
+			"size": attachment.FileSize,
+		})
+	}
+	if len(payloads) > 0 {
+		return payloads
+	}
+
+	legacyURL := AttachmentURL(c, legacyPath)
+	if legacyURL == nil {
+		return []map[string]any{}
+	}
+	return []map[string]any{
+		{
+			"name": FirstString(legacyName, "Lampiran"),
+			"url":  *legacyURL,
+		},
+	}
+}
+
+func GroupComplaintAttachmentsByComplaintID(rows []models.ComplaintAttachment) map[int64][]models.ComplaintAttachment {
+	grouped := make(map[int64][]models.ComplaintAttachment, len(rows))
+	for _, row := range rows {
+		grouped[row.ComplaintID] = append(grouped[row.ComplaintID], row)
+	}
+	return grouped
+}
+
 func LookupUserName(db *sqlx.DB, userID int64) string {
 	name, _ := dbrepo.GetUserNameByID(db, userID)
 	if name == "" {

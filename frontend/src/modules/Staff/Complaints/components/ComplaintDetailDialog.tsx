@@ -100,30 +100,39 @@ export default function ComplaintDetailDialog({
                                 </div>
                             </section>
 
-                            {complaint.attachment?.url && (
+                            {complaint.attachments && complaint.attachments.length > 0 && (
                                 <section className="space-y-3">
                                     <h4 className="text-sm font-semibold text-slate-900">
                                         Lampiran
                                     </h4>
-                                    <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-paperclip"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-slate-900 text-sm">
-                                                    {complaint.attachment.name ?? 'Berkas lampiran'}
-                                                </p>
-                                                <p className="text-xs text-slate-500">
-                                                    Klik tombol untuk melihat dokumen.
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <Button asChild size="sm" variant="outline">
-                                            <a href={complaint.attachment.url} target="_blank" rel="noreferrer">
-                                                Lihat
-                                            </a>
-                                        </Button>
+                                    <div className="space-y-2">
+                                        {complaint.attachments.map((attachment, index) =>
+                                            attachment.url ? (
+                                                <div
+                                                    key={`${attachment.url}-${index}`}
+                                                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-paperclip"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-slate-900 text-sm">
+                                                                {attachment.name ?? `Lampiran ${index + 1}`}
+                                                            </p>
+                                                            <p className="text-xs text-slate-500">
+                                                                Klik tombol untuk melihat gambar.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <Button asChild size="sm" variant="outline">
+                                                        <a href={attachment.url} target="_blank" rel="noreferrer">
+                                                            Lihat
+                                                        </a>
+                                                    </Button>
+                                                </div>
+                                            ) : null,
+                                        )}
                                     </div>
                                 </section>
                             )}
