@@ -20,6 +20,7 @@ import {
 } from '@/shared/components/ui/dialog';
 import { Label } from '@/shared/components/ui/label';
 import { router, useForm } from '@/shared/lib/inertia';
+import { imageOrPdfUploadRule, validateFile } from '@/shared/lib/input-validation';
 import { route } from '@/shared/lib/route';
 
 
@@ -96,11 +97,31 @@ export default function ComplaintComposerDialog({
         setIsPlaying(false);
     };
 
+    const applyAttachment = (file: File | null) => {
+        if (!file) {
+            form.setData('attachment', null);
+            return true;
+        }
+
+        const validationMessage = validateFile(file, imageOrPdfUploadRule);
+        if (validationMessage) {
+            toast.error('Lampiran tidak valid', {
+                description: validationMessage,
+            });
+            form.setData('attachment', null);
+            return false;
+        }
+
+        form.setData('attachment', file);
+        form.clearErrors('attachment');
+        return true;
+    };
+
     const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0] ?? null;
-        form.setData('attachment', file);
-        if (file) {
-            form.clearErrors('attachment');
+        const applied = applyAttachment(file);
+        if (!applied && fileInputRef.current) {
+            fileInputRef.current.value = '';
         }
     };
 
@@ -150,10 +171,10 @@ export default function ComplaintComposerDialog({
         canvas.toBlob((blob) => {
             if (!blob) return;
             const file = new File([blob], `photo-${Date.now()}.png`, { type: 'image/png' });
-            form.setData('attachment', file);
-            form.clearErrors('attachment');
-            toast.success('Foto berhasil ditangkap dan dilampirkan.');
-            stopCameraStream();
+            if (applyAttachment(file)) {
+                toast.success('Foto berhasil ditangkap dan dilampirkan.');
+                stopCameraStream();
+            }
         }, 'image/png');
     };
 

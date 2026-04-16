@@ -4,6 +4,7 @@
     Upload,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { TemplateEditorCard } from '@/modules/SuperAdmin/KelolaSurat/components/template-dialog/TemplateEditorCard';
 import { TemplateListSection } from '@/modules/SuperAdmin/KelolaSurat/components/template-dialog/TemplateListSection';
@@ -36,10 +37,20 @@ import {
 } from '@/shared/components/ui/dialog';
 import { apiUrl } from '@/shared/lib/api';
 import { router, useForm } from '@/shared/lib/inertia';
+import { imageUploadRule, validateFile } from '@/shared/lib/input-validation';
 
 type ConfirmTemplateAction =
     | { type: 'deactivate'; template: Template }
     | { type: 'delete'; template: Template };
+
+const docxTemplateRule = {
+    allowedMimeTypes: [
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ],
+    allowedExtensions: ['docx'],
+    maxSizeBytes: 5 * 1024 * 1024,
+    label: 'Template DOCX',
+};
 
 export default function TemplateDialog({ open, onOpenChange }: TemplateDialogProps) {
     const [templates, setTemplates] = useState<Template[]>([]);
@@ -68,6 +79,26 @@ export default function TemplateDialog({ open, onOpenChange }: TemplateDialogPro
 
     const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0] || null;
+        form.clearErrors('logo_file');
+
+        if (!file) {
+            form.setData('logo_file', null);
+            setLogoPreview(null);
+            return;
+        }
+
+        const validationMessage = validateFile(file, imageUploadRule);
+        if (validationMessage) {
+            form.setData('logo_file', null);
+            form.setError('logo_file', validationMessage);
+            setLogoPreview(null);
+            if (logoInputRef.current) {
+                logoInputRef.current.value = '';
+            }
+            toast.error(validationMessage);
+            return;
+        }
+
         form.setData('logo_file', file);
 
         if (file) {
@@ -79,6 +110,27 @@ export default function TemplateDialog({ open, onOpenChange }: TemplateDialogPro
         } else {
             setLogoPreview(null);
         }
+    };
+
+    const handleTemplateFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] || null;
+        form.clearErrors('template_file');
+
+        if (!file) {
+            form.setData('template_file', null);
+            return;
+        }
+
+        const validationMessage = validateFile(file, docxTemplateRule);
+        if (validationMessage) {
+            form.setData('template_file', null);
+            form.setError('template_file', validationMessage);
+            event.target.value = '';
+            toast.error(validationMessage);
+            return;
+        }
+
+        form.setData('template_file', file);
     };
 
     const fetchTemplates = async () => {
@@ -240,9 +292,7 @@ export default function TemplateDialog({ open, onOpenChange }: TemplateDialogPro
                                     onSubmit={editingTemplate ? handleUpdate : handleUpload}
                                     onCancel={handleCancelUpload}
                                     onNameChange={(value) => form.setData('name', value)}
-                                    onTemplateFileChange={(event) =>
-                                        form.setData('template_file', event.target.files?.[0] || null)
-                                    }
+                                    onTemplateFileChange={handleTemplateFileChange}
                                     onLogoChange={handleLogoChange}
                                     onHeaderChange={(value) => form.setData('header_text', value)}
                                     onFooterChange={(value) => form.setData('footer_text', value)}

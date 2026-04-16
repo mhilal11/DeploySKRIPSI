@@ -7,6 +7,7 @@ import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
+import { pdfUploadRule, validateFile } from '@/shared/lib/input-validation';
 
 
 export interface ApplicationFormData {
@@ -38,8 +39,6 @@ interface ApplicationFormProps {
     ) => void;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
-
-const MAX_CV_SIZE_BYTES = 5 * 1024 * 1024;
 
 export default function ApplicationForm({
     selectedDivision,
@@ -78,24 +77,12 @@ export default function ApplicationForm({
             return;
         }
 
-        const isPdf =
-            file.type === 'application/pdf' ||
-            file.name.toLowerCase().endsWith('.pdf');
-
-        if (!isPdf) {
+        const validationMessage = validateFile(file, pdfUploadRule);
+        if (validationMessage) {
             resetInput?.();
             setData('cv', null);
             toast.error('File tidak didukung', {
-                description: 'Silakan unggah CV dalam format PDF.',
-            });
-            return;
-        }
-
-        if (file.size > MAX_CV_SIZE_BYTES) {
-            resetInput?.();
-            setData('cv', null);
-            toast.error('Ukuran file terlalu besar', {
-                description: 'Ukuran maksimal CV adalah 5MB.',
+                description: validationMessage,
             });
             return;
         }

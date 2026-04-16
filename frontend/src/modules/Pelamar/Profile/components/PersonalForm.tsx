@@ -18,6 +18,7 @@ import {
     getCitiesByProvince,
     getCityDisplayName
 } from '@/shared/data/indonesian-locations';
+import { isValidEmail, normalizeEmail } from '@/shared/lib/input-validation';
 
 import { ApplicantProfileForm } from '../profileTypes';
 
@@ -50,7 +51,7 @@ export default function PersonalForm({
 
     // Validation: Must contain @
     const handleEmailChange = (value: string) => {
-        onChange('email', value);
+        onChange('email', normalizeEmail(value));
     };
 
     // Validation: Only numbers, 8-13 characters
@@ -122,8 +123,13 @@ export default function PersonalForm({
                         disabled={disabled}
                     />
                     <p className="mt-1 text-xs text-slate-500">
-                        Harus mengandung simbol @
+                        Gunakan format email yang valid
                     </p>
+                    {data.email && !isValidEmail(data.email) && (
+                        <p className="mt-1 text-sm text-amber-600">
+                            Format email belum valid
+                        </p>
+                    )}
                     {errors['personal.email'] && (
                         <p className="mt-1 text-sm text-red-500">
                             {errors['personal.email']}
@@ -203,7 +209,7 @@ export default function PersonalForm({
                             <SelectValue placeholder="Pilih agama" />
                         </SelectTrigger>
                         <SelectContent>
-                            {['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'].map(
+                            {['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Kong Hu Chu', 'Lainnya'].map(
                                 (religion) => (
                                     <SelectItem key={religion} value={religion}>
                                         {religion}

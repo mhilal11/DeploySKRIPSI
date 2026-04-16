@@ -2,6 +2,7 @@
 import { toast } from 'sonner';
 
 import { router, useForm } from '@/shared/lib/inertia';
+import { imageUploadRule, validateFile } from '@/shared/lib/input-validation';
 
 import {
     ApplicantProfilePayload,
@@ -168,6 +169,14 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
     const handlePhotoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) {
+            return;
+        }
+        const validationMessage = validateFile(file, imageUploadRule);
+        if (validationMessage) {
+            toast.error('Foto profil tidak valid', {
+                description: validationMessage,
+            });
+            event.target.value = '';
             return;
         }
 

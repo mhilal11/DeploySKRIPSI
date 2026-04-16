@@ -7,6 +7,7 @@ import InputError from '@/shared/components/InputError';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Head, useForm } from '@/shared/lib/inertia';
+import { normalizeEmail } from '@/shared/lib/input-validation';
 
 const logo = '/img/LogoLDP.png';
 
@@ -121,7 +122,8 @@ export default function ForgotPassword({ status }: { status?: string }) {
                                             value={data.email}
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
                                             autoFocus
-                                            onChange={(e) => setData('email', e.target.value)}
+                                            onChange={(e) => setData('email', normalizeEmail(e.target.value))}
+                                            required
                                         />
                                     </div>
                                     <InputError message={errors.email} className="text-sm text-red-300" />

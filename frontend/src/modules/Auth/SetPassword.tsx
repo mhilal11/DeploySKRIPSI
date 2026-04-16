@@ -7,6 +7,7 @@ import PasswordRequirementChecklist from '@/shared/components/PasswordRequiremen
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Head, useForm } from '@/shared/lib/inertia';
+import { normalizeEmail } from '@/shared/lib/input-validation';
 import {
     PASSWORD_POLICY_ERROR_MESSAGE,
     passwordViolatesPolicy,
@@ -20,7 +21,7 @@ function resolveEmailFromURL(): string {
     }
     const params = new URLSearchParams(window.location.search);
     const raw = params.get('email') ?? '';
-    return raw.trim().toLowerCase();
+    return normalizeEmail(raw);
 }
 
 export default function SetPassword({
@@ -177,6 +178,7 @@ export default function SetPassword({
                                                 clearErrors('password');
                                                 setData('password', e.target.value);
                                             }}
+                                            required
                                         />
                                         <button
                                             type="button"
@@ -214,6 +216,7 @@ export default function SetPassword({
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
                                             autoComplete="new-password"
                                             onChange={(e) => setData('password_confirmation', e.target.value)}
+                                            required
                                         />
                                         <button
                                             type="button"

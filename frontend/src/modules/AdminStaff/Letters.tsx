@@ -20,6 +20,7 @@ import {
 } from '@/shared/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Head, router, useForm, usePage } from '@/shared/lib/inertia';
+import { documentUploadRule, validateFile } from '@/shared/lib/input-validation';
 import type { PageProps } from '@/shared/types';
 
 interface LettersPageProps extends Record<string, unknown> {
@@ -312,10 +313,15 @@ export default function AdminStaffLetters() {
   };
 
   const handleReplyAttachmentChange = (file: File | null) => {
-    if (file && !isAllowedReplyAttachment(file)) {
-      replyForm.setData('lampiran', null);
-      toast.error('File balasan harus PDF atau Word (.doc/.docx).');
-      return;
+    if (file) {
+      const validationMessage = validateFile(file, documentUploadRule);
+      if (validationMessage || !isAllowedReplyAttachment(file)) {
+        replyForm.setData('lampiran', null);
+        toast.error('File balasan harus PDF atau Word (.doc/.docx).', {
+          description: validationMessage ?? 'Format file tidak didukung.',
+        });
+        return;
+      }
     }
     replyForm.setData('lampiran', file);
   };

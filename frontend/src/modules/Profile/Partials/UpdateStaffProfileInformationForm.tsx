@@ -22,6 +22,7 @@ import {
 } from '@/shared/data/indonesian-locations';
 import { api, apiUrl } from '@/shared/lib/api';
 import { useForm, usePage } from '@/shared/lib/inertia';
+import { imageUploadRule, isValidEmail, validateFile } from '@/shared/lib/input-validation';
 
 import UpdatePasswordForm from './UpdatePasswordForm';
 
@@ -283,8 +284,11 @@ export default function UpdateStaffProfileInformationForm({
         if (!file) {
             return;
         }
-        if (!file.type.startsWith('image/')) {
-            toast.error('File harus berupa gambar.');
+        const validationMessage = validateFile(file, imageUploadRule);
+        if (validationMessage) {
+            toast.error('File foto tidak valid.', {
+                description: validationMessage,
+            });
             return;
         }
         setData('remove_profile_photo', false);
@@ -389,7 +393,7 @@ export default function UpdateStaffProfileInformationForm({
                             Pilih Foto
                             <input
                                 type="file"
-                                accept="image/*"
+                                accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                                 className="hidden"
                                 onChange={handlePhotoChange}
                                 disabled={processing}
@@ -585,7 +589,7 @@ function validate(data: Data, section: 'personal' | 'education'): Record<string,
             ['province', 'Provinsi wajib diisi.'],
         ];
         requiredTop.forEach(([field, msg]) => !String(data[field]).trim() && (errs[field] = msg));
-        if (data.email && !data.email.includes('@')) errs.email = 'Format email tidak valid.';
+        if (data.email && !isValidEmail(data.email)) errs.email = 'Format email tidak valid.';
         if (data.phone && !isValidPhone(data.phone)) errs.phone = 'Nomor telepon harus 8-13 digit angka.';
         if (data.date_of_birth) {
             const selected = new Date(data.date_of_birth).getTime();

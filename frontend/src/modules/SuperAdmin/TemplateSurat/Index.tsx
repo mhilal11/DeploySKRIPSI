@@ -28,6 +28,7 @@ import {
 } from '@/modules/SuperAdmin/TemplateSurat/components/utils';
 import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
 import { Head, router, useForm, usePage, usePageManager } from '@/shared/lib/inertia';
+import { imageUploadRule, validateFile } from '@/shared/lib/input-validation';
 import { route } from '@/shared/lib/route';
 import type { PageProps } from '@/shared/types';
 
@@ -261,14 +262,15 @@ export default function TemplateSuratIndex() {
             return;
         }
 
-        if (!ALLOWED_LOGO_FILE_TYPES.has(file.type)) {
+        const validationMessage = validateFile(file, imageUploadRule);
+        if (validationMessage || !ALLOWED_LOGO_FILE_TYPES.has(file.type)) {
             form.setData('logo_file', null);
-            form.setError('logo_file', 'Logo harus berupa PNG atau JPG.');
+            form.setError('logo_file', validationMessage ?? 'Logo harus berupa PNG atau JPG.');
             setLogoPreview(
                 form.data.remove_logo ? null : selectedTemplate?.logoUrl ?? null,
             );
             resetLogoInput();
-            toast.error('Logo harus berupa PNG atau JPG.');
+            toast.error(validationMessage ?? 'Logo harus berupa PNG atau JPG.');
             return;
         }
 

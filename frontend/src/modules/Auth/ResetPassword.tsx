@@ -7,6 +7,7 @@ import PasswordRequirementChecklist from '@/shared/components/PasswordRequiremen
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Head, useForm } from '@/shared/lib/inertia';
+import { normalizeEmail } from '@/shared/lib/input-validation';
 import {
     PASSWORD_POLICY_ERROR_MESSAGE,
     passwordViolatesPolicy,
@@ -130,7 +131,8 @@ export default function ResetPassword({
                                             value={data.email}
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
                                             autoComplete="username"
-                                            onChange={(e) => setData('email', e.target.value)}
+                                            onChange={(e) => setData('email', normalizeEmail(e.target.value))}
+                                            required
                                         />
                                     </div>
                                     <InputError message={errors.email} className="text-sm text-red-300" />
@@ -157,6 +159,7 @@ export default function ResetPassword({
                                                 clearErrors('password');
                                                 setData('password', e.target.value);
                                             }}
+                                            required
                                         />
                                         <button
                                             type="button"
@@ -194,6 +197,7 @@ export default function ResetPassword({
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
                                             autoComplete="new-password"
                                             onChange={(e) => setData('password_confirmation', e.target.value)}
+                                            required
                                         />
                                         <button
                                             type="button"

@@ -36,6 +36,7 @@ export default function TerminationDialog({
     typeOptions = ['Resign', 'PHK', 'Pensiun'],
     staffOptions = [],
 }: TerminationDialogProps) {
+    const minEffectiveDate = new Date().toISOString().split('T')[0];
     const [open, setOpen] = useState(false);
     const [pickerOpen, setPickerOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -196,6 +197,7 @@ export default function TerminationDialog({
                                     <Input
                                         type="date"
                                         value={form.data.effective_date}
+                                        min={minEffectiveDate}
                                         onChange={(event) =>
                                             form.setData('effective_date', event.target.value)
                                         }

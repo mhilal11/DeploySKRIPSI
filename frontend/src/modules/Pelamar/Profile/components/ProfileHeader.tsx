@@ -62,7 +62,7 @@ export default function ProfileHeader({
                         <input
                             id="profile-photo"
                             type="file"
-                            accept="image/*"
+                            accept=".png,.jpg,.jpeg,image/png,image/jpeg"
                             className="hidden"
                             onChange={onPhotoChange}
                         />

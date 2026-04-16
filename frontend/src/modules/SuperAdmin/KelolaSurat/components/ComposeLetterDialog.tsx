@@ -22,6 +22,7 @@ import {
     SelectValue,
 } from '@/shared/components/ui/select';
 import { Textarea } from '@/shared/components/ui/textarea';
+import { documentUploadRule, validateFile } from '@/shared/lib/input-validation';
 
 
 const ALL_DIVISIONS_VALUE = '__all_divisions__';
@@ -82,11 +83,16 @@ export default function ComposeLetterDialog({
 
     const handleAttachmentChange = (event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0] ?? null;
-        if (file && !isAllowedAttachment(file)) {
-            event.target.value = '';
-            setData('lampiran', null);
-            toast.error('File ini tidak bisa, hanya PDF atau Word yang diperbolehkan');
-            return;
+        if (file) {
+            const validationMessage = validateFile(file, documentUploadRule);
+            if (validationMessage || !isAllowedAttachment(file)) {
+                event.target.value = '';
+                setData('lampiran', null);
+                toast.error('File ini tidak bisa, hanya PDF atau Word yang diperbolehkan', {
+                    description: validationMessage ?? 'Format file tidak didukung.',
+                });
+                return;
+            }
         }
 
         setData('lampiran', file);

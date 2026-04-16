@@ -34,6 +34,9 @@ import type {
 } from "../Staff/types";
 
 export default function StaffResignation() {
+    const minimumEffectiveDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0];
     const { props } = usePage<PageProps<Partial<ResignationPageProps>>>();
     const profile: ProfileInfo = {
         name: props.profile?.name ?? "",
@@ -254,6 +257,7 @@ export default function StaffResignation() {
                                                 type="date"
                                                 value={form.data.effective_date}
                                                 required
+                                                min={minimumEffectiveDate}
                                                 onChange={(e) =>
                                                     form.setData(
                                                         "effective_date",

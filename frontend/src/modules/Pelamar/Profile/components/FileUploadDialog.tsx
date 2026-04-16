@@ -12,6 +12,7 @@ import {
     DialogTitle,
     DialogFooter,
 } from '@/shared/components/ui/dialog';
+import { imageOrPdfUploadRule, validateFile as validateSelectedFile } from '@/shared/lib/input-validation';
 
 interface FileUploadDialogProps {
     open: boolean;
@@ -21,9 +22,6 @@ interface FileUploadDialogProps {
     currentFileUrl?: string | null;
     disabled?: boolean;
 }
-
-const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 export default function FileUploadDialog({
     open,
@@ -39,15 +37,10 @@ export default function FileUploadDialog({
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const validateFile = (file: File): boolean => {
-        if (!ALLOWED_TYPES.includes(file.type)) {
+        const errorMessage = validateSelectedFile(file, imageOrPdfUploadRule);
+        if (errorMessage) {
             toast.error('Format file tidak valid', {
-                description: 'File harus berformat JPG, JPEG, PNG, atau PDF',
-            });
-            return false;
-        }
-        if (file.size > MAX_SIZE) {
-            toast.error('Ukuran file terlalu besar', {
-                description: 'Ukuran file maksimal 5MB',
+                description: errorMessage,
             });
             return false;
         }

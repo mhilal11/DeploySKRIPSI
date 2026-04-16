@@ -19,6 +19,7 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Head, useForm } from "@/shared/lib/inertia";
+import { normalizeEmail } from "@/shared/lib/input-validation";
 import { markLandingSplashSkipOnce } from "@/shared/lib/landing-splash";
 import {
     PASSWORD_POLICY_ERROR_MESSAGE,
@@ -266,7 +267,7 @@ export default function Register({
                                             autoComplete="username"
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-cyan-400/50 focus-visible:ring-cyan-400/50 backdrop-blur-sm"
                                             onChange={(e) =>
-                                                setData("email", e.target.value.toLowerCase())
+                                                setData("email", normalizeEmail(e.target.value))
                                             }
                                             required
                                         />
