@@ -6,47 +6,40 @@ import { Button } from '@/shared/components/ui/button';
 const plans = [
   {
     name: 'Dasar',
-    price: '299',
-    speed: '100 Mbps',
+    speed: '20 Mbps',
     features: [
-      'Kecepatan download hingga 100 Mbps',
-      'Data tidak terbatas',
-      'Instalasi gratis',
-      'Dukungan via email',
-      'Termasuk 1 pengguna',
+      'Kecepatan download hingga 20 Mbps',
+      'Data Tidak Terbatas Tanpa FUP',
+      'Tanpa Biaya Tambahan Perangkat',
+      'Powerfull Support Customer Service',
     ],
     popular: false,
   },
   {
     name: 'Standar',
-    price: '499',
-    speed: '500 Mbps',
+    speed: '30 Mbps',
     features: [
-      'Kecepatan download hingga 500 Mbps',
-      'Data tidak terbatas',
-      'Instalasi & router gratis',
-      'Dukungan prioritas 24/7',
-      'Hingga 5 pengguna',
-      'Paket keamanan gratis',
+      'Kecepatan download hingga 30 Mbps',
+      'Data Tidak Terbatas Tanpa FUP',
+      'Tanpa Biaya Tambahan Perangkat',
+      'Powerfull Support Customer Service',
     ],
     popular: true,
   },
   {
     name: 'Premium',
-    price: '799',
-    speed: '1000 Mbps',
+    speed: '50 Mbps',
     features: [
-      'Kecepatan download hingga 1 Gbps',
-      'Data tidak terbatas',
-      'Instalasi & router premium gratis',
-      'Dukungan VIP 24/7',
-      'Pengguna tidak terbatas',
-      'Paket keamanan & kontrol orang tua gratis',
-      'Alamat IP statis',
+      'Kecepatan download hingga 50 Mbps',
+      'Data Tidak Terbatas Tanpa FUP',
+      'Tanpa Biaya Tambahan Perangkat',
+      'Powerfull Support Customer Service',
     ],
     popular: false,
   },
 ];
+
+const whatsappBaseUrl = 'https://wa.me/628174770006';
 
 export function PricingSection() {
   useEffect(() => {
@@ -72,10 +65,10 @@ export function PricingSection() {
         {/* Section Header */}
         <div className="text-center mb-12 md:mb-16" data-aos="fade-up">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl text-white mb-4 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
-            Harga yang Sederhana & <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Transparan</span>
+            Paket yang Fleksibel & <span className="text-[#2F6DB5]">Responsif</span>
           </h2>
           <p className="text-lg sm:text-xl text-white/80 max-w-2xl mx-auto drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
-            Pilih paket yang sempurna untuk kebutuhan Anda. Semua paket termasuk data tidak terbatas dan tanpa kontrak.
+            Pilih paket yang sesuai kebutuhan Anda lalu hubungi tim kami via WhatsApp untuk konsultasi dan penawaran terbaik.
           </p>
         </div>
 
@@ -92,7 +85,7 @@ export function PricingSection() {
             >
               {/* Popular Badge */}
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-4 py-1 rounded-full text-sm flex items-center gap-1 shadow-[0_4px_16px_rgba(34,211,238,0.5)] z-10 backdrop-blur-sm border border-cyan-400/30">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0F4C81] text-white px-4 py-1 rounded-full text-sm flex items-center gap-1 shadow-[0_4px_16px_rgba(47,109,181,0.35)] z-10 backdrop-blur-sm border border-[#2F6DB5]/30">
                   <Star className="w-4 h-4 fill-current" />
                   Paling Populer
                 </div>
@@ -100,9 +93,9 @@ export function PricingSection() {
 
               {/* Card */}
               <div
-                className={`h-full bg-white/15 backdrop-blur-[30px] rounded-[24px] p-6 md:p-8 shadow-[0_8px_32px_rgba(139,92,246,0.3)] border-2 ${
+                className={`h-full bg-white/15 backdrop-blur-[30px] rounded-[24px] p-6 md:p-8 shadow-[0_8px_32px_rgba(24,39,75,0.35)] border-2 ${
                   plan.popular
-                    ? 'border-cyan-400/60 shadow-[0_8px_32px_rgba(34,211,238,0.4)]'
+                    ? 'border-[#2F6DB5]/60 shadow-[0_8px_32px_rgba(47,109,181,0.32)]'
                     : 'border-white/30'
                 }`}
               >
@@ -112,20 +105,14 @@ export function PricingSection() {
                 </h3>
                 
                 {/* Speed */}
-                <div className="text-cyan-400 mb-6">{plan.speed}</div>
-
-                {/* Price */}
-                <div className="mb-8">
-                  <span className="text-4xl md:text-5xl text-white">Rp{plan.price}</span>
-                  <span className="text-white/70">rb/bulan</span>
-                </div>
+                <div className="text-[#4A90D9] mb-6">{plan.speed}</div>
 
                 {/* Features */}
                 <ul className="space-y-4 mb-8">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-start gap-3">
-                      <div className="w-5 h-5 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 border border-cyan-400/40">
-                        <Check className="w-3 h-3 text-cyan-400" />
+                      <div className="w-5 h-5 rounded-full bg-[#0F4C81]/20 flex items-center justify-center flex-shrink-0 mt-0.5 border border-[#2F6DB5]/40">
+                        <Check className="w-3 h-3 text-[#4A90D9]" />
                       </div>
                       <span className="text-white/90 text-sm md:text-base">{feature}</span>
                     </li>
@@ -134,13 +121,20 @@ export function PricingSection() {
 
                 {/* CTA Button */}
                 <Button
+                  asChild
                   className={`w-full ${
                     plan.popular
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-[0_8px_32px_rgba(34,211,238,0.5)] border border-cyan-400/30'
+                      ? 'bg-[#0F4C81] hover:bg-[#0C3E6B] text-white shadow-[0_8px_32px_rgba(47,109,181,0.32)] border border-[#2F6DB5]/30'
                       : 'bg-white/20 border-2 border-white/40 text-white hover:bg-white/30 backdrop-blur-sm'
                   } rounded-[20px]`}
                 >
-                  Mulai Sekarang
+                  <a
+                    href={`${whatsappBaseUrl}?text=${encodeURIComponent(`Halo, saya ingin konsultasi paket ${plan.name} (${plan.speed}).`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Hubungi via WhatsApp
+                  </a>
                 </Button>
               </div>
             </div>
@@ -150,13 +144,12 @@ export function PricingSection() {
         {/* Bottom Note */}
         <div className="text-center mt-12" data-aos="fade-up" data-aos-delay="400">
           <p className="text-white/80">
-            Semua paket dilengkapi dengan jaminan uang kembali 30 hari. Tanpa pertanyaan.
+            Tim kami siap membantu memilih paket yang paling sesuai untuk kebutuhan rumah maupun bisnis Anda.
           </p>
         </div>
       </div>
     </section>
   );
 }
-
 
 

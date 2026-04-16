@@ -138,7 +138,7 @@ export function Navbar({ canLogin = true, canRegister = true }: NavbarProps) {
               {canRegister && (
                 <Button
                   asChild
-                  className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white border border-cyan-400/40 shadow-[0_6px_20px_rgba(34,211,238,0.3)]"
+                  className="bg-[#0F4C81] hover:bg-[#0C3E6B] text-white border border-[#2F6DB5]/40 shadow-[0_6px_20px_rgba(47,109,181,0.28)]"
                 >
                   <Link href="/register" onClick={handleAuthNavigate}>Daftar</Link>
                 </Button>

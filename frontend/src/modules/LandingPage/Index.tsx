@@ -58,7 +58,7 @@ export default function LandingPage({
       {/* Splash Screen modern */}
       <SplashScreen />
 
-      <div className="bg-gradient-to-br from-[#05070f] via-[#0b1024] to-[#050a16] text-white min-h-screen overflow-x-hidden relative">
+      <div className="bg-black text-white min-h-screen overflow-x-hidden relative">
         <Navbar canLogin={canLogin} canRegister={canRegister} />
         <main>
           <HeroSection />

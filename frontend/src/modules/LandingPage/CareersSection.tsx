@@ -19,7 +19,6 @@ import {
 } from '@/shared/components/ui/dialog';
 import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
 
-import { ImageWithFallback } from './figma/ImageWithFallback';
 
 type CareerJob = {
   id?: number;
@@ -152,10 +151,10 @@ export function CareersSection({ jobs }: CareersSectionProps) {
   return (
     <section id="careers" className="py-16 md:py-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-2 gap-8 md:gap-12 items-center mb-12 md:mb-16">
-          <div data-aos="fade-right">
+        <div className="mx-auto mb-12 max-w-3xl text-center md:mb-16" data-aos="fade-up">
+          <div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl text-white mb-4 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">
-              Bergabung dengan <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Tim Kami</span>
+              Bergabung dengan <span className="text-[#2F6DB5]">Tim Kami</span>
             </h2>
             <p className="text-lg sm:text-xl text-white/80 mb-6 drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
               Jelajahi lowongan pekerjaan saat ini dan kembangkan karir Anda bersama kami.
@@ -166,16 +165,6 @@ export function CareersSection({ jobs }: CareersSectionProps) {
             </p>
           </div>
 
-          <div data-aos="fade-left" className="relative mx-auto w-full max-w-[32rem] lg:max-w-none">
-            <div className="overflow-hidden rounded-[28px] border border-white/30 shadow-[0_8px_32px_rgba(139,92,246,0.4)] backdrop-blur-sm">
-              <ImageWithFallback
-                src="https://images.unsplash.com/photo-1748346918817-0b1b6b2f9bab?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBvZmZpY2UlMjB0ZWFtfGVufDF8fHx8MTc2Mjg2NTQ2OHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
-                alt="Tim Kami"
-                className="h-auto w-full"
-              />
-              <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/40 to-cyan-500/20" />
-            </div>
-          </div>
         </div>
 
         {hasJobs ? (
@@ -241,17 +230,17 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                   key={`${job.id ?? job.division}-${index}`}
                   data-aos="fade-up"
                   data-aos-delay={index * 50}
-                  className={`relative group bg-white/15 backdrop-blur-[30px] border border-white/30 rounded-[24px] p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(34,211,238,0.4)] hover:border-cyan-400/50 ${canApply ? 'hover:-translate-y-1' : 'opacity-95'
+                  className={`relative group bg-white/15 backdrop-blur-[30px] border border-white/30 rounded-[24px] p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(47,109,181,0.28)] hover:border-[#2F6DB5]/50 ${canApply ? 'hover:-translate-y-1' : 'opacity-95'
                     }`}
                 >
                   <div className="space-y-4">
-                    <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-cyan-400/40 bg-cyan-500/20 px-3 py-1 text-sm text-cyan-300">
+                    <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-[#2F6DB5]/40 bg-[#0F4C81]/20 px-3 py-1 text-sm text-[#7DB6F5]">
                       <span className="break-words">{job.division}</span>
-                      {slots && <span className="text-xs text-cyan-200 break-words">{slots}</span>}
+                      {slots && <span className="text-xs text-[#A9D0FF] break-words">{slots}</span>}
                     </div>
 
                     <div>
-                      <h3 className="text-xl text-white mb-2 group-hover:text-cyan-300 transition-colors">
+                      <h3 className="text-xl text-white mb-2 group-hover:text-[#7DB6F5] transition-colors">
                         {title}
                       </h3>
                       {job.description && job.isHiring && (
@@ -261,16 +250,16 @@ export function CareersSection({ jobs }: CareersSectionProps) {
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-white/80">
-                        <MapPin className="w-4 h-4 text-cyan-400" />
+                        <MapPin className="w-4 h-4 text-[#4A90D9]" />
                         <span className="text-sm">{location}</span>
                       </div>
                       <div className="flex items-center gap-2 text-white/80">
-                        <Clock className="w-4 h-4 text-cyan-400" />
+                        <Clock className="w-4 h-4 text-[#4A90D9]" />
                         <span className="text-sm">{type}</span>
                       </div>
                       {teamCapacityText && (
                         <div className="flex items-center gap-2 text-white/80">
-                          <Users className="w-4 h-4 text-cyan-400" />
+                          <Users className="w-4 h-4 text-[#4A90D9]" />
                           <span className="text-sm">{teamCapacityText}</span>
                         </div>
                       )}
@@ -295,10 +284,10 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                             additionalCriteriaEntries,
                           })
                         }
-                        className="flex h-auto w-full items-center justify-between rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-left text-white hover:bg-white/5 hover:text-cyan-200"
+                        className="flex h-auto w-full items-center justify-between rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-left text-white hover:bg-white/5 hover:text-[#A9D0FF]"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-500/10 text-cyan-300">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-[#2F6DB5]/30 bg-[#0F4C81]/10 text-[#7DB6F5]">
                             <Info className="h-4 w-4" />
                           </div>
                           <div className="space-y-0.5">
@@ -310,7 +299,7 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                             </p>
                           </div>
                         </div>
-                        <span className="text-xs font-medium text-cyan-300">
+                        <span className="text-xs font-medium text-[#7DB6F5]">
                           Lihat detail
                         </span>
                       </Button>
@@ -321,7 +310,7 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                         href="/login"
                         onClick={handleApplyNavigate}
                         aria-label={`Lamar posisi ${title}`}
-                        className="flex items-center justify-between text-sm font-medium text-cyan-300 transition-colors hover:text-cyan-200"
+                        className="flex items-center justify-between text-sm font-medium text-[#7DB6F5] transition-colors hover:text-[#A9D0FF]"
                       >
                         <span>Klik untuk melamar</span>
                         <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
@@ -337,8 +326,8 @@ export function CareersSection({ jobs }: CareersSectionProps) {
             })}
           </div>
         ) : (
-          <div className="rounded-[24px] border border-dashed border-cyan-400/40 bg-white/5 p-8 text-center">
-            <p className="text-cyan-300 font-medium">Belum ada data lowongan ditampilkan saat ini.</p>
+          <div className="rounded-[24px] border border-dashed border-[#2F6DB5]/40 bg-white/5 p-8 text-center">
+            <p className="text-[#7DB6F5] font-medium">Belum ada data lowongan ditampilkan saat ini.</p>
             <p className="text-sm text-white/70 mt-2">
               Pantau halaman ini secara berkala untuk mengetahui pembukaan rekrutmen terbaru.
             </p>
@@ -354,8 +343,8 @@ export function CareersSection({ jobs }: CareersSectionProps) {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-hidden border border-slate-800 bg-[#0f172a] p-0 text-white sm:max-w-2xl">
-          <DialogHeader className="border-b border-white/10 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 px-6 py-5 pr-14">
+          <DialogContent className="max-h-[90vh] overflow-hidden border border-slate-800 bg-[#0f172a] p-0 text-white sm:max-w-2xl">
+          <DialogHeader className="border-b border-white/10 bg-[#0F4C81]/12 px-6 py-5 pr-14">
             <DialogTitle className="text-xl text-white">
               {selectedJobDetail?.title ?? 'Detail Lowongan'}
             </DialogTitle>
@@ -366,8 +355,8 @@ export function CareersSection({ jobs }: CareersSectionProps) {
 
           <div className="max-h-[calc(90vh-5.5rem)] space-y-4 overflow-y-auto px-6 py-5">
             {selectedJobDetail && selectedJobDetail.requirements.length > 0 && (
-              <div className="space-y-3 rounded-2xl border border-cyan-400/20 bg-white/5 p-4">
-                <p className="flex items-center gap-2 text-sm font-medium text-cyan-200">
+              <div className="space-y-3 rounded-2xl border border-[#2F6DB5]/20 bg-white/5 p-4">
+                <p className="flex items-center gap-2 text-sm font-medium text-[#A9D0FF]">
                   <ListChecks className="h-4 w-4" />
                   Persyaratan Kandidat
                 </p>
@@ -384,8 +373,8 @@ export function CareersSection({ jobs }: CareersSectionProps) {
               </div>
             )}
 
-            <div className="space-y-3 rounded-2xl border border-cyan-400/20 bg-white/5 p-4">
-              <p className="text-sm font-medium text-cyan-200">Kriteria Kelayakan</p>
+            <div className="space-y-3 rounded-2xl border border-[#2F6DB5]/20 bg-white/5 p-4">
+              <p className="text-sm font-medium text-[#A9D0FF]">Kriteria Kelayakan</p>
               <div className="flex flex-wrap gap-2">
                 {selectedJobDetail?.ageRangeText && (
                   <span className="max-w-full break-words rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/80">
@@ -409,7 +398,7 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                     </span>
                   )}
                 {selectedJobDetail?.programStudiesText && (
-                  <span className="max-w-full break-words rounded-full border border-cyan-300/30 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100">
+                  <span className="max-w-full break-words rounded-full border border-[#2F6DB5]/30 bg-[#0F4C81]/10 px-3 py-1.5 text-xs text-[#A9D0FF]">
                     Prodi: {selectedJobDetail.programStudiesText}
                   </span>
                 )}
