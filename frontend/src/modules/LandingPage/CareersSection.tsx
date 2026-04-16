@@ -1,7 +1,22 @@
-import { MapPin, Clock, ArrowRight, Users, ListChecks } from 'lucide-react';
+import {
+  ArrowRight,
+  Clock,
+  Info,
+  ListChecks,
+  MapPin,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
+import { Button } from '@/shared/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/components/ui/dialog';
 import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
 
 import { ImageWithFallback } from './figma/ImageWithFallback';
@@ -27,6 +42,17 @@ type CareerJob = {
 interface CareersSectionProps {
   jobs: CareerJob[];
 }
+
+type JobDetailModalState = {
+  title: string;
+  requirements: string[];
+  ageRangeText: string | null;
+  gender: string | null;
+  minEducation: string | null;
+  minExperience: number | null;
+  programStudiesText: string | null;
+  additionalCriteriaEntries: Array<[string, unknown]>;
+};
 
 const EDUCATION_LABELS: Record<string, string> = {
   sma: 'SMA/SMK',
@@ -99,6 +125,9 @@ const formatDateIndo = (value?: string | null): string | null => {
 };
 
 export function CareersSection({ jobs }: CareersSectionProps) {
+  const [selectedJobDetail, setSelectedJobDetail] =
+    useState<JobDetailModalState | null>(null);
+
   useEffect(() => {
     void import('aos').then(({ default: AOS }) => {
       AOS.init({
@@ -198,24 +227,24 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                 typeof job.current_staff === 'number' && typeof job.capacity === 'number'
                   ? `${job.current_staff}/${job.capacity} posisi terisi`
                   : null;
+              const hasCriteriaSummary =
+                ageRangeText !== null ||
+                gender !== null ||
+                minEducation !== null ||
+                minExperience !== null ||
+                programStudiesText !== null ||
+                additionalCriteriaEntries.length > 0;
+              const hasDetailSections = requirements.length > 0 || hasCriteriaSummary;
 
               return (
                 <div
                   key={`${job.id ?? job.division}-${index}`}
                   data-aos="fade-up"
                   data-aos-delay={index * 50}
-                  className={`relative group bg-white/15 backdrop-blur-[30px] border border-white/30 rounded-[24px] p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(34,211,238,0.4)] hover:border-cyan-400/50 ${canApply ? 'hover:-translate-y-1 cursor-pointer' : 'opacity-95'
+                  className={`relative group bg-white/15 backdrop-blur-[30px] border border-white/30 rounded-[24px] p-5 sm:p-6 transition-all duration-300 hover:shadow-[0_8px_32px_rgba(34,211,238,0.4)] hover:border-cyan-400/50 ${canApply ? 'hover:-translate-y-1' : 'opacity-95'
                     }`}
                 >
-                  {canApply && (
-                    <Link
-                      href="/login"
-                      onClick={handleApplyNavigate}
-                      aria-label={`Lamar posisi ${title}`}
-                      className="absolute inset-0 z-10"
-                    />
-                  )}
-                  <div className="relative z-0 space-y-4">
+                  <div className="space-y-4">
                     <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-cyan-400/40 bg-cyan-500/20 px-3 py-1 text-sm text-cyan-300">
                       <span className="break-words">{job.division}</span>
                       {slots && <span className="text-xs text-cyan-200 break-words">{slots}</span>}
@@ -250,69 +279,58 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                       )}
                     </div>
 
-                    {requirements.length > 0 && (
-                      <div className="space-y-2 rounded-xl border border-cyan-400/20 bg-black/20 p-3">
-                        <p className="flex items-center gap-2 text-sm text-cyan-200">
-                          <ListChecks className="h-4 w-4" />
-                          Persyaratan Kandidat
-                        </p>
-                        <div className="space-y-1">
-                          {requirements.map((requirement, requirementIndex) => (
-                            <p key={`${job.id ?? job.division}-req-${requirementIndex}`} className="break-words text-xs text-white/75">
-                              {requirementIndex + 1}. {requirement}
+                    {hasDetailSections && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() =>
+                          setSelectedJobDetail({
+                            title,
+                            requirements,
+                            ageRangeText,
+                            gender,
+                            minEducation,
+                            minExperience,
+                            programStudiesText,
+                            additionalCriteriaEntries,
+                          })
+                        }
+                        className="flex h-auto w-full items-center justify-between rounded-2xl border border-white/10 bg-black/10 px-4 py-3 text-left text-white hover:bg-white/5 hover:text-cyan-200"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-500/10 text-cyan-300">
+                            <Info className="h-4 w-4" />
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-sm font-medium">
+                              Lihat persyaratan &amp; kriteria
                             </p>
-                          ))}
+                            <p className="text-xs text-white/60">
+                              Buka popup detail lowongan
+                            </p>
+                          </div>
                         </div>
-                      </div>
+                        <span className="text-xs font-medium text-cyan-300">
+                          Lihat detail
+                        </span>
+                      </Button>
                     )}
 
-                    <div className="space-y-2 rounded-xl border border-cyan-400/20 bg-black/20 p-3">
-                      <p className="text-sm text-cyan-200">Kriteria Kelayakan</p>
-                      <div className="flex flex-wrap gap-2">
-                        {ageRangeText && (
-                          <span className="max-w-full break-words rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
-                            Umur: {ageRangeText}
-                          </span>
-                        )}
-                        {gender && (
-                          <span className="max-w-full break-words rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
-                            Gender: {gender}
-                          </span>
-                        )}
-                        {minEducation && (
-                          <span className="max-w-full break-words rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
-                            Min Pendidikan: {minEducation}
-                          </span>
-                        )}
-                        {minExperience !== null && (
-                          <span className="max-w-full break-words rounded-full border border-white/20 px-2.5 py-1 text-[11px] text-white/80">
-                            Min Pengalaman: {minExperience} tahun
-                          </span>
-                        )}
-                        {programStudiesText && (
-                          <span className="max-w-full break-words rounded-full border border-cyan-300/30 bg-cyan-500/10 px-2.5 py-1 text-[11px] text-cyan-100">
-                            Prodi: {programStudiesText}
-                          </span>
-                        )}
+                    {canApply ? (
+                      <Link
+                        href="/login"
+                        onClick={handleApplyNavigate}
+                        aria-label={`Lamar posisi ${title}`}
+                        className="flex items-center justify-between text-sm font-medium text-cyan-300 transition-colors hover:text-cyan-200"
+                      >
+                        <span>Klik untuk melamar</span>
+                        <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                      </Link>
+                    ) : (
+                      <div className="flex items-center justify-between text-sm font-medium text-white/50">
+                        <span>Belum membuka lowongan</span>
                       </div>
-                      {additionalCriteriaEntries.length > 0 && (
-                        <div className="space-y-1 border-t border-white/10 pt-2">
-                          {additionalCriteriaEntries.map(([key, value]) => (
-                            <p key={`${job.id ?? job.division}-criteria-${key}`} className="break-words text-[11px] text-white/65">
-                              {key}: {typeof value === 'string' ? value : JSON.stringify(value)}
-                            </p>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div
-                      className={`flex items-center justify-between text-sm font-medium ${canApply ? 'text-cyan-300' : 'text-white/50'
-                        }`}
-                    >
-                      <span>{canApply ? 'Klik untuk melamar' : 'Belum membuka lowongan'}</span>
-                      {canApply && <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />}
-                    </div>
+                    )}
                   </div>
                 </div>
               );
@@ -327,6 +345,105 @@ export function CareersSection({ jobs }: CareersSectionProps) {
           </div>
         )}
       </div>
+
+      <Dialog
+        open={selectedJobDetail !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedJobDetail(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-hidden border border-slate-800 bg-[#0f172a] p-0 text-white sm:max-w-2xl">
+          <DialogHeader className="border-b border-white/10 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 px-6 py-5 pr-14">
+            <DialogTitle className="text-xl text-white">
+              {selectedJobDetail?.title ?? 'Detail Lowongan'}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-white/70">
+              Persyaratan kandidat dan kriteria kelayakan untuk posisi ini.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[calc(90vh-5.5rem)] space-y-4 overflow-y-auto px-6 py-5">
+            {selectedJobDetail && selectedJobDetail.requirements.length > 0 && (
+              <div className="space-y-3 rounded-2xl border border-cyan-400/20 bg-white/5 p-4">
+                <p className="flex items-center gap-2 text-sm font-medium text-cyan-200">
+                  <ListChecks className="h-4 w-4" />
+                  Persyaratan Kandidat
+                </p>
+                <div className="space-y-2">
+                  {selectedJobDetail.requirements.map((requirement, requirementIndex) => (
+                    <p
+                      key={`modal-req-${requirementIndex}`}
+                      className="break-words text-sm text-white/80"
+                    >
+                      {requirementIndex + 1}. {requirement}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3 rounded-2xl border border-cyan-400/20 bg-white/5 p-4">
+              <p className="text-sm font-medium text-cyan-200">Kriteria Kelayakan</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedJobDetail?.ageRangeText && (
+                  <span className="max-w-full break-words rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/80">
+                    Umur: {selectedJobDetail.ageRangeText}
+                  </span>
+                )}
+                {selectedJobDetail?.gender && (
+                  <span className="max-w-full break-words rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/80">
+                    Gender: {selectedJobDetail.gender}
+                  </span>
+                )}
+                {selectedJobDetail?.minEducation && (
+                  <span className="max-w-full break-words rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/80">
+                    Min Pendidikan: {selectedJobDetail.minEducation}
+                  </span>
+                )}
+                {selectedJobDetail?.minExperience !== null &&
+                  selectedJobDetail?.minExperience !== undefined && (
+                    <span className="max-w-full break-words rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/80">
+                      Min Pengalaman: {selectedJobDetail.minExperience} tahun
+                    </span>
+                  )}
+                {selectedJobDetail?.programStudiesText && (
+                  <span className="max-w-full break-words rounded-full border border-cyan-300/30 bg-cyan-500/10 px-3 py-1.5 text-xs text-cyan-100">
+                    Prodi: {selectedJobDetail.programStudiesText}
+                  </span>
+                )}
+              </div>
+
+              {selectedJobDetail &&
+                selectedJobDetail.additionalCriteriaEntries.length > 0 && (
+                  <div className="space-y-2 border-t border-white/10 pt-3">
+                    {selectedJobDetail.additionalCriteriaEntries.map(([key, value]) => (
+                      <p
+                        key={`modal-criteria-${key}`}
+                        className="break-words text-xs text-white/65"
+                      >
+                        {key}: {typeof value === 'string' ? value : JSON.stringify(value)}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+              {selectedJobDetail &&
+                selectedJobDetail.ageRangeText === null &&
+                selectedJobDetail.gender === null &&
+                selectedJobDetail.minEducation === null &&
+                selectedJobDetail.minExperience === null &&
+                selectedJobDetail.programStudiesText === null &&
+                selectedJobDetail.additionalCriteriaEntries.length === 0 && (
+                  <p className="text-sm text-white/60">
+                    Tidak ada kriteria kelayakan tambahan untuk lowongan ini.
+                  </p>
+                )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
