@@ -3,6 +3,7 @@
 import { AutocompleteInput, AutocompleteOption } from '@/shared/components/ui/autocomplete-input';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
+import { DatePickerInput } from '@/shared/components/ui/date-picker-input';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import {
@@ -27,7 +28,6 @@ interface PersonalFormProps {
     errors: Record<string, string>;
     onChange: (key: keyof ApplicantProfileForm['personal'], value: string) => void;
     onSave: () => void;
-    onReset: () => void;
     processing: boolean;
     disabled?: boolean;
 }
@@ -37,7 +37,6 @@ export default function PersonalForm({
     errors,
     onChange,
     onSave,
-    onReset,
     processing,
     disabled = false,
 }: PersonalFormProps) {
@@ -88,7 +87,7 @@ export default function PersonalForm({
     today.setHours(0, 0, 0, 0);
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    const maxDate = yesterday.toISOString().split('T')[0];
+    const maxDate = yesterday;
 
     return (
         <Card className="p-6">
@@ -161,12 +160,13 @@ export default function PersonalForm({
                 </div>
                 <div>
                     <Label>Tanggal Lahir *</Label>
-                    <Input
-                        type="date"
+                    <DatePickerInput
                         value={data.date_of_birth}
-                        onChange={(event) => onChange('date_of_birth', event.target.value)}
+                        onChange={(value) => onChange('date_of_birth', value)}
                         disabled={disabled}
-                        max={maxDate}
+                        maxDate={maxDate}
+                        toYear={today.getFullYear()}
+                        className={errors['personal.date_of_birth'] ? 'border-destructive' : undefined}
                     />
                     <p className="mt-1 text-xs text-slate-500">
                         Tidak dapat memilih tanggal hari ini atau masa depan

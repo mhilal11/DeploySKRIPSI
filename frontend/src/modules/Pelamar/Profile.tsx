@@ -76,7 +76,6 @@ export default function Profile({
         removeCertification,
         submitSection,
         getEducationError,
-        handleReset,
     } = useProfileForm(profile);
     const [reminderOpen, setReminderOpen] = useState(
         Boolean(profileReminderMessage),
@@ -335,7 +334,6 @@ export default function Profile({
                             errors={form.errors as Record<string, string>}
                             onChange={setPersonalField}
                             onSave={() => handleSaveWithConfirmation('personal')}
-                            onReset={handleReset}
                             processing={
                                 form.processing && submittingSection === 'personal'
                             }

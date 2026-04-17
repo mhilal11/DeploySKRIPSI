@@ -1,8 +1,20 @@
 ﻿import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import * as React from "react"
-import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
+import {
+  DayButton,
+  DayPicker,
+  type DropdownProps,
+  getDefaultClassNames,
+} from "react-day-picker"
 
 import { Button, buttonVariants } from "@/shared/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/components/ui/select"
 import { cn } from "@/shared/lib/utils"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
@@ -53,17 +65,17 @@ function Calendar({
         ),
         month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
         nav: cn(
-          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
+          "pointer-events-none absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
           defaultClassNames.nav
         ),
         button_previous: cn(
           buttonVariants({ variant: buttonVariant }),
-          "h-[--cell-size] w-[--cell-size] select-none p-0 aria-disabled:opacity-50",
+          "pointer-events-auto h-[--cell-size] w-[--cell-size] select-none p-0 aria-disabled:opacity-50",
           defaultClassNames.button_previous
         ),
         button_next: cn(
           buttonVariants({ variant: buttonVariant }),
-          "h-[--cell-size] w-[--cell-size] select-none p-0 aria-disabled:opacity-50",
+          "pointer-events-auto h-[--cell-size] w-[--cell-size] select-none p-0 aria-disabled:opacity-50",
           defaultClassNames.button_next
         ),
         month_caption: cn(
@@ -140,6 +152,7 @@ function Calendar({
             />
           )
         },
+        Dropdown: CalendarDropdown,
         Chevron: ({ className, orientation, ...props }) => {
           if (orientation === "left") {
             return (
@@ -274,6 +287,59 @@ function CalendarDayButton({
 }
 
 Calendar.displayName = "Calendar"
+
+function CalendarDropdown({
+  options,
+  value,
+  onChange,
+  disabled,
+  "aria-label": ariaLabel,
+}: DropdownProps) {
+  const selectedValue = value === undefined ? undefined : String(value)
+  const selectedLabel =
+    options?.find((option) => String(option.value) === selectedValue)?.label ??
+    ""
+
+  return (
+    <Select
+      value={selectedValue}
+      onValueChange={(nextValue) => {
+        if (!onChange) {
+          return
+        }
+
+        const event = {
+          target: { value: nextValue },
+          currentTarget: { value: nextValue },
+        } as React.ChangeEvent<HTMLSelectElement>
+
+        onChange(event)
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger
+        aria-label={ariaLabel}
+        className="h-8 min-w-[5.25rem] gap-1 rounded-md border-slate-300 bg-white px-2 text-sm shadow-none focus-visible:ring-2"
+      >
+        <SelectValue>{selectedLabel}</SelectValue>
+      </SelectTrigger>
+      <SelectContent
+        position="popper"
+        className="max-h-[12.5rem] min-w-[var(--radix-select-trigger-width)]"
+      >
+        {options?.map((option) => (
+          <SelectItem
+            key={option.value}
+            value={String(option.value)}
+            disabled={option.disabled}
+          >
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
 
 export { Calendar, CalendarDayButton }
 

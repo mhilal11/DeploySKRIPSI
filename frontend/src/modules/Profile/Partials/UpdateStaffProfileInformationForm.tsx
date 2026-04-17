@@ -14,6 +14,7 @@ import {
     AlertDialogTitle,
 } from '@/shared/components/ui/alert-dialog';
 import { AutocompleteInput, AutocompleteOption } from '@/shared/components/ui/autocomplete-input';
+import { DatePickerInput } from '@/shared/components/ui/date-picker-input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import {
     getAllProvinces,
@@ -195,8 +196,9 @@ export default function UpdateStaffProfileInformationForm({
     );
     const maxBirthDate = useMemo(() => {
         const today = new Date();
+        today.setHours(0, 0, 0, 0);
         today.setDate(today.getDate() - 1);
-        return today.toISOString().split('T')[0];
+        return today;
     }, []);
     const currentYear = new Date().getFullYear();
 
@@ -449,7 +451,15 @@ export default function UpdateStaffProfileInformationForm({
                         <Field label="Nama Lengkap *" value={data.name} onChange={(value) => setData('name', value)} error={mergedErrors.name} disabled={!isEditing.personal} />
                         <Field label="Email *" type="email" value={data.email} onChange={(value) => setData('email', value)} error={mergedErrors.email} disabled={!isEditing.personal} />
                         <Field label="Nomor Telepon *" maxLength={13} value={data.phone} onChange={(value) => setData('phone', digitsOnly(value))} error={mergedErrors.phone} disabled={!isEditing.personal} />
-                        <Field label="Tanggal Lahir *" type="date" max={maxBirthDate} value={data.date_of_birth} onChange={(value) => setData('date_of_birth', value)} error={mergedErrors.date_of_birth} disabled={!isEditing.personal} />
+                        <DateField
+                            label="Tanggal Lahir *"
+                            value={data.date_of_birth}
+                            onChange={(value) => setData('date_of_birth', value)}
+                            error={mergedErrors.date_of_birth}
+                            disabled={!isEditing.personal}
+                            maxDate={maxBirthDate}
+                            toYear={currentYear}
+                        />
                         <Select label="Jenis Kelamin *" value={data.gender} options={genderOptions} onChange={(value) => setData('gender', value)} error={mergedErrors.gender} disabled={!isEditing.personal} />
                         <Select label="Agama *" value={data.religion} options={religionOptions} onChange={(value) => setData('religion', value)} error={mergedErrors.religion} disabled={!isEditing.personal} />
                         <Area label="Alamat Lengkap *" value={data.address} onChange={(value) => setData('address', value)} error={mergedErrors.address} disabled={!isEditing.personal} />
@@ -910,6 +920,43 @@ function Field({ label, value, onChange, error, type = 'text', maxLength, min, m
                 <RequiredLabel text={label} />
             </label>
             <input type={type} value={value} onChange={(event) => onChange(event.target.value)} maxLength={maxLength} min={min} max={max} disabled={disabled} className="mt-1 h-10 w-full rounded border border-slate-300 px-3 text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500" />
+            {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+        </div>
+    );
+}
+
+function DateField({
+    label,
+    value,
+    onChange,
+    error,
+    disabled = false,
+    maxDate,
+    toYear,
+}: {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    error?: string;
+    disabled?: boolean;
+    maxDate?: Date;
+    toYear?: number;
+}) {
+    return (
+        <div>
+            <label className="text-sm font-medium text-slate-600">
+                <RequiredLabel text={label} />
+            </label>
+            <div className="mt-1">
+                <DatePickerInput
+                    value={value}
+                    onChange={onChange}
+                    disabled={disabled}
+                    maxDate={maxDate}
+                    toYear={toYear}
+                    className={error ? 'border-destructive' : undefined}
+                />
+            </div>
             {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
         </div>
     );

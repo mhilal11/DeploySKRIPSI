@@ -411,11 +411,6 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
         field: RequiredEducationField,
     ) => (form.errors as any)[`educations.${index}.${field}`];
 
-    const handleReset = () => {
-        form.reset();
-        setPhotoPreview(profile.profile_photo_url ?? null);
-    };
-
     return {
         form,
         photoPreview,
@@ -438,7 +433,6 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
         removeCertification,
         submitSection,
         getEducationError,
-        handleReset,
     };
 }
 
