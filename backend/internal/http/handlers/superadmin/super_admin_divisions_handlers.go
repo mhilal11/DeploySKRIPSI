@@ -184,6 +184,10 @@ func SuperAdminDivisionsStore(c *gin.Context) {
 	name := services.NormalizeDivisionName(req.Name)
 	descriptionValue := normalizeOptionalText(req.Description)
 	managerValue := normalizeOptionalText(req.ManagerName)
+	if managerValue != nil {
+		normalized := handlers.NormalizePersonName(*managerValue)
+		managerValue = &normalized
+	}
 	capacity := 0
 	if req.Capacity != nil {
 		capacity = *req.Capacity
@@ -196,6 +200,7 @@ func SuperAdminDivisionsStore(c *gin.Context) {
 	handlers.ValidateFieldLength(validationErrors, "name", "Nama divisi", name, 120)
 	handlers.ValidateFieldLength(validationErrors, "description", "Deskripsi divisi", handlers.FirstString(descriptionValue, ""), 1000)
 	handlers.ValidateFieldLength(validationErrors, "manager_name", "Ketua divisi", handlers.FirstString(managerValue, ""), 120)
+	handlers.ValidatePersonName(validationErrors, "manager_name", "Ketua divisi", handlers.FirstString(managerValue, ""))
 	if capacity < 0 {
 		validationErrors["capacity"] = "Kapasitas divisi tidak boleh kurang dari 0."
 	}
@@ -328,10 +333,15 @@ func SuperAdminDivisionsUpdate(c *gin.Context) {
 	managerValue := profile.ManagerName
 	if req.ManagerName != nil {
 		managerValue = normalizeOptionalText(req.ManagerName)
+		if managerValue != nil {
+			normalized := handlers.NormalizePersonName(*managerValue)
+			managerValue = &normalized
+		}
 	}
 	validationErrors := handlers.FieldErrors{}
 	handlers.ValidateFieldLength(validationErrors, "description", "Deskripsi divisi", handlers.FirstString(descriptionValue, ""), 1000)
 	handlers.ValidateFieldLength(validationErrors, "manager_name", "Ketua divisi", handlers.FirstString(managerValue, ""), 120)
+	handlers.ValidatePersonName(validationErrors, "manager_name", "Ketua divisi", handlers.FirstString(managerValue, ""))
 	if len(validationErrors) > 0 {
 		handlers.ValidationErrors(c, validationErrors)
 		return

@@ -6,6 +6,10 @@ import InputLabel from '@/shared/components/InputLabel';
 import PrimaryButton from '@/shared/components/PrimaryButton';
 import TextInput from '@/shared/components/TextInput';
 import { useForm, usePage } from '@/shared/lib/inertia';
+import {
+    normalizePersonName,
+    sanitizePersonNameInput,
+} from '@/shared/lib/input-validation';
 
 
 export default function UpdateProfileInformation({
@@ -58,7 +62,12 @@ export default function UpdateProfileInformation({
                         id="name"
                         className="mt-1 block w-full"
                         value={data.name}
-                        onChange={(e) => setData('name', e.target.value)}
+                        onChange={(e) =>
+                            setData('name', sanitizePersonNameInput(e.target.value))
+                        }
+                        onBlur={(e) =>
+                            setData('name', normalizePersonName(e.target.value))
+                        }
                         required
                         isFocused
                         autoComplete="name"

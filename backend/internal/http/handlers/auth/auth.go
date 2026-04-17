@@ -296,10 +296,16 @@ func Register(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"name": "Nama wajib diisi.", "email": "Email wajib diisi.", "password": "Password wajib diisi."})
 		return
 	}
-	req.Name = strings.TrimSpace(req.Name)
+	req.Name = handlers.NormalizePersonName(req.Name)
 	req.Email = handlers.NormalizeEmail(req.Email)
 	if field, msg := validateAuthFieldLengths(req.Name, maxNameLength, "Nama"); field != "" {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"name": msg})
+		return
+	}
+	validationErrors := handlers.FieldErrors{}
+	handlers.ValidatePersonName(validationErrors, "name", "Nama", req.Name)
+	if len(validationErrors) > 0 {
+		handlers.ValidationErrors(c, validationErrors)
 		return
 	}
 	if field, msg := validateAuthFieldLengths(req.Email, maxEmailLength, "Email"); field != "" {

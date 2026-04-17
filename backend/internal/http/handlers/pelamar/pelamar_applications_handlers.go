@@ -87,7 +87,7 @@ func PelamarApplicationsStore(c *gin.Context) {
 	}
 
 	divisionID := c.PostForm("division_id")
-	fullName := strings.TrimSpace(c.PostForm("full_name"))
+	fullName := handlers.NormalizePersonName(c.PostForm("full_name"))
 	email := handlers.NormalizeEmail(c.PostForm("email"))
 	phone := normalizePhoneNumber(c.PostForm("phone"))
 	skills := strings.TrimSpace(c.PostForm("skills"))
@@ -106,6 +106,7 @@ func PelamarApplicationsStore(c *gin.Context) {
 		validationErrors["skills"] = "Keahlian wajib diisi."
 	}
 	handlers.ValidateFieldLength(validationErrors, "full_name", "Nama", fullName, 255)
+	handlers.ValidatePersonName(validationErrors, "full_name", "Nama", fullName)
 	handlers.ValidateFieldLength(validationErrors, "email", "Email", email, 254)
 	handlers.ValidateFieldLength(validationErrors, "phone", "Nomor telepon", phone, 20)
 	handlers.ValidateFieldLength(validationErrors, "skills", "Keahlian", skills, 2000)

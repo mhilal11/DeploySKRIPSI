@@ -7,7 +7,12 @@ import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
-import { pdfUploadRule, validateFile } from '@/shared/lib/input-validation';
+import {
+    normalizePersonName,
+    pdfUploadRule,
+    sanitizePersonNameInput,
+    validateFile,
+} from '@/shared/lib/input-validation';
 
 
 export interface ApplicationFormData {
@@ -69,6 +74,10 @@ export default function ApplicationForm({
         if (numbersOnly.length <= 13) {
             setData('phone', numbersOnly);
         }
+    };
+
+    const handleNameChange = (value: string) => {
+        setData('full_name', sanitizePersonNameInput(value));
     };
 
     const applyCvFile = (file: File | null, resetInput?: () => void) => {
@@ -167,7 +176,10 @@ export default function ApplicationForm({
                         id="fullname"
                         required
                         value={data.full_name}
-                        onChange={(event) => setData('full_name', event.target.value)}
+                        onChange={(event) => handleNameChange(event.target.value)}
+                        onBlur={(event) =>
+                            setData('full_name', normalizePersonName(event.target.value))
+                        }
                         placeholder="Masukkan nama lengkap"
                     />
                     {errors.full_name && (

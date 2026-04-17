@@ -2,9 +2,30 @@ export const MAX_COMMON_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
 const emailPattern =
     /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+const personNamePattern = /^[\p{L}\p{M}]+(?:[ '-][\p{L}\p{M}]+)*$/u;
+const disallowedPersonNameCharsPattern = /[^\p{L}\p{M}\s'-]/gu;
+
+export const PERSON_NAME_ERROR_MESSAGE =
+    "Nama hanya boleh berisi huruf, spasi, tanda hubung (-), dan apostrof (').";
 
 export function normalizeEmail(value: string): string {
     return value.trim().toLowerCase();
+}
+
+export function sanitizePersonNameInput(value: string): string {
+    return value.replace(disallowedPersonNameCharsPattern, '');
+}
+
+export function normalizePersonName(value: string): string {
+    return value.trim().replace(/\s+/g, ' ');
+}
+
+export function isValidPersonName(value: string): boolean {
+    const normalized = normalizePersonName(value);
+    if (!normalized) {
+        return false;
+    }
+    return personNamePattern.test(normalized);
 }
 
 export function isValidEmail(value: string): boolean {

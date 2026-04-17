@@ -19,7 +19,11 @@ import {
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Head, useForm } from "@/shared/lib/inertia";
-import { normalizeEmail } from "@/shared/lib/input-validation";
+import {
+    normalizeEmail,
+    normalizePersonName,
+    sanitizePersonNameInput,
+} from "@/shared/lib/input-validation";
 import { markLandingSplashSkipOnce } from "@/shared/lib/landing-splash";
 import {
     PASSWORD_POLICY_ERROR_MESSAGE,
@@ -62,9 +66,6 @@ export default function Register({
     const containerRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
     const isExistingGoogleAccount = oauth_error_code === "email_exists";
-
-    // Regex validasi nama: hanya huruf, spasi, petik atas, dan strip
-    const nameRegex = /^[A-Za-z\s'-]+$/;
 
     useEffect(() => {
         markLandingSplashSkipOnce();
@@ -233,17 +234,12 @@ export default function Register({
                                             value={data.name}
                                             autoComplete="name"
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-[#2F6DB5]/60 focus-visible:ring-[#2F6DB5]/60 backdrop-blur-sm"
-                                            onChange={(e) => {
-                                                const value = e.target.value;
-
-                                                // validasi: hanya huruf, spasi, petik atas, strip
-                                                if (
-                                                    value === "" ||
-                                                    nameRegex.test(value)
-                                                ) {
-                                                    setData("name", value);
-                                                }
-                                            }}
+                                            onChange={(e) =>
+                                                setData("name", sanitizePersonNameInput(e.target.value))
+                                            }
+                                            onBlur={(e) =>
+                                                setData("name", normalizePersonName(e.target.value))
+                                            }
                                             required
                                         />
                                     </div>

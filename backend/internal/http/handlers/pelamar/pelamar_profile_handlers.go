@@ -73,7 +73,7 @@ func PelamarProfileUpdate(c *gin.Context) {
 			var personal map[string]string
 			_ = json.Unmarshal([]byte(personalJSON), &personal)
 			if v, ok := personal["full_name"]; ok {
-				trimmed := strings.TrimSpace(v)
+				trimmed := handlers.NormalizePersonName(v)
 				profile.FullName = &trimmed
 				shouldSyncUserAccount = true
 			}

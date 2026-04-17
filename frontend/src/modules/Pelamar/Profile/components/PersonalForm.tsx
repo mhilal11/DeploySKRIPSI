@@ -19,7 +19,12 @@ import {
     getCitiesByProvince,
     getCityDisplayName
 } from '@/shared/data/indonesian-locations';
-import { isValidEmail, normalizeEmail } from '@/shared/lib/input-validation';
+import {
+    isValidEmail,
+    normalizeEmail,
+    normalizePersonName,
+    sanitizePersonNameInput,
+} from '@/shared/lib/input-validation';
 
 import { ApplicantProfileForm } from '../profileTypes';
 
@@ -42,10 +47,7 @@ export default function PersonalForm({
 }: PersonalFormProps) {
     // Validation: Only letters, spaces, hyphens, and apostrophes
     const handleNameChange = (value: string) => {
-        const validNamePattern = /^[a-zA-Z\s\-']*$/;
-        if (validNamePattern.test(value) || value === '') {
-            onChange('full_name', value);
-        }
+        onChange('full_name', sanitizePersonNameInput(value));
     };
 
     // Validation: Must contain @
@@ -100,6 +102,9 @@ export default function PersonalForm({
                     <Input
                         value={data.full_name}
                         onChange={(event) => handleNameChange(event.target.value)}
+                        onBlur={(event) =>
+                            onChange('full_name', normalizePersonName(event.target.value))
+                        }
                         placeholder="Masukkan nama lengkap"
                         disabled={disabled}
                     />

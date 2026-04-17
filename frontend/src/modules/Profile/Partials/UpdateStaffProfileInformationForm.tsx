@@ -23,7 +23,14 @@ import {
 } from '@/shared/data/indonesian-locations';
 import { api, apiUrl } from '@/shared/lib/api';
 import { useForm, usePage } from '@/shared/lib/inertia';
-import { imageUploadRule, isValidEmail, validateFile } from '@/shared/lib/input-validation';
+import {
+    imageUploadRule,
+    isValidEmail,
+    isValidPersonName,
+    PERSON_NAME_ERROR_MESSAGE,
+    sanitizePersonNameInput,
+    validateFile,
+} from '@/shared/lib/input-validation';
 
 import UpdatePasswordForm from './UpdatePasswordForm';
 
@@ -448,7 +455,7 @@ export default function UpdateStaffProfileInformationForm({
                             isEditing={isEditing.personal}
                             onEdit={() => startEdit('personal')}
                         />
-                        <Field label="Nama Lengkap *" value={data.name} onChange={(value) => setData('name', value)} error={mergedErrors.name} disabled={!isEditing.personal} />
+                        <Field label="Nama Lengkap *" value={data.name} onChange={(value) => setData('name', sanitizePersonNameInput(value))} error={mergedErrors.name} disabled={!isEditing.personal} />
                         <Field label="Email *" type="email" value={data.email} onChange={(value) => setData('email', value)} error={mergedErrors.email} disabled={!isEditing.personal} />
                         <Field label="Nomor Telepon *" maxLength={13} value={data.phone} onChange={(value) => setData('phone', digitsOnly(value))} error={mergedErrors.phone} disabled={!isEditing.personal} />
                         <DateField
@@ -599,6 +606,7 @@ function validate(data: Data, section: 'personal' | 'education'): Record<string,
             ['province', 'Provinsi wajib diisi.'],
         ];
         requiredTop.forEach(([field, msg]) => !String(data[field]).trim() && (errs[field] = msg));
+        if (data.name && !isValidPersonName(data.name)) errs.name = PERSON_NAME_ERROR_MESSAGE;
         if (data.email && !isValidEmail(data.email)) errs.email = 'Format email tidak valid.';
         if (data.phone && !isValidPhone(data.phone)) errs.phone = 'Nomor telepon harus 8-13 digit angka.';
         if (data.date_of_birth) {

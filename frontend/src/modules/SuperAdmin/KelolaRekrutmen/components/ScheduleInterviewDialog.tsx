@@ -29,6 +29,10 @@ import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { useForm } from '@/shared/lib/inertia';
+import {
+    normalizePersonName,
+    sanitizePersonNameInput,
+} from '@/shared/lib/input-validation';
 
 import { ApplicantRecord, InterviewSchedule } from '../types';
 
@@ -455,7 +459,12 @@ export default function ScheduleInterviewDialog({
                             <Input
                                 id="interviewer"
                                 value={data.interviewer}
-                                onChange={(e) => setData('interviewer', e.target.value)}
+                                onChange={(e) =>
+                                    setData('interviewer', sanitizePersonNameInput(e.target.value))
+                                }
+                                onBlur={(e) =>
+                                    setData('interviewer', normalizePersonName(e.target.value))
+                                }
                                 required
                                 disabled={processing}
                                 placeholder="Nama Pewawancara / Tim HR"

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"hris-backend/internal/config"
+	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/http/middleware"
 	"hris-backend/internal/models"
 	dbrepo "hris-backend/internal/repository"
@@ -224,10 +225,18 @@ func createGoogleRegisteredUser(c *gin.Context, claims googleTokenClaims) (*mode
 		return nil, errors.New("Gagal menyiapkan akun baru.")
 	}
 
-	displayName := strings.TrimSpace(claims.Name)
+	displayName := handlers.NormalizePersonName(claims.Name)
 	if displayName == "" {
 		parts := strings.SplitN(claims.Email, "@", 2)
-		displayName = parts[0]
+		candidate := handlers.NormalizePersonName(parts[0])
+		if handlers.IsValidPersonName(candidate) {
+			displayName = candidate
+		} else {
+			displayName = "Pelamar"
+		}
+	}
+	if !handlers.IsValidPersonName(displayName) {
+		displayName = "Pelamar"
 	}
 
 	now := time.Now()

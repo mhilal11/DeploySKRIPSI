@@ -11,6 +11,10 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import type { InertiaFormProps } from '@/shared/lib/inertia';
+import {
+    normalizePersonName,
+    sanitizePersonNameInput,
+} from '@/shared/lib/input-validation';
 
 import type { DivisionRecord } from './types';
 
@@ -57,10 +61,11 @@ export default function EditDivisionDialog({ division, form, onClose, onSubmit }
                                         id="division-manager"
                                         value={form.data.manager_name}
                                         onChange={(e) => {
-                                            // Only allow letters and spaces
-                                            const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
-                                            form.setData('manager_name', value);
+                                            form.setData('manager_name', sanitizePersonNameInput(e.target.value));
                                         }}
+                                        onBlur={(e) =>
+                                            form.setData('manager_name', normalizePersonName(e.target.value))
+                                        }
                                         placeholder="Nama ketua divisi"
                                     />
                                     {form.errors.manager_name && (

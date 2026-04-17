@@ -11,6 +11,10 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import type { InertiaFormProps } from '@/shared/lib/inertia';
+import {
+    normalizePersonName,
+    sanitizePersonNameInput,
+} from '@/shared/lib/input-validation';
 
 export type CreateDivisionFormFields = {
     name: string;
@@ -57,9 +61,11 @@ export default function CreateDivisionDialog({ open, form, onClose, onSubmit }: 
                                     id="division-manager-create"
                                     value={form.data.manager_name}
                                     onChange={(event) => {
-                                        const value = event.target.value.replace(/[^a-zA-Z\s]/g, '');
-                                        form.setData('manager_name', value);
+                                        form.setData('manager_name', sanitizePersonNameInput(event.target.value));
                                     }}
+                                    onBlur={(event) =>
+                                        form.setData('manager_name', normalizePersonName(event.target.value))
+                                    }
                                     placeholder="Nama ketua divisi"
                                 />
                                 {form.errors.manager_name && (

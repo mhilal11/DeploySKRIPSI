@@ -8,9 +8,31 @@ import (
 )
 
 var emailPattern = regexp.MustCompile(`^[a-z0-9.!#$%&'*+/=?^_` + "`" + `{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$`)
+var personNamePattern = regexp.MustCompile(`^[\p{L}\p{M}]+(?:[ '-][\p{L}\p{M}]+)*$`)
 
 func NormalizeEmail(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func NormalizePersonName(value string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+}
+
+func IsValidPersonName(value string) bool {
+	normalized := NormalizePersonName(value)
+	if normalized == "" {
+		return false
+	}
+	return personNamePattern.MatchString(normalized)
+}
+
+func ValidatePersonName(errs FieldErrors, field, label, value string) {
+	if errs == nil {
+		return
+	}
+	if normalized := NormalizePersonName(value); normalized != "" && !IsValidPersonName(normalized) {
+		errs[field] = label + " hanya boleh berisi huruf, spasi, tanda hubung (-), dan apostrof (')."
+	}
 }
 
 func IsValidEmail(value string) bool {

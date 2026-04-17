@@ -347,7 +347,7 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 	timeStart := c.PostForm("time")
 	timeEnd := c.PostForm("end_time")
 	mode := c.PostForm("mode")
-	interviewer := c.PostForm("interviewer")
+	interviewer := handlers.NormalizePersonName(c.PostForm("interviewer"))
 	meetingLink := c.PostForm("meeting_link")
 	notes := c.PostForm("notes")
 
@@ -378,7 +378,7 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 			}
 			if interviewer == "" {
 				if raw, ok := payload["interviewer"].(string); ok {
-					interviewer = strings.TrimSpace(raw)
+					interviewer = handlers.NormalizePersonName(raw)
 				}
 			}
 			if meetingLink == "" {
@@ -404,6 +404,7 @@ func SuperAdminRecruitmentScheduleInterview(c *gin.Context) {
 	handlers.ValidateFieldLength(validationErrors, "end_time", "Waktu selesai", timeEnd, 10)
 	handlers.ValidateFieldLength(validationErrors, "mode", "Mode interview", mode, 20)
 	handlers.ValidateFieldLength(validationErrors, "interviewer", "Interviewer", interviewer, 120)
+	handlers.ValidatePersonName(validationErrors, "interviewer", "Interviewer", interviewer)
 	handlers.ValidateFieldLength(validationErrors, "meeting_link", "Link meeting", meetingLink, 500)
 	handlers.ValidateFieldLength(validationErrors, "notes", "Catatan interview", notes, 3000)
 	if len(validationErrors) > 0 {

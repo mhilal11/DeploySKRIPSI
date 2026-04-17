@@ -129,7 +129,7 @@ func UpdateProfile(c *gin.Context) {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"name": "Nama wajib diisi.", "email": "Email wajib diisi."})
 		return
 	}
-	req.Name = strings.TrimSpace(req.Name)
+	req.Name = handlers.NormalizePersonName(req.Name)
 	req.Email = handlers.NormalizeEmail(req.Email)
 	req.Phone = strings.TrimSpace(req.Phone)
 	req.DateOfBirth = strings.TrimSpace(req.DateOfBirth)
@@ -171,6 +171,7 @@ func UpdateProfile(c *gin.Context) {
 			fieldErrors["email"] = "Email wajib diisi."
 		}
 		handlers.ValidateFieldLength(fieldErrors, "name", "Nama", req.Name, 255)
+		handlers.ValidatePersonName(fieldErrors, "name", "Nama", req.Name)
 		handlers.ValidateFieldLength(fieldErrors, "email", "Email", req.Email, 255)
 		handlers.ValidateFieldLength(fieldErrors, "phone", "Nomor telepon", req.Phone, 50)
 		handlers.ValidateFieldLength(fieldErrors, "address", "Alamat", req.Address, 1000)

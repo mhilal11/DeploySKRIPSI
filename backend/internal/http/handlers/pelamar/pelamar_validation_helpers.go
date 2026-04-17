@@ -14,7 +14,7 @@ var applicantEducationLevels = []string{"SD", "SMP", "SMA/SMK", "D3", "D4", "S1"
 func validatePersonalRequired(profile *models.ApplicantProfile) handlers.FieldErrors {
 	errs := handlers.FieldErrors{}
 
-	fullName := strings.TrimSpace(handlers.FirstString(profile.FullName, ""))
+	fullName := handlers.NormalizePersonName(handlers.FirstString(profile.FullName, ""))
 	email := handlers.NormalizeEmail(handlers.FirstString(profile.Email, ""))
 	phone := normalizePhoneNumber(handlers.FirstString(profile.Phone, ""))
 	gender := strings.TrimSpace(handlers.FirstString(profile.Gender, ""))
@@ -68,6 +68,7 @@ func validatePersonalRequired(profile *models.ApplicantProfile) handlers.FieldEr
 		errs["personal.city"] = "Kota/Kabupaten wajib diisi."
 	}
 	handlers.ValidateFieldLength(errs, "personal.full_name", "Nama lengkap", fullName, 255)
+	handlers.ValidatePersonName(errs, "personal.full_name", "Nama lengkap", fullName)
 	handlers.ValidateFieldLength(errs, "personal.email", "Email", email, 254)
 	handlers.ValidateFieldLength(errs, "personal.phone", "Nomor telepon", phone, 20)
 	handlers.ValidateFieldLength(errs, "personal.address", "Alamat lengkap", address, 1000)

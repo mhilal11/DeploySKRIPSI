@@ -23,7 +23,7 @@ func SuperAdminAccountsStore(c *gin.Context) {
 		return
 	}
 
-	name := strings.TrimSpace(c.PostForm("name"))
+	name := handlers.NormalizePersonName(c.PostForm("name"))
 	email := strings.TrimSpace(strings.ToLower(c.PostForm("email")))
 	role := strings.TrimSpace(c.PostForm("role"))
 	division := services.NormalizeDivisionName(c.PostForm("division"))
@@ -127,7 +127,7 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		return
 	}
 
-	name := strings.TrimSpace(c.PostForm("name"))
+	name := handlers.NormalizePersonName(c.PostForm("name"))
 	email := strings.TrimSpace(strings.ToLower(c.PostForm("email")))
 	role := strings.TrimSpace(c.PostForm("role"))
 	division := services.NormalizeDivisionName(c.PostForm("division"))
@@ -424,6 +424,7 @@ func validateAccountInput(
 		fieldErrors["status"] = "Status wajib dipilih."
 	}
 	handlers.ValidateFieldLength(fieldErrors, "name", "Nama", name, 120)
+	handlers.ValidatePersonName(fieldErrors, "name", "Nama", name)
 	handlers.ValidateFieldLength(fieldErrors, "email", "Email", email, 254)
 	handlers.ValidateFieldLength(fieldErrors, "role", "Role", role, 40)
 	handlers.ValidateFieldLength(fieldErrors, "division", "Divisi", division, 120)

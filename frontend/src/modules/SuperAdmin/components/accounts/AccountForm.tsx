@@ -1,6 +1,10 @@
 ﻿import { FormEvent } from 'react';
 
 import PasswordRequirementChecklist from '@/shared/components/PasswordRequirementChecklist';
+import {
+    normalizePersonName,
+    sanitizePersonNameInput,
+} from '@/shared/lib/input-validation';
 
 interface AccountFormState {
     employee_code?: string | null;
@@ -105,10 +109,9 @@ export default function AccountForm({
                         id="name"
                         value={data.name}
                         onChange={(e) => {
-                            // Only allow letters, spaces, apostrophes, and hyphens
-                            const value = e.target.value.replace(/[^a-zA-Z\s'-]/g, '');
-                            setData('name', value);
+                            setData('name', sanitizePersonNameInput(e.target.value));
                         }}
+                        onBlur={(e) => setData('name', normalizePersonName(e.target.value))}
                         className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-4 text-sm text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                     />
                     {errors.name && (
