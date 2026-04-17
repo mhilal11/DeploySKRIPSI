@@ -34,6 +34,7 @@ interface PersonalFormProps {
     onChange: (key: keyof ApplicantProfileForm['personal'], value: string) => void;
     onSave: () => void;
     processing: boolean;
+    hasChanges?: boolean;
     disabled?: boolean;
 }
 
@@ -43,6 +44,7 @@ export default function PersonalForm({
     onChange,
     onSave,
     processing,
+    hasChanges = true,
     disabled = false,
 }: PersonalFormProps) {
     // Validation: Only letters, spaces, hyphens, and apostrophes
@@ -311,12 +313,17 @@ export default function PersonalForm({
                 <div className="mt-6 flex flex-wrap gap-3">
                     <Button
                         onClick={onSave}
-                        disabled={processing}
+                        disabled={processing || !hasChanges}
                         className="bg-blue-900 hover:bg-blue-800"
                     >
                         <Save className="mr-2 h-4 w-4" />
                         Simpan Data Pribadi
                     </Button>
+                    {!processing && !hasChanges && (
+                        <p className="self-center text-sm text-slate-500">
+                            Ubah minimal 1 field terlebih dahulu agar tombol simpan aktif.
+                        </p>
+                    )}
                 </div>
             )}
         </Card>

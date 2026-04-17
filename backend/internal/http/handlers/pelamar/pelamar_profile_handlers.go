@@ -173,11 +173,19 @@ func PelamarProfileUpdate(c *gin.Context) {
 
 	if section == "experience" || section == "all" {
 		experiencesJSON := c.PostForm("experiences")
+		if section == "experience" && strings.TrimSpace(experiencesJSON) == "" {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"experiences": "Minimal 1 pengalaman kerja/magang wajib diisi."})
+			return
+		}
 		if experiencesJSON != "" {
 			var experiences []map[string]any
 			if err := json.Unmarshal([]byte(experiencesJSON), &experiences); err != nil {
 				handlers.ValidationErrors(c, handlers.FieldErrors{"experiences": "Format data pengalaman tidak valid."})
 				return
+			}
+			if section == "all" && len(experiences) == 0 {
+				profile.Experiences = models.JSON([]byte("[]"))
+				goto certificationsSection
 			}
 
 			if errs := validateExperienceRequired(experiences); len(errs) > 0 {
@@ -194,8 +202,13 @@ func PelamarProfileUpdate(c *gin.Context) {
 		}
 	}
 
+certificationsSection:
 	if section == "certification" {
 		certificationsJSON := c.PostForm("certifications")
+		if strings.TrimSpace(certificationsJSON) == "" {
+			handlers.ValidationErrors(c, handlers.FieldErrors{"certifications": "Minimal 1 sertifikasi wajib diisi."})
+			return
+		}
 		var certs []map[string]any
 		if certificationsJSON != "" {
 			_ = json.Unmarshal([]byte(certificationsJSON), &certs)

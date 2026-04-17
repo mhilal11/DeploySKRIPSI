@@ -1,5 +1,5 @@
 ﻿import { Edit, X, Lock, AlertTriangle, CheckCircle, Info } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import PelamarLayout from '@/modules/Pelamar/Layout';
 import UpdatePasswordForm from '@/modules/Profile/Partials/UpdatePasswordForm';
@@ -29,8 +29,12 @@ import ExperienceForm from './Profile/components/ExperienceForm';
 import PersonalForm from './Profile/components/PersonalForm';
 import ProfileHeader from './Profile/components/ProfileHeader';
 import {
+    ApplicantProfileForm,
     ApplicantProfilePayload,
     Education,
+    isCertificationComplete as isCertificationItemComplete,
+    isEducationComplete as isEducationItemComplete,
+    isExperienceComplete as isExperienceItemComplete,
     RequiredCertificationField,
     RequiredExperienceField,
     SectionKey,
@@ -47,6 +51,35 @@ type ProfilePageProps = PageProps<{
 
 const AVATAR_SIZE = 160;
 type ApplicantTab = Exclude<SectionKey, 'photo'> | 'password';
+
+const normalizeComparableValue = (value: string | undefined | null) => value ?? '';
+
+const serializePersonalData = (personal: ApplicantProfileForm['personal']) =>
+    JSON.stringify({
+        full_name: normalizeComparableValue(personal.full_name),
+        email: normalizeComparableValue(personal.email),
+        phone: normalizeComparableValue(personal.phone),
+        date_of_birth: normalizeComparableValue(personal.date_of_birth),
+        gender: normalizeComparableValue(personal.gender),
+        religion: normalizeComparableValue(personal.religion),
+        address: normalizeComparableValue(personal.address),
+        domicile_address: normalizeComparableValue(personal.domicile_address),
+        city: normalizeComparableValue(personal.city),
+        province: normalizeComparableValue(personal.province),
+    });
+
+const serializeEducations = (educations: Education[]) =>
+    JSON.stringify(
+        educations.map((education) => ({
+            id: education.id,
+            institution: normalizeComparableValue(education.institution),
+            degree: normalizeComparableValue(education.degree),
+            field_of_study: normalizeComparableValue(education.field_of_study),
+            start_year: normalizeComparableValue(education.start_year),
+            end_year: normalizeComparableValue(education.end_year),
+            gpa: normalizeComparableValue(education.gpa),
+        })),
+    );
 
 export default function Profile({
     profile,
@@ -84,11 +117,11 @@ export default function Profile({
     const [activeTab, setActiveTab] = useState<ApplicantTab>('personal');
     const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
     const [pendingSaveSection, setPendingSaveSection] = useState<SectionKey | null>(null);
-    const editSnapshotRef = useRef<{
+    const [editSnapshot, setEditSnapshot] = useState<{
         personal: typeof form.data.personal;
         educations: Education[];
     } | null>(null);
-    const prevRecentlySuccessfulRef = useRef(false);
+    const [prevRecentlySuccessful, setPrevRecentlySuccessful] = useState(false);
 
     // Profile is locked only during active application process
     const isProfileLocked = hasActiveApplication;
@@ -98,14 +131,20 @@ export default function Profile({
     }, [profileReminderMessage]);
 
     useEffect(() => {
-        if (isEditing && form.recentlySuccessful && !prevRecentlySuccessfulRef.current) {
-            editSnapshotRef.current = {
+        if (isEditing && form.recentlySuccessful && !prevRecentlySuccessful) {
+            setEditSnapshot({
                 personal: { ...form.data.personal },
                 educations: form.data.educations.map((item) => ({ ...item })),
-            };
+            });
         }
-        prevRecentlySuccessfulRef.current = form.recentlySuccessful;
-    }, [form.recentlySuccessful, form.data.personal, form.data.educations, isEditing]);
+        setPrevRecentlySuccessful(form.recentlySuccessful);
+    }, [
+        form.recentlySuccessful,
+        form.data.personal,
+        form.data.educations,
+        isEditing,
+        prevRecentlySuccessful,
+    ]);
     const flatErrors = form.errors as Record<string, string>;
     const getExperienceError = (index: number, field: RequiredExperienceField) =>
         flatErrors[`experiences.${index}.${field}`];
@@ -126,29 +165,28 @@ export default function Profile({
         form.data.personal.province
     );
 
-    const isEducationComplete = form.data.educations.length > 0 &&
-        form.data.educations.every(edu =>
-            edu.institution && edu.degree && edu.field_of_study && edu.start_year && edu.end_year
-        );
+    const isEducationComplete =
+        form.data.educations.length > 0 &&
+        form.data.educations.every(isEducationItemComplete);
+    const hasPersonalChanges = Boolean(
+        editSnapshot &&
+            serializePersonalData(editSnapshot.personal) !==
+                serializePersonalData(form.data.personal),
+    );
+    const hasEducationChanges = Boolean(
+        editSnapshot &&
+            serializeEducations(editSnapshot.educations) !==
+                serializeEducations(form.data.educations),
+    );
 
     const hasExperienceData = form.data.experiences.length > 0;
-    const isExperienceComplete = hasExperienceData &&
-        form.data.experiences.every(exp =>
-            exp.company &&
-            exp.position &&
-            exp.start_date &&
-            (exp.is_current || exp.end_date) &&
-            exp.description
-        );
+    const isExperienceComplete =
+        hasExperienceData && form.data.experiences.every(isExperienceItemComplete);
 
     const hasCertificationData = form.data.certifications.length > 0;
-    const isCertificationComplete = hasCertificationData &&
-        form.data.certifications.every(cert =>
-            cert.name &&
-            cert.issuing_organization &&
-            cert.issue_date &&
-            cert.expiry_date
-        );
+    const isCertificationComplete =
+        hasCertificationData &&
+        form.data.certifications.every(isCertificationItemComplete);
 
     // Get tab style class
     const getTabClassName = (status: 'complete' | 'incomplete' | 'neutral') => {
@@ -177,11 +215,11 @@ export default function Profile({
 
     const handleToggleEdit = () => {
         if (isEditing) {
-            if (editSnapshotRef.current) {
+            if (editSnapshot) {
                 form.setData((prevData) => ({
                     ...prevData,
-                    personal: { ...editSnapshotRef.current!.personal },
-                    educations: editSnapshotRef.current!.educations.map((item) => ({ ...item })),
+                    personal: { ...editSnapshot.personal },
+                    educations: editSnapshot.educations.map((item) => ({ ...item })),
                 }));
             }
             form.clearErrors();
@@ -189,10 +227,10 @@ export default function Profile({
             return;
         }
 
-        editSnapshotRef.current = {
+        setEditSnapshot({
             personal: { ...form.data.personal },
             educations: form.data.educations.map((item) => ({ ...item })),
-        };
+        });
         setIsEditing(true);
     };
 
@@ -337,6 +375,7 @@ export default function Profile({
                             processing={
                                 form.processing && submittingSection === 'personal'
                             }
+                            hasChanges={hasPersonalChanges}
                             disabled={!isEditing || isProfileLocked}
                         />
                     </TabsContent>
@@ -354,6 +393,7 @@ export default function Profile({
                                 form.processing && submittingSection === 'education'
                             }
                             getFieldError={getEducationError}
+                            hasChanges={hasEducationChanges}
                             disabled={!isEditing || isProfileLocked}
                         />
                     </TabsContent>

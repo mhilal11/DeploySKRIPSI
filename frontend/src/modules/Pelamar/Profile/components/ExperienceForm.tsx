@@ -8,7 +8,11 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 
-import { Experience, RequiredExperienceField } from '../profileTypes';
+import {
+    Experience,
+    isExperienceComplete,
+    RequiredExperienceField,
+} from '../profileTypes';
 
 interface ExperienceFormProps {
     experiences: Experience[];
@@ -35,6 +39,8 @@ export default function ExperienceForm({
 }: ExperienceFormProps) {
     const isValidYearMonth = (value: string) =>
         /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
+    const hasExperiences = experiences.length > 0;
+    const canSave = hasExperiences && experiences.every(isExperienceComplete);
 
     const handleStartDateChange = (experience: Experience, nextStartDate: string) => {
         onChange(experience.id, 'start_date', nextStartDate);
@@ -233,12 +239,19 @@ export default function ExperienceForm({
                 <div className="mt-6">
                     <Button
                         onClick={onSave}
-                        disabled={processing}
+                        disabled={processing || !canSave}
                         className="bg-blue-900 hover:bg-blue-800"
                     >
                         <Save className="mr-2 h-4 w-4" />
                         Simpan Pengalaman Kerja/Magang
                     </Button>
+                    {!processing && !canSave && (
+                        <p className="mt-2 text-sm text-slate-500">
+                            {hasExperiences
+                                ? 'Lengkapi semua field wajib pada setiap pengalaman kerja/magang agar tombol simpan aktif.'
+                                : 'Tambahkan dan isi minimal 1 pengalaman kerja/magang agar tombol simpan aktif.'}
+                        </p>
+                    )}
                 </div>
             )}
         </Card>

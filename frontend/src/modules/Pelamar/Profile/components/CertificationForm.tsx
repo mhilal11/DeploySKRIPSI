@@ -7,7 +7,11 @@ import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 
-import { Certification, RequiredCertificationField } from '../profileTypes';
+import {
+    Certification,
+    isCertificationComplete,
+    RequiredCertificationField,
+} from '../profileTypes';
 import FileUploadDialog from './FileUploadDialog';
 
 interface CertificationFormProps {
@@ -36,6 +40,8 @@ export default function CertificationForm({
     disabled = false,
 }: CertificationFormProps) {
     const [uploadDialogOpen, setUploadDialogOpen] = useState<string | null>(null);
+    const hasCertifications = certifications.length > 0;
+    const canSave = hasCertifications && certifications.every(isCertificationComplete);
 
     const getFileIcon = (certification: Certification) => {
         if (certification.file) {
@@ -303,12 +309,19 @@ export default function CertificationForm({
                 <div className="mt-6">
                     <Button
                         onClick={onSave}
-                        disabled={processing}
+                        disabled={processing || !canSave}
                         className="bg-blue-900 hover:bg-blue-800"
                     >
                         <Save className="mr-2 h-4 w-4" />
                         Simpan Sertifikasi
                     </Button>
+                    {!processing && !canSave && (
+                        <p className="mt-2 text-sm text-slate-500">
+                            {hasCertifications
+                                ? 'Lengkapi nama sertifikasi, organisasi penerbit, dan tanggal terbit agar tombol simpan aktif.'
+                                : 'Tambahkan dan isi minimal 1 sertifikasi agar tombol simpan aktif.'}
+                        </p>
+                    )}
                 </div>
             )}
         </Card>

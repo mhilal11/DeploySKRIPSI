@@ -335,6 +335,30 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
     };
 
     const submitSection = (section: SectionKey) => {
+        if (section === 'experience') {
+            if (form.data.experiences.length === 0) {
+                form.setError('experiences', 'Minimal 1 pengalaman kerja/magang wajib diisi.');
+                toast.error('Gagal Menyimpan ', {
+                    description: 'Tambahkan minimal satu pengalaman kerja/magang sebelum menyimpan.',
+                    duration: 4000,
+                });
+                return;
+            }
+            form.clearErrors('experiences');
+        }
+
+        if (section === 'certification') {
+            if (form.data.certifications.length === 0) {
+                form.setError('certifications', 'Minimal 1 sertifikasi wajib diisi.');
+                toast.error('Gagal Menyimpan ', {
+                    description: 'Tambahkan minimal satu sertifikasi sebelum menyimpan.',
+                    duration: 4000,
+                });
+                return;
+            }
+            form.clearErrors('certifications');
+        }
+
         setSubmittingSection(section);
         
         form.transform((data) => {
@@ -389,7 +413,7 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
                     duration: 3000,
                 });
             },
-            onError: () => {
+            onError: (serverErrors) => {
                 const errorMessages = {
                     personal: 'Periksa kembali semua field wajib pada data pribadi.',
                     education: 'Periksa kembali data pendidikan yang wajib diisi.',
@@ -397,8 +421,12 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
                     certification: 'Periksa kembali data sertifikasi yang wajib diisi.',
                     photo: 'Gagal menyimpan foto profil, silakan coba lagi.',
                 };
+                const firstError = Object.values(serverErrors ?? {}).find(
+                    (value) => typeof value === 'string' && value.trim().length > 0,
+                );
                 toast.error('Gagal Menyimpan ', {
-                    description: errorMessages[section],
+                    description:
+                        typeof firstError === 'string' ? firstError : errorMessages[section],
                     duration: 4000,
                 });
             },

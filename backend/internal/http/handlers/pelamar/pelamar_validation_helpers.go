@@ -141,6 +141,10 @@ func validateEducationRequired(educations []map[string]any) handlers.FieldErrors
 
 func validateExperienceRequired(experiences []map[string]any) handlers.FieldErrors {
 	errs := handlers.FieldErrors{}
+	if len(experiences) == 0 {
+		errs["experiences"] = "Minimal 1 pengalaman kerja/magang wajib diisi."
+		return errs
+	}
 
 	for i, experience := range experiences {
 		company := strings.TrimSpace(anyToTrimmedString(experience["company"]))
@@ -180,6 +184,10 @@ func validateExperienceRequired(experiences []map[string]any) handlers.FieldErro
 
 func validateCertificationRequired(certs []map[string]any) handlers.FieldErrors {
 	errs := handlers.FieldErrors{}
+	if len(certs) == 0 {
+		errs["certifications"] = "Minimal 1 sertifikasi wajib diisi."
+		return errs
+	}
 
 	for i, cert := range certs {
 		name := strings.TrimSpace(anyToTrimmedString(cert["name"]))

@@ -64,6 +64,12 @@ export function AutocompleteInput({
         setIsOpen(newValue.trim().length > 0);
         onInputChange?.(newValue);
 
+        // Keep form state in sync while typing custom values so submit does not
+        // race ahead of the delayed blur handler.
+        if (allowCustomValue) {
+            onValueChange(newValue);
+        }
+
         if (newValue.trim() === '') {
             onValueChange('');
         }

@@ -154,3 +154,33 @@ export const isEducationComplete = (education: Education): boolean => {
     return true;
 };
 
+export const isExperienceComplete = (experience: Experience): boolean => {
+    const requiredValues = [
+        experience.company,
+        experience.position,
+        experience.start_date,
+        experience.description,
+    ];
+
+    const hasRequiredValues = requiredValues.every((value) =>
+        Boolean((value ?? '').toString().trim()),
+    );
+
+    if (!hasRequiredValues) {
+        return false;
+    }
+
+    if (experience.is_current) {
+        return true;
+    }
+
+    return Boolean((experience.end_date ?? '').toString().trim());
+};
+
+export const isCertificationComplete = (
+    certification: Certification,
+): boolean =>
+    [certification.name, certification.issuing_organization, certification.issue_date].every(
+        (value) => Boolean((value ?? '').toString().trim()),
+    );
+

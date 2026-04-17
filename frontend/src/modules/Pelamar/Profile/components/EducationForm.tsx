@@ -15,6 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/shared/components/ui/select';
+import { YearPickerInput } from '@/shared/components/ui/year-picker-input';
 import { api, apiUrl } from '@/shared/lib/api';
 
 import { Education, RequiredEducationField, GPA_REQUIRED_DEGREES } from '../profileTypes';
@@ -34,6 +35,7 @@ interface EducationFormProps {
     processing: boolean;
     getFieldError: (index: number, field: RequiredEducationField) => string | undefined;
     baseError?: string;
+    hasChanges?: boolean;
     disabled?: boolean;
 }
 
@@ -47,6 +49,7 @@ export default function EducationForm({
     processing,
     getFieldError,
     baseError,
+    hasChanges = true,
     disabled = false,
 }: EducationFormProps) {
     const currentYear = new Date().getFullYear();
@@ -143,6 +146,50 @@ export default function EducationForm({
             window.clearTimeout(timer);
         };
     }, [programQuery]);
+
+    const handleStartYearChange = (education: Education, nextStartYear: string) => {
+        onChange(education.id, 'start_year', nextStartYear);
+
+        const startYear = parseInt(nextStartYear, 10);
+        const endYear = parseInt(education.end_year ?? '', 10);
+        if (Number.isNaN(startYear) || Number.isNaN(endYear)) {
+            return;
+        }
+
+        const maxEndYear = startYear + 7;
+        if (endYear < startYear) {
+            onChange(education.id, 'end_year', nextStartYear);
+            toast.info('Tahun selesai disesuaikan dengan tahun mulai.');
+            return;
+        }
+
+        if (endYear > maxEndYear) {
+            onChange(education.id, 'end_year', String(maxEndYear));
+            toast.info('Tahun selesai disesuaikan maksimal 7 tahun dari tahun mulai.');
+        }
+    };
+
+    const handleEndYearChange = (education: Education, nextEndYear: string) => {
+        const endYear = parseInt(nextEndYear, 10);
+        const startYear = parseInt(education.start_year ?? '', 10);
+
+        if (!Number.isNaN(startYear)) {
+            if (endYear < startYear) {
+                onChange(education.id, 'end_year', String(startYear));
+                toast.error('Tahun selesai tidak boleh di bawah tahun mulai.');
+                return;
+            }
+
+            const maxEndYear = startYear + 7;
+            if (endYear > maxEndYear) {
+                onChange(education.id, 'end_year', String(maxEndYear));
+                toast.error('Tahun selesai maksimal 7 tahun dari tahun mulai.');
+                return;
+            }
+        }
+
+        onChange(education.id, 'end_year', nextEndYear);
+    };
 
     return (
         <Card className="p-6">
@@ -260,43 +307,12 @@ export default function EducationForm({
                             </div>
                             <div>
                                 <Label>Tahun Mulai *</Label>
-                                <Input
-                                    type="number"
+                                <YearPickerInput
                                     value={education.start_year ?? ''}
-                                    onChange={(event) => {
-                                        const value = event.target.value;
-                                        if (/^\d{0,4}$/.test(value)) {
-                                            onChange(education.id, 'start_year', value);
-                                        }
-                                    }}
-                                    onBlur={() => {
-                                        const rawStartYear = parseInt(education.start_year ?? '', 10);
-                                        if (Number.isNaN(rawStartYear)) {
-                                            return;
-                                        }
-
-                                        const normalizedStartYear = Math.min(
-                                            Math.max(rawStartYear, MIN_EDUCATION_YEAR),
-                                            currentYear,
-                                        );
-                                        if (normalizedStartYear !== rawStartYear) {
-                                            onChange(education.id, 'start_year', String(normalizedStartYear));
-                                        }
-
-                                        const maxEndYear = normalizedStartYear + 7;
-                                        const rawEndYear = parseInt(education.end_year ?? '', 10);
-                                        if (!Number.isNaN(rawEndYear) && rawEndYear > maxEndYear) {
-                                            onChange(education.id, 'end_year', String(maxEndYear));
-                                            return;
-                                        }
-
-                                        if (!Number.isNaN(rawEndYear) && rawEndYear < normalizedStartYear) {
-                                            onChange(education.id, 'end_year', String(normalizedStartYear));
-                                        }
-                                    }}
-                                    min={MIN_EDUCATION_YEAR}
-                                    max={currentYear}
-                                    placeholder="2019"
+                                    onChange={(value) => handleStartYearChange(education, value)}
+                                    minYear={MIN_EDUCATION_YEAR}
+                                    maxYear={currentYear}
+                                    placeholder="Pilih tahun mulai"
                                     disabled={disabled}
                                 />
                                 {getFieldError(index, 'start_year') && (
@@ -307,81 +323,20 @@ export default function EducationForm({
                             </div>
                             <div>
                                 <Label>Tahun Selesai *</Label>
-                                <Input
-                                    type="number"
+                                <YearPickerInput
                                     value={education.end_year ?? ''}
-                                    onChange={(event) => {
-                                        const value = event.target.value;
-                                        if (!/^\d{0,4}$/.test(value)) {
-                                            return;
-                                        }
-
-                                        const startYearValue = education.start_year ?? '';
-                                        const hasFullStartYear = /^\d{4}$/.test(startYearValue);
-                                        const hasFullEndYear = /^\d{4}$/.test(value);
-
-                                        if (hasFullStartYear && hasFullEndYear) {
-                                            const startYear = parseInt(startYearValue, 10);
-                                            const endYear = parseInt(value, 10);
-                                            const maxEndYear = startYear + 7;
-
-                                            if (endYear < startYear) {
-                                                toast.error('Tahun selesai tidak boleh di bawah tahun mulai.', {
-                                                    id: `edu-end-below-start-${education.id}`,
-                                                });
-                                                return;
-                                            }
-
-                                            if (endYear > maxEndYear) {
-                                                toast.error('Tahun selesai maksimal 7 tahun dari tahun mulai.', {
-                                                    id: `edu-end-over-max-${education.id}`,
-                                                });
-                                                return;
-                                            }
-                                        }
-
-                                        onChange(education.id, 'end_year', value);
-                                    }}
-                                    onBlur={() => {
-                                        const rawEndYear = parseInt(education.end_year ?? '', 10);
-                                        if (Number.isNaN(rawEndYear)) {
-                                            return;
-                                        }
-
-                                        const startYear = parseInt(education.start_year ?? '', 10);
-                                        if (Number.isNaN(startYear)) {
-                                            if (rawEndYear < MIN_EDUCATION_YEAR) {
-                                                onChange(education.id, 'end_year', String(MIN_EDUCATION_YEAR));
-                                            }
-                                            return;
-                                        }
-
-                                        const maxEndYear = startYear + 7;
-                                        if (rawEndYear < startYear) {
-                                            toast.error('Tahun selesai tidak boleh di bawah tahun mulai.');
-                                        }
-                                        if (rawEndYear > maxEndYear) {
-                                            toast.error('Tahun selesai maksimal 7 tahun dari tahun mulai.');
-                                        }
-                                        const normalizedEndYear = Math.min(
-                                            Math.max(rawEndYear, startYear),
-                                            maxEndYear,
-                                        );
-                                        if (normalizedEndYear !== rawEndYear) {
-                                            onChange(education.id, 'end_year', String(normalizedEndYear));
-                                        }
-                                    }}
-                                    min={
+                                    onChange={(value) => handleEndYearChange(education, value)}
+                                    minYear={
                                         Number.isNaN(parseInt(education.start_year ?? '', 10))
                                             ? MIN_EDUCATION_YEAR
                                             : parseInt(education.start_year ?? '', 10)
                                     }
-                                    max={
+                                    maxYear={
                                         Number.isNaN(parseInt(education.start_year ?? '', 10))
-                                            ? undefined
+                                            ? currentYear + 7
                                             : parseInt(education.start_year ?? '', 10) + 7
                                     }
-                                    placeholder="2023"
+                                    placeholder="Pilih tahun selesai"
                                     disabled={disabled}
                                 />
                                 <p className="mt-1 text-xs text-slate-500">
@@ -461,12 +416,17 @@ export default function EducationForm({
                 <div className="mt-6">
                     <Button
                         onClick={onSave}
-                        disabled={processing}
+                        disabled={processing || !hasChanges}
                         className="bg-blue-900 hover:bg-blue-800"
                     >
                         <Save className="mr-2 h-4 w-4" />
                         Simpan Pendidikan
                     </Button>
+                    {!processing && !hasChanges && (
+                        <p className="mt-2 text-sm text-slate-500">
+                            Ubah minimal 1 field pendidikan terlebih dahulu agar tombol simpan aktif.
+                        </p>
+                    )}
                 </div>
             )}
         </Card>
