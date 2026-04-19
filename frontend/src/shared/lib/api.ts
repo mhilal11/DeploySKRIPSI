@@ -55,14 +55,28 @@ function getCookie(name: string): string | null {
 }
 
 function extractCsrfToken(payload: unknown): string | null {
-  if (!payload || typeof payload !== 'object') {
-    return null;
-  }
+  const candidates: unknown[] = [payload];
 
-  const record = payload as Record<string, unknown>;
-  const directToken = record.csrfToken ?? record.token;
-  if (typeof directToken === 'string' && directToken.trim() !== '') {
-    return directToken.trim();
+  while (candidates.length > 0) {
+    const current = candidates.shift();
+    if (!current || typeof current !== 'object') {
+      continue;
+    }
+
+    const record = current as Record<string, unknown>;
+    const directToken =
+      record.csrfToken ??
+      record.csrf_token ??
+      record.csrf ??
+      record.token;
+    if (typeof directToken === 'string' && directToken.trim() !== '') {
+      return directToken.trim();
+    }
+
+    // Some clients wrap payloads under a `data` object; scan that too.
+    if (record.data && typeof record.data === 'object') {
+      candidates.push(record.data);
+    }
   }
 
   return null;
@@ -155,13 +169,19 @@ export async function ensureCsrfToken(): Promise<string | null> {
     const response = await api.get(apiUrl('/csrf'), {
       withCredentials: true,
     });
+    console.log('[api] csrf response data:', response.data);
+    console.log('[api] csrf response headers:', response.headers);
     const responseToken = extractCsrfToken(response.data);
     const cookieToken = getCookie('XSRF-TOKEN');
     latestCsrfToken = responseToken ?? cookieToken;
     console.log('[api] csrf token:', latestCsrfToken);
     return latestCsrfToken;
-  } catch {
-    // ignore; server will still set token on next request
+  } catch (error) {
+    // Log the failure so the actual csrf payload or cookie problem is visible in devtools.
+    if (axios.isAxiosError(error)) {
+      console.log('[api] csrf response data:', error.response?.data);
+      console.log('[api] csrf response headers:', error.response?.headers);
+    }
     latestCsrfToken = getCookie('XSRF-TOKEN');
     console.log('[api] csrf token:', latestCsrfToken);
     return latestCsrfToken;
