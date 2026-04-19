@@ -145,7 +145,7 @@ func UpdateProfile(c *gin.Context) {
 		req.Section = "all"
 	}
 	if user.Role == models.RoleStaff {
-		req.Phone = normalizePhoneNumber(req.Phone)
+		req.Phone = handlers.NormalizePhoneNumber(req.Phone)
 	}
 	removePhotoRequested := req.RemoveProfilePhoto
 	if !removePhotoRequested {
@@ -192,7 +192,7 @@ func UpdateProfile(c *gin.Context) {
 			if req.Phone == "" {
 				fieldErrors["phone"] = "Nomor telepon wajib diisi."
 			} else if !isValidStaffPhone(req.Phone) {
-				fieldErrors["phone"] = "Nomor telepon harus 8-13 digit angka."
+				fieldErrors["phone"] = "Nomor telepon harus berisi 8-15 digit yang valid."
 			}
 			if req.DateOfBirth == "" {
 				fieldErrors["date_of_birth"] = "Tanggal lahir wajib diisi."
@@ -462,24 +462,11 @@ func isValidEmail(value string) bool {
 }
 
 func isValidStaffPhone(value string) bool {
-	normalized := normalizePhoneNumber(value)
-	return len(normalized) >= 8 && len(normalized) <= 13
+	return handlers.IsValidPhoneNumber(value)
 }
 
 func normalizePhoneNumber(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-
-	var builder strings.Builder
-	builder.Grow(len(value))
-	for _, r := range value {
-		if r >= '0' && r <= '9' {
-			builder.WriteRune(r)
-		}
-	}
-	return builder.String()
+	return handlers.NormalizePhoneNumber(value)
 }
 
 func requiresEducationGPA(degree string) bool {

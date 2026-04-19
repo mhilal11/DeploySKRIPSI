@@ -112,7 +112,7 @@ func PelamarApplicationsStore(c *gin.Context) {
 	handlers.ValidateFieldLength(validationErrors, "skills", "Keahlian", skills, 2000)
 	handlers.ValidateEmail(validationErrors, "email", email)
 	if phone == "" || !isValidPhoneNumber(phone) {
-		validationErrors["phone"] = "Nomor telepon harus 8-13 digit angka."
+		validationErrors["phone"] = "Nomor telepon harus berisi 8-15 digit yang valid."
 	}
 	if len(validationErrors) > 0 {
 		handlers.ValidationErrors(c, validationErrors)

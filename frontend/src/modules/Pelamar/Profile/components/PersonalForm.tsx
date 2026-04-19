@@ -5,6 +5,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { DatePickerInput } from '@/shared/components/ui/date-picker-input';
 import { Input } from '@/shared/components/ui/input';
+import { InternationalPhoneInput } from '@/shared/components/ui/international-phone-input';
 import { Label } from '@/shared/components/ui/label';
 import {
     Select,
@@ -55,14 +56,6 @@ export default function PersonalForm({
     // Validation: Must contain @
     const handleEmailChange = (value: string) => {
         onChange('email', normalizeEmail(value));
-    };
-
-    // Validation: Only numbers, 8-13 characters
-    const handlePhoneChange = (value: string) => {
-        const numbersOnly = value.replace(/\D/g, '');
-        if (numbersOnly.length <= 13) {
-            onChange('phone', numbersOnly);
-        }
     };
 
     // Province and city options
@@ -144,26 +137,12 @@ export default function PersonalForm({
                 </div>
                 <div>
                     <Label>Nomor Telepon *</Label>
-                    <Input
+                    <InternationalPhoneInput
                         value={data.phone}
-                        onChange={(event) => handlePhoneChange(event.target.value)}
-                        placeholder="08xxxxxxxxxx"
+                        onChange={(value) => onChange('phone', value)}
                         disabled={disabled}
-                        maxLength={13}
+                        error={errors['personal.phone']}
                     />
-                    <p className="mt-1 text-xs text-slate-500">
-                        8-13 digit angka
-                    </p>
-                    {data.phone && (data.phone.length < 8 || data.phone.length > 13) && (
-                        <p className="mt-1 text-sm text-amber-600">
-                            Nomor telepon harus 8-13 digit
-                        </p>
-                    )}
-                    {errors['personal.phone'] && (
-                        <p className="mt-1 text-sm text-red-500">
-                            {errors['personal.phone']}
-                        </p>
-                    )}
                 </div>
                 <div>
                     <Label>Tanggal Lahir *</Label>

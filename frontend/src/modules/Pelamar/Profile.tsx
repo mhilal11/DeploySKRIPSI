@@ -21,6 +21,10 @@ import {
     TabsTrigger,
 } from '@/shared/components/ui/tabs';
 import { Head } from '@/shared/lib/inertia';
+import {
+    parseStoredPhoneNumber,
+    validatePhoneNumberForCountry,
+} from '@/shared/lib/input-validation';
 import { PageProps } from '@/shared/types';
 
 import CertificationForm from './Profile/components/CertificationForm';
@@ -146,6 +150,11 @@ export default function Profile({
         prevRecentlySuccessful,
     ]);
     const flatErrors = form.errors as Record<string, string>;
+    const parsedPersonalPhone = parseStoredPhoneNumber(form.data.personal.phone);
+    const isPersonalPhoneValid = validatePhoneNumberForCountry(
+        parsedPersonalPhone.country,
+        parsedPersonalPhone.localNumber,
+    ).isValid;
     const getExperienceError = (index: number, field: RequiredExperienceField) =>
         flatErrors[`experiences.${index}.${field}`];
     const getCertificationError = (index: number, field: RequiredCertificationField) =>
@@ -155,7 +164,7 @@ export default function Profile({
     const isPersonalComplete = Boolean(
         form.data.personal.full_name &&
         form.data.personal.email &&
-        form.data.personal.phone &&
+        isPersonalPhoneValid &&
         form.data.personal.date_of_birth &&
         form.data.personal.gender &&
         form.data.personal.religion &&

@@ -15,6 +15,7 @@ import {
 } from '@/shared/components/ui/alert-dialog';
 import { AutocompleteInput, AutocompleteOption } from '@/shared/components/ui/autocomplete-input';
 import { DatePickerInput } from '@/shared/components/ui/date-picker-input';
+import { InternationalPhoneInput } from '@/shared/components/ui/international-phone-input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import {
     getAllProvinces,
@@ -26,9 +27,11 @@ import { useForm, usePage } from '@/shared/lib/inertia';
 import {
     imageUploadRule,
     isValidEmail,
+    parseStoredPhoneNumber,
     isValidPersonName,
     PERSON_NAME_ERROR_MESSAGE,
     sanitizePersonNameInput,
+    validatePhoneNumberForCountry,
     validateFile,
 } from '@/shared/lib/input-validation';
 
@@ -136,7 +139,7 @@ export default function UpdateStaffProfileInformationForm({
         remove_profile_photo: false,
         name: user?.name ?? '',
         email: user?.email ?? '',
-        phone: digitsOnly(profile?.phone ?? ''),
+        phone: profile?.phone ?? '',
         date_of_birth: profile?.date_of_birth ?? '',
         gender: profile?.gender ?? '',
         religion: profile?.religion ?? '',
@@ -156,7 +159,7 @@ export default function UpdateStaffProfileInformationForm({
             remove_profile_photo: false,
             name: user?.name ?? '',
             email: user?.email ?? '',
-            phone: digitsOnly(profile?.phone ?? ''),
+            phone: profile?.phone ?? '',
             date_of_birth: profile?.date_of_birth ?? '',
             gender: profile?.gender ?? '',
             religion: profile?.religion ?? '',
@@ -457,7 +460,19 @@ export default function UpdateStaffProfileInformationForm({
                         />
                         <Field label="Nama Lengkap *" value={data.name} onChange={(value) => setData('name', sanitizePersonNameInput(value))} error={mergedErrors.name} disabled={!isEditing.personal} />
                         <Field label="Email *" type="email" value={data.email} onChange={(value) => setData('email', value)} error={mergedErrors.email} disabled={!isEditing.personal} />
-                        <Field label="Nomor Telepon *" maxLength={13} value={data.phone} onChange={(value) => setData('phone', digitsOnly(value))} error={mergedErrors.phone} disabled={!isEditing.personal} />
+                        <div>
+                            <label className="text-sm font-medium text-slate-600">
+                                <RequiredLabel text="Nomor Telepon *" />
+                            </label>
+                            <div className="mt-1">
+                                <InternationalPhoneInput
+                                    value={data.phone}
+                                    onChange={(value) => setData('phone', value)}
+                                    disabled={!isEditing.personal}
+                                    error={mergedErrors.phone}
+                                />
+                            </div>
+                        </div>
                         <DateField
                             label="Tanggal Lahir *"
                             value={data.date_of_birth}
@@ -608,7 +623,16 @@ function validate(data: Data, section: 'personal' | 'education'): Record<string,
         requiredTop.forEach(([field, msg]) => !String(data[field]).trim() && (errs[field] = msg));
         if (data.name && !isValidPersonName(data.name)) errs.name = PERSON_NAME_ERROR_MESSAGE;
         if (data.email && !isValidEmail(data.email)) errs.email = 'Format email tidak valid.';
-        if (data.phone && !isValidPhone(data.phone)) errs.phone = 'Nomor telepon harus 8-13 digit angka.';
+        if (data.phone) {
+            const parsedPhone = parseStoredPhoneNumber(data.phone);
+            const phoneValidation = validatePhoneNumberForCountry(
+                parsedPhone.country,
+                parsedPhone.localNumber,
+            );
+            if (!phoneValidation.isValid && phoneValidation.message) {
+                errs.phone = phoneValidation.message;
+            }
+        }
         if (data.date_of_birth) {
             const selected = new Date(data.date_of_birth).getTime();
             const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -682,8 +706,6 @@ function normalizeEducations(items?: Edu[] | null): Edu[] {
         }))
         : [{ ...EMPTY_EDU }];
 }
-function digitsOnly(value: string): string { return value.replace(/\D/g, ''); }
-function isValidPhone(value: string): boolean { const n = digitsOnly(value); return n.length >= 8 && n.length <= 13; }
 function requiresGPA(degree: string): boolean { return GPA_REQUIRED_DEGREES.includes(degree.toUpperCase().trim()); }
 function updateEdu(setData: any, data: Data, index: number, field: keyof Edu, value: string) { const next = [...data.educations]; next[index] = { ...next[index], [field]: value }; setData('educations', next); }
 function removeEdu(setData: any, data: Data, index: number) { const next = data.educations.filter((_, i) => i !== index); setData('educations', next.length ? next : [{ ...EMPTY_EDU }]); }

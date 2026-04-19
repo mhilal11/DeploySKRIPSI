@@ -160,24 +160,11 @@ func syncCompletion(profile *models.ApplicantProfile) {
 }
 
 func normalizePhoneNumber(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-
-	var builder strings.Builder
-	builder.Grow(len(value))
-	for _, r := range value {
-		if r >= '0' && r <= '9' {
-			builder.WriteRune(r)
-		}
-	}
-	return builder.String()
+	return handlers.NormalizePhoneNumber(value)
 }
 
 func isValidPhoneNumber(value string) bool {
-	length := len(value)
-	return length >= 8 && length <= 13
+	return handlers.IsValidPhoneNumber(value)
 }
 
 func stageDate(app models.Application, stage string) *time.Time {

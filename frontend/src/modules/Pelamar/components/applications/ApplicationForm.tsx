@@ -5,9 +5,12 @@ import { toast } from 'sonner';
 import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
+import { InternationalPhoneInput } from '@/shared/components/ui/international-phone-input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import {
+    parseStoredPhoneNumber,
+    validatePhoneNumberForCountry,
     normalizePersonName,
     pdfUploadRule,
     sanitizePersonNameInput,
@@ -55,10 +58,11 @@ export default function ApplicationForm({
 }: ApplicationFormProps) {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [isDragActive, setIsDragActive] = useState(false);
-
-    const normalizedPhone = data.phone.replace(/\D/g, '');
-    const isPhoneValid =
-        normalizedPhone.length >= 8 && normalizedPhone.length <= 13;
+    const parsedPhone = parseStoredPhoneNumber(data.phone);
+    const isPhoneValid = validatePhoneNumberForCountry(
+        parsedPhone.country,
+        parsedPhone.localNumber,
+    ).isValid;
 
     const isFormComplete =
         Boolean(data.division_id) &&
@@ -68,13 +72,6 @@ export default function ApplicationForm({
         isPhoneValid &&
         Boolean(data.skills?.trim()) &&
         Boolean(data.cv);
-
-    const handlePhoneChange = (value: string) => {
-        const numbersOnly = value.replace(/\D/g, '');
-        if (numbersOnly.length <= 13) {
-            setData('phone', numbersOnly);
-        }
-    };
 
     const handleNameChange = (value: string) => {
         setData('full_name', sanitizePersonNameInput(value));
@@ -202,23 +199,12 @@ export default function ApplicationForm({
                 </div>
                 <div>
                     <Label htmlFor="phone">No. Telepon</Label>
-                    <Input
-                        id="phone"
-                        required
+                    <InternationalPhoneInput
                         value={data.phone}
-                        onChange={(event) => handlePhoneChange(event.target.value)}
-                        placeholder="081234567890"
-                        maxLength={13}
+                        onChange={(value) => setData('phone', value)}
+                        disabled={processing}
+                        error={errors.phone}
                     />
-                    <p className="mt-1 text-xs text-slate-500">8-13 digit angka</p>
-                    {data.phone && !isPhoneValid && (
-                        <p className="mt-1 text-xs text-amber-600">
-                            Nomor telepon harus 8-13 digit
-                        </p>
-                    )}
-                    {errors.phone && (
-                        <p className="mt-1 text-xs text-red-500">{errors.phone}</p>
-                    )}
                 </div>
                 <div>
                     <Label>Posisi yang Dilamar</Label>

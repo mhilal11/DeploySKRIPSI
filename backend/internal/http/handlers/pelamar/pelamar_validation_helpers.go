@@ -35,7 +35,7 @@ func validatePersonalRequired(profile *models.ApplicantProfile) handlers.FieldEr
 	if phone == "" {
 		errs["personal.phone"] = "Nomor telepon wajib diisi."
 	} else if !isValidPhoneNumber(phone) {
-		errs["personal.phone"] = "Nomor telepon harus 8-13 digit angka."
+		errs["personal.phone"] = "Nomor telepon harus berisi 8-15 digit yang valid."
 	}
 	if profile.DateOfBirth == nil {
 		errs["personal.date_of_birth"] = "Tanggal lahir wajib diisi."

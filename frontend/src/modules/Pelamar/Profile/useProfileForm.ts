@@ -2,7 +2,12 @@
 import { toast } from 'sonner';
 
 import { router, useForm } from '@/shared/lib/inertia';
-import { imageUploadRule, validateFile } from '@/shared/lib/input-validation';
+import {
+    imageUploadRule,
+    parseStoredPhoneNumber,
+    validatePhoneNumberForCountry,
+    validateFile,
+} from '@/shared/lib/input-validation';
 
 import {
     ApplicantProfilePayload,
@@ -141,8 +146,16 @@ export function useProfileForm(profile: ApplicantProfilePayload) {
             'province',
         ];
         const personalProgress =
-            fields.filter((field) => Boolean(form.data.personal[field]))
-                .length / fields.length;
+            fields.filter((field) => {
+                if (field === 'phone') {
+                    const parsedPhone = parseStoredPhoneNumber(form.data.personal.phone);
+                    return validatePhoneNumberForCountry(
+                        parsedPhone.country,
+                        parsedPhone.localNumber,
+                    ).isValid;
+                }
+                return Boolean(form.data.personal[field]);
+            }).length / fields.length;
 
         const hasValidEducation = form.data.educations.some((education) =>
             isEducationComplete(education),
