@@ -171,7 +171,11 @@ export async function ensureCsrfToken(): Promise<string | null> {
     });
     console.log('[api] csrf response data:', response.data);
     console.log('[api] csrf response headers:', response.headers);
-    const responseToken = extractCsrfToken(response.data);
+    // Backend currently returns { csrf_token: "..." }, so prefer that exact field first.
+    const responseToken =
+      typeof response.data?.csrf_token === 'string' && response.data.csrf_token.trim() !== ''
+        ? response.data.csrf_token.trim()
+        : extractCsrfToken(response.data);
     const cookieToken = getCookie('XSRF-TOKEN');
     latestCsrfToken = responseToken ?? cookieToken;
     console.log('[api] csrf token:', latestCsrfToken);

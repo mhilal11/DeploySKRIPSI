@@ -144,6 +144,8 @@ export function useForm<T extends Record<string, any>>(initialData: T): InertiaF
     const payload = transform ? transform(data) : data;
     const shouldUseFormData = Boolean(options?.forceFormData) || containsFile(payload);
     const normalizedMethod = method.toLowerCase();
+    const normalizedUrl = apiUrl(url);
+    const isLoginRequest = normalizedMethod === 'post' && /\/api\/login$/i.test(normalizedUrl);
 
     try {
       // Mutating requests, including POST /login, must preload CSRF and forward it explicitly.
@@ -152,14 +154,30 @@ export function useForm<T extends Record<string, any>>(initialData: T): InertiaF
           ? null
           : await ensureCsrfToken();
 
+      const requestHeaders = {
+        ...(shouldUseFormData ? { 'Content-Type': 'multipart/form-data' } : {}),
+        ...(csrfToken
+          ? {
+              'X-CSRF-Token': csrfToken,
+              'X-XSRF-TOKEN': csrfToken,
+            }
+          : {}),
+      };
+
+      if (isLoginRequest) {
+        // Temporary CSRF/session diagnostics for Railway login.
+        console.log('[auth] login request headers:', requestHeaders);
+        console.log('[auth] login withCredentials:', true);
+        console.log('[auth] login document.cookie:', typeof document === 'undefined' ? null : document.cookie);
+        console.log('[auth] login xsrf cookie present:', typeof document === 'undefined' ? false : document.cookie.includes('XSRF-TOKEN='));
+      }
+
       const response = await api.request({
         method,
-        url: apiUrl(url),
+        url: normalizedUrl,
         data: shouldUseFormData ? toFormData(payload) : payload,
-        headers: {
-          ...(shouldUseFormData ? { 'Content-Type': 'multipart/form-data' } : {}),
-          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-        },
+        withCredentials: true,
+        headers: requestHeaders,
       });
 
       const responseData = response.data;
@@ -195,6 +213,11 @@ export function useForm<T extends Record<string, any>>(initialData: T): InertiaF
       if (isAxiosError(error)) {
         const status = error.response?.status;
         const responseData = error.response?.data as any;
+        if (isLoginRequest) {
+          console.log('[auth] login error status:', status);
+          console.log('[auth] login error response body:', responseData);
+          console.log('[auth] login error response headers:', error.response?.headers);
+        }
         if (status === 422 && responseData?.errors) {
           setErrors(responseData.errors);
           options?.onError?.(responseData.errors);
