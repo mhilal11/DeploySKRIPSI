@@ -46,7 +46,7 @@ const swaggerUIHTML = `<!doctype html>
 </body>
 </html>`
 
-const productionFrontendOrigin = "https://deploy-skripsi-tawny.vercel.app"
+const productionFrontendOrigin = "https://portal-ldp.vercel.app"
 
 func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	if cfg.Env == "production" {
