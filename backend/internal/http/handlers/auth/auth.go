@@ -183,10 +183,29 @@ func AuthInfo(c *gin.Context) {
 }
 
 func GetCSRF(c *gin.Context) {
+	defer func() {
+		middleware.AuthDebugLog(
+			c,
+			"/api/csrf",
+			middleware.AuthDebugIntField("csrf_token_len", middleware.AuthDebugTokenLen(c.GetString("csrf_token"))),
+			middleware.AuthDebugBoolField("csrf_generated", middleware.AuthDebugCSRFGenerated(c)),
+			middleware.AuthDebugBoolField("xsrf_cookie_set", middleware.AuthDebugCSRFCookieSet(c)),
+			middleware.AuthDebugStatusField(c),
+		)
+	}()
 	c.JSON(http.StatusOK, gin.H{"csrf_token": c.GetString("csrf_token")})
 }
 
 func GetMe(c *gin.Context) {
+	defer func() {
+		middleware.AuthDebugLog(
+			c,
+			"/api/me",
+			middleware.AuthDebugBoolField("session_lookup_ok", middleware.AuthDebugSessionLookupOK(c)),
+			middleware.AuthDebugBoolField("user_found", middleware.CurrentUser(c) != nil),
+			middleware.AuthDebugStatusField(c),
+		)
+	}()
 	user := middleware.CurrentUser(c)
 	if user == nil {
 		c.JSON(http.StatusOK, gin.H{"user": nil})
@@ -211,6 +230,19 @@ func GetMe(c *gin.Context) {
 }
 
 func Login(c *gin.Context) {
+	credentialValidationSucceeded := false
+	sessionCreated := false
+	defer func() {
+		middleware.AuthDebugLog(
+			c,
+			"/api/login",
+			middleware.AuthDebugBoolField("credential_validation_ok", credentialValidationSucceeded),
+			middleware.AuthDebugBoolField("csrf_valid", middleware.AuthDebugCSRFValid(c)),
+			middleware.AuthDebugBoolField("session_created", sessionCreated),
+			middleware.AuthDebugBoolField("response_session_cookie_set", middleware.AuthDebugHasSetCookie(c, "hris_session")),
+			middleware.AuthDebugStatusField(c),
+		)
+	}()
 	var req loginRequest
 	if err := c.ShouldBind(&req); err != nil {
 		handlers.ValidationErrors(c, handlers.FieldErrors{"email": "Email wajib diisi.", "password": "Password wajib diisi."})
@@ -267,12 +299,14 @@ func Login(c *gin.Context) {
 
 	now := time.Now()
 	_ = repo.SetUserLastLogin(user.ID, now)
+	credentialValidationSucceeded = true
 
 	session := sessions.Default(c)
 	if err := renewAuthenticatedSession(session, user.ID); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyimpan sesi login.")
 		return
 	}
+	sessionCreated = true
 
 	c.JSON(http.StatusOK, gin.H{
 		"user":        dto.UserFromModel(user),
@@ -282,6 +316,16 @@ func Login(c *gin.Context) {
 
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
+	sessionExisted := middleware.AuthDebugSessionLookupOK(c)
+	defer func() {
+		middleware.AuthDebugLog(
+			c,
+			"/api/logout",
+			middleware.AuthDebugBoolField("csrf_valid", middleware.AuthDebugCSRFValid(c)),
+			middleware.AuthDebugBoolField("session_existed", sessionExisted),
+			middleware.AuthDebugStatusField(c),
+		)
+	}()
 	session.Clear()
 	if err := session.Save(); err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menghapus sesi.")
