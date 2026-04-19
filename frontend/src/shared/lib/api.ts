@@ -1,5 +1,7 @@
 import axios, { AxiosError } from 'axios';
 
+let latestCsrfToken: string | null = null;
+
 function normalizeApiOrigin(value?: string | null): string {
   const trimmed = value?.trim();
   if (!trimmed) {
@@ -52,8 +54,26 @@ function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
+function extractCsrfToken(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const directToken = record.csrfToken ?? record.token;
+  if (typeof directToken === 'string' && directToken.trim() !== '') {
+    return directToken.trim();
+  }
+
+  return null;
+}
+
+export function getStoredCsrfToken(): string | null {
+  return latestCsrfToken ?? getCookie('XSRF-TOKEN');
+}
+
 api.interceptors.request.use((config) => {
-  const token = getCookie('XSRF-TOKEN');
+  const token = getStoredCsrfToken();
   if (token) {
     config.headers = config.headers ?? {};
     config.headers['X-CSRF-Token'] = token;
@@ -129,11 +149,22 @@ export function resolveAssetUrl(path?: string | null): string | null {
   return base ? `${base}/storage/${normalized}` : `/storage/${normalized}`;
 }
 
-export async function ensureCsrfToken(): Promise<void> {
+export async function ensureCsrfToken(): Promise<string | null> {
   try {
-    await api.get(apiUrl('/csrf'));
+    // Always refresh CSRF before credentialed mutations such as login.
+    const response = await api.get(apiUrl('/csrf'), {
+      withCredentials: true,
+    });
+    const responseToken = extractCsrfToken(response.data);
+    const cookieToken = getCookie('XSRF-TOKEN');
+    latestCsrfToken = responseToken ?? cookieToken;
+    console.log('[api] csrf token:', latestCsrfToken);
+    return latestCsrfToken;
   } catch {
     // ignore; server will still set token on next request
+    latestCsrfToken = getCookie('XSRF-TOKEN');
+    console.log('[api] csrf token:', latestCsrfToken);
+    return latestCsrfToken;
   }
 }
 

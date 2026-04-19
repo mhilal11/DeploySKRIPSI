@@ -1,6 +1,6 @@
 import { useCallback, useContext, useMemo, useRef, useState } from 'react';
 
-import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
+import { api, apiUrl, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
 
 import { PageContext } from './inertia-context';
 import { getRouterStore } from './inertia-store';
@@ -143,13 +143,23 @@ export function useForm<T extends Record<string, any>>(initialData: T): InertiaF
     const transform = transformRef.current;
     const payload = transform ? transform(data) : data;
     const shouldUseFormData = Boolean(options?.forceFormData) || containsFile(payload);
+    const normalizedMethod = method.toLowerCase();
 
     try {
+      // Mutating requests, including POST /login, must preload CSRF and forward it explicitly.
+      const csrfToken =
+        normalizedMethod === 'get' || normalizedMethod === 'head' || normalizedMethod === 'options'
+          ? null
+          : await ensureCsrfToken();
+
       const response = await api.request({
         method,
         url: apiUrl(url),
         data: shouldUseFormData ? toFormData(payload) : payload,
-        headers: shouldUseFormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+        headers: {
+          ...(shouldUseFormData ? { 'Content-Type': 'multipart/form-data' } : {}),
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        },
       });
 
       const responseData = response.data;

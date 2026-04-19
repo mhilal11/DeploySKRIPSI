@@ -147,6 +147,7 @@ export default function Login({
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
 
+        // useForm now fetches /api/csrf before POST /login and forwards X-CSRF-Token.
         post('/login', {
             onSuccess: (responseData: any) => {
                 if (
