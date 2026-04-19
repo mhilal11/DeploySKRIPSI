@@ -15,7 +15,7 @@ import {
     pendingStatuses,
 } from '@/modules/SuperAdmin/components/sidebar-config';
 import type { NavItem } from '@/modules/SuperAdmin/components/sidebar-config';
-import { Link, router } from '@/shared/lib/inertia';
+import { Link, router, usePageManager } from '@/shared/lib/inertia';
 import { route } from '@/shared/lib/route';
 import { cn } from '@/shared/lib/utils';
 import { User } from '@/shared/types';
@@ -43,6 +43,8 @@ function Sidebar({
     initialNotifications = {}
 }: SidebarProps) {
     const pathname = usePathname();
+    const { authLoaded } = usePageManager();
+    const logoutDisabled = !authLoaded;
 
     // If the shell provides live notifications, use them directly.
     // Otherwise fall back to local Echo-driven state (standalone usage).
@@ -409,7 +411,11 @@ function Sidebar({
                         </div>
                         <button
                             type="button"
-                            onClick={() => router.post(route('logout'))}
+                            onClick={() => {
+                                if (logoutDisabled) return;
+                                router.post(route('logout'));
+                            }}
+                            disabled={logoutDisabled}
                             className="flex w-full items-center justify-center gap-2 rounded-lg bg-white/10 px-3 md:px-4 py-1.5 md:py-2 text-[10px] md:text-xs font-semibold text-white transition hover:bg-white/20"
                         >
                             <LogOut size={12} className="md:w-3.5 md:h-3.5" />
@@ -427,7 +433,11 @@ function Sidebar({
                     </div>
                     <button
                         type="button"
-                        onClick={() => router.post(route('logout'))}
+                        onClick={() => {
+                            if (logoutDisabled) return;
+                            router.post(route('logout'));
+                        }}
+                        disabled={logoutDisabled}
                         className="p-2 rounded-lg hover:bg-white/10 text-blue-200 hover:text-white transition-colors"
                         title="Keluar"
                     >

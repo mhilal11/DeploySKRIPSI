@@ -175,12 +175,13 @@ export function PageProvider({ children }: { children: React.ReactNode }) {
       getProps: () => props,
       setRouteName,
       setAuthUser,
+      isAuthReady: () => authLoaded,
     });
 
     return () => {
       setRouterStore(null);
     };
-  }, [navigate, props, setProps, mergeProps, setRouteName, setAuthUser]);
+  }, [authLoaded, navigate, props, setProps, mergeProps, setRouteName, setAuthUser]);
 
   useEffect(() => {
     let active = true;
@@ -322,7 +323,7 @@ export function usePageManager() {
   return ctx;
 }
 
-export { Head, Link, router, useForm };
+export { Head, Link, router, useForm, usePageManager };
 export type {
   FormOptions,
   InertiaFormProps,

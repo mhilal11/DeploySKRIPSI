@@ -19,7 +19,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
-import { Link, router, usePage } from '@/shared/lib/inertia';
+import { Link, router, usePage, usePageManager } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
 
 interface NavbarProps { }
@@ -52,8 +52,10 @@ const UNSEEN_INBOX_UPDATED_EVENT = 'admin-staff:inbox-unseen-updated';
 
 export default function Navbar({ }: NavbarProps) {
     const { props: { auth, sidebarNotifications = {} } } = usePage<PageProps>();
+    const { authLoaded } = usePageManager();
     const user = auth?.user;
     const profilePhotoUrl = auth?.profilePhotoUrl;
+    const logoutDisabled = !authLoaded;
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isVisible, setIsVisible] = useState(true);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -250,9 +252,12 @@ export default function Navbar({ }: NavbarProps) {
                                 </DropdownMenuItem> 
                                 <DropdownMenuSeparator /> */}
                                 <DropdownMenuItem
-                                    onClick={() => router.post(route('logout'))}
+                                    onClick={() => {
+                                        if (logoutDisabled) return;
+                                        router.post(route('logout'));
+                                    }}
                                     className="text-red-600 focus:text-red-600 cursor-pointer"
-                                    disabled={false}
+                                    disabled={logoutDisabled}
                                 >
                                     <LogOut className="h-4 w-4 mr-2" />
                                     Keluar

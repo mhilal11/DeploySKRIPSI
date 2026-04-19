@@ -1,6 +1,6 @@
 ﻿import { FileText, LayoutDashboard, MessageSquare } from "lucide-react";
 
-import { Link, router, usePage } from "@/shared/lib/inertia";
+import { Link, router, usePage, usePageManager } from "@/shared/lib/inertia";
 import { route } from "@/shared/lib/route";
 import type { PageProps } from "@/shared/types";
 
@@ -49,7 +49,9 @@ export default function StaffSidebar({
     const {
         props: { auth },
     } = usePage<PageProps>();
+    const { authLoaded } = usePageManager();
     const user = auth.user;
+    const logoutDisabled = !authLoaded;
 
     const isActive = (patterns: string | string[]) => {
         if (Array.isArray(patterns)) {
@@ -150,10 +152,15 @@ export default function StaffSidebar({
 
                 <button
                     type="button"
-                    onClick={() => router.post(route("logout"))}
+                    onClick={() => {
+                        if (logoutDisabled) return;
+                        router.post(route("logout"));
+                    }}
+                    disabled={logoutDisabled}
                     className="
                         mt-4 w-full text-center rounded-lg bg-white/10 px-4 py-2 
                         text-sm font-semibold text-white transition hover:bg-white/20
+                        disabled:cursor-not-allowed disabled:opacity-60
                     "
                 >
                     Keluar

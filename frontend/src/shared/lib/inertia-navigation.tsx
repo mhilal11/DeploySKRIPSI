@@ -1,7 +1,7 @@
 import NextLink from 'next/link';
 import React, { useEffect } from 'react';
 
-import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
+import { api, apiUrl, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
 
 import { getRouterStore } from './inertia-store';
 import { VisitOptions } from './inertia-types';
@@ -19,6 +19,10 @@ function buildUrl(url: string, data?: Record<string, any>): string {
   });
   const separator = url.includes('?') ? '&' : '?';
   return `${url}${separator}${query.toString()}`;
+}
+
+function isLogoutVisit(url: string, method: string): boolean {
+  return method.toLowerCase() === 'post' && /(^|\/)logout(?:\?.*)?$/i.test(url);
 }
 
 export const router = {
@@ -51,10 +55,20 @@ export const router = {
     }
 
     try {
+      const requestHeaders: Record<string, string> = {};
+      if (isLogoutVisit(url, method)) {
+        // Logout must refresh CSRF because login rotates the session token on the backend.
+        const csrfToken = await ensureCsrfToken();
+        if (csrfToken) {
+          requestHeaders['X-CSRF-Token'] = csrfToken;
+        }
+      }
       const response = await api.request({
         method,
         url: apiUrl(url),
         data,
+        withCredentials: true,
+        headers: requestHeaders,
       });
       const responseData = response.data;
       if (url.includes('/logout')) {
@@ -106,11 +120,22 @@ export type InertiaLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
   method?: string;
   data?: Record<string, any>;
   as?: 'button' | 'a';
+  disabled?: boolean;
 };
 
 export const Link = React.forwardRef<HTMLAnchorElement, InertiaLinkProps>(
-  ({ href, method, data, as, onClick, ...rest }, ref) => {
+  ({ href, method, data, as, onClick, disabled = false, ...rest }, ref) => {
+    const routerStore = getRouterStore();
+    const resolvedMethod = (method ?? 'get').toLowerCase();
+    // Prevent manual logout clicks before the auth bootstrap has finished loading the session.
+    const isDisabled =
+      disabled || (isLogoutVisit(href, resolvedMethod) && !(routerStore?.isAuthReady?.() ?? true));
+
     const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (isDisabled) {
+        event.preventDefault();
+        return;
+      }
       if (onClick) {
         onClick(event);
       }
@@ -127,8 +152,12 @@ export const Link = React.forwardRef<HTMLAnchorElement, InertiaLinkProps>(
       return (
         <button
           type="button"
+          disabled={isDisabled}
           onClick={(event) => {
             event.preventDefault();
+            if (isDisabled) {
+              return;
+            }
             router.visit(href, { method: method ?? 'post', data });
           }}
           className={rest.className}
@@ -139,7 +168,7 @@ export const Link = React.forwardRef<HTMLAnchorElement, InertiaLinkProps>(
     }
 
     if (method && method.toLowerCase() !== 'get') {
-      return <a ref={ref} href={href} onClick={handleClick} {...rest} />;
+      return <a ref={ref} href={href} onClick={handleClick} aria-disabled={isDisabled} {...rest} />;
     }
 
     return <NextLink ref={ref} href={href} onClick={handleClick} {...rest} />;

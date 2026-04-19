@@ -8,7 +8,7 @@
     X,
 } from 'lucide-react';
 
-import { Link, router, usePage } from '@/shared/lib/inertia';
+import { Link, router, usePage, usePageManager } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
 
 interface SidebarProps {
@@ -37,7 +37,9 @@ export default function Sidebar({
     onMobileClose,
 }: SidebarProps) {
     const { props: { auth } } = usePage<PageProps>();
+    const { authLoaded } = usePageManager();
     const user = auth?.user;
+    const logoutDisabled = !authLoaded;
 
     return (
         <>
@@ -151,11 +153,15 @@ export default function Sidebar({
                     )}
 
                     <button
-                        onClick={() => router.post(route('logout'))}
+                        onClick={() => {
+                            if (logoutDisabled) return;
+                            router.post(route('logout'));
+                        }}
+                        disabled={logoutDisabled}
                         className="
                             mt-4 w-full flex items-center justify-center gap-2 rounded-lg
                             bg-white/10 px-4 py-2 text-sm font-semibold text-white
-                            hover:bg-white/20 transition
+                            hover:bg-white/20 transition disabled:cursor-not-allowed disabled:opacity-60
                         "
                     >
                         <LogOut className="h-4 w-4" />

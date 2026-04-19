@@ -58,4 +58,5 @@ export interface RouterStore {
   getProps: () => any;
   setRouteName: (name: string) => void;
   setAuthUser: (user: any | null, profilePhotoUrl?: string | null) => void;
+  isAuthReady: () => boolean;
 }

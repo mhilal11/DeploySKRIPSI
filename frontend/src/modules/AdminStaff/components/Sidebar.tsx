@@ -1,6 +1,6 @@
 ﻿import { Mail, LayoutDashboard, X, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
  
-import { Link, usePage, router } from '@/shared/lib/inertia';
+import { Link, usePage, usePageManager, router } from '@/shared/lib/inertia';
 import { cn } from '@/shared/lib/utils'; // Pastikan Anda memiliki utility ini
 import type { PageProps } from '@/shared/types';
 
@@ -39,8 +39,10 @@ export default function Sidebar({ isOpen, onToggle, isMobileOpen, onMobileClose 
     const {
         props: { auth, sidebarNotifications = {} },
     } = usePage<PageProps>();
+    const { authLoaded } = usePageManager();
 
     const user = auth.user;
+    const logoutDisabled = !authLoaded;
 
     const handleNavClick = () => {
         // Pada tampilan mobile, sidebar harus ditutup setelah navigasi
@@ -195,7 +197,11 @@ export default function Sidebar({ isOpen, onToggle, isMobileOpen, onMobileClose 
                             </div>
                             <button
                                 type="button"
-                                onClick={() => router.post(route('logout'))}
+                                onClick={() => {
+                                    if (logoutDisabled) return;
+                                    router.post(route('logout'));
+                                }}
+                                disabled={logoutDisabled}
                                 className="flex w-full items-center justify-center gap-2 rounded-lg px-3 md:px-4 py-1.5 md:py-2 text-[10px] md:text-xs font-semibold transition bg-white/10 text-white hover:bg-white/20"
                             >
                                 <LogOut size={12} className="md:w-3.5 md:h-3.5" />
@@ -214,7 +220,11 @@ export default function Sidebar({ isOpen, onToggle, isMobileOpen, onMobileClose 
                         </div>
                         <button
                             type="button"
-                            onClick={() => router.post(route('logout'))}
+                            onClick={() => {
+                                if (logoutDisabled) return;
+                                router.post(route('logout'));
+                            }}
+                            disabled={logoutDisabled}
                             className="p-2 rounded-lg hover:bg-white/10 text-blue-200 hover:text-white transition-colors"
                             title="Keluar"
                         >
