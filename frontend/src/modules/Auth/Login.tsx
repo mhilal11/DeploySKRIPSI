@@ -64,8 +64,6 @@ export default function Login({
     const [isResendingVerification, setIsResendingVerification] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const cardRef = useRef<HTMLDivElement>(null);
-    const emailInputRef = useRef<HTMLInputElement>(null);
-    const passwordInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         markLandingSplashSkipOnce();
@@ -146,24 +144,8 @@ export default function Login({
         };
     }, []);
 
-    const syncEmailValue = (value: string) => {
-        setData('email', normalizeEmail(value));
-    };
-
-    const syncPasswordValue = (value: string) => {
-        setData('password', value);
-    };
-
     const submit: FormEventHandler = (e) => {
         e.preventDefault();
-        // Temporary iPhone diagnostics: compare controlled state with the visible native input values.
-        console.log('[auth] login submit email:', data.email);
-        console.log('[auth] login submit password_length:', data.password.length);
-        console.log('[auth] login submit dom_email:', emailInputRef.current?.value ?? '');
-        console.log(
-            '[auth] login submit dom_password_length:',
-            passwordInputRef.current?.value.length ?? 0,
-        );
 
         // useForm now refreshes /api/csrf before POST /login so axios can send the current XSRF cookie header.
         post('/login', {
@@ -362,21 +344,15 @@ export default function Login({
                                     <div className="relative">
                                         <Mail className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/60" />
                                         <Input
-                                            ref={emailInputRef}
                                             id="email"
                                             type="email"
                                             name="email"
                                             value={data.email}
                                             autoComplete="username"
-                                            autoCapitalize="none"
-                                            autoCorrect="off"
-                                            spellCheck={false}
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 text-base text-white placeholder:text-white/60 focus-visible:border-[#2F6DB5]/60 focus-visible:ring-[#2F6DB5]/60 backdrop-blur-sm"
-                                            onChange={(e) => syncEmailValue(e.target.value)}
-                                            onInput={(e) =>
-                                                syncEmailValue((e.target as HTMLInputElement).value)
+                                            onChange={(e) =>
+                                                setData('email', normalizeEmail(e.target.value))
                                             }
-                                            onBlur={(e) => syncEmailValue(e.target.value)}
                                             required
                                         />
                                     </div>
@@ -406,21 +382,15 @@ export default function Login({
                                     <div className="relative">
                                         <Lock className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/60" />
                                         <Input
-                                            ref={passwordInputRef}
                                             id="password"
                                             type={showPassword ? 'text' : 'password'}
                                             name="password"
                                             value={data.password}
                                             autoComplete="current-password"
-                                            autoCapitalize="none"
-                                            autoCorrect="off"
-                                            spellCheck={false}
                                             className="h-12 rounded-[16px] border-white/30 bg-white/15 pl-11 pr-12 text-base text-white placeholder:text-white/60 focus-visible:border-[#2F6DB5]/60 focus-visible:ring-[#2F6DB5]/60 backdrop-blur-sm"
-                                            onChange={(e) => syncPasswordValue(e.target.value)}
-                                            onInput={(e) =>
-                                                syncPasswordValue((e.target as HTMLInputElement).value)
+                                            onChange={(e) =>
+                                                setData('password', e.target.value)
                                             }
-                                            onBlur={(e) => syncPasswordValue(e.target.value)}
                                             required
                                         />
                                         <button
