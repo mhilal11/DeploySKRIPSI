@@ -1,7 +1,5 @@
 import axios, { AxiosError } from 'axios';
 
-let latestCsrfToken: string | null = null;
-
 function normalizeApiOrigin(value?: string | null): string {
   const trimmed = value?.trim();
   if (!trimmed) {
@@ -44,6 +42,10 @@ if (typeof window !== 'undefined') {
 export const api = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-CSRF-Token',
+  // Cross-site requests still need to mirror the current XSRF cookie into the header.
+  withXSRFToken: true,
 });
 
 function getCookie(name: string): string | null {
@@ -82,16 +84,11 @@ function extractCsrfToken(payload: unknown): string | null {
   return null;
 }
 
-export function getStoredCsrfToken(): string | null {
-  return latestCsrfToken ?? getCookie('XSRF-TOKEN');
+export function getCsrfCookieToken(): string | null {
+  return getCookie('XSRF-TOKEN');
 }
 
 api.interceptors.request.use((config) => {
-  const token = getStoredCsrfToken();
-  if (token) {
-    config.headers = config.headers ?? {};
-    config.headers['X-CSRF-Token'] = token;
-  }
   config.headers = config.headers ?? {};
   config.headers['X-Requested-With'] = 'XMLHttpRequest';
   return config;
@@ -165,30 +162,29 @@ export function resolveAssetUrl(path?: string | null): string | null {
 
 export async function ensureCsrfToken(): Promise<string | null> {
   try {
-    // Always refresh CSRF before credentialed mutations such as login.
+    // Refresh the cookie source of truth; protected requests should rely on the latest cookie value.
     const response = await api.get(apiUrl('/csrf'), {
       withCredentials: true,
     });
     console.log('[api] csrf response data:', response.data);
     console.log('[api] csrf response headers:', response.headers);
-    // Backend currently returns { csrf_token: "..." }, so prefer that exact field first.
     const responseToken =
       typeof response.data?.csrf_token === 'string' && response.data.csrf_token.trim() !== ''
         ? response.data.csrf_token.trim()
         : extractCsrfToken(response.data);
-    const cookieToken = getCookie('XSRF-TOKEN');
-    latestCsrfToken = responseToken ?? cookieToken;
-    console.log('[api] csrf token:', latestCsrfToken);
-    return latestCsrfToken;
+    const cookieToken = getCsrfCookieToken();
+    console.log('[api] csrf response token:', responseToken);
+    console.log('[api] csrf cookie token:', cookieToken);
+    return cookieToken ?? responseToken;
   } catch (error) {
     // Log the failure so the actual csrf payload or cookie problem is visible in devtools.
     if (axios.isAxiosError(error)) {
       console.log('[api] csrf response data:', error.response?.data);
       console.log('[api] csrf response headers:', error.response?.headers);
     }
-    latestCsrfToken = getCookie('XSRF-TOKEN');
-    console.log('[api] csrf token:', latestCsrfToken);
-    return latestCsrfToken;
+    const cookieToken = getCsrfCookieToken();
+    console.log('[api] csrf cookie token:', cookieToken);
+    return cookieToken;
   }
 }
 

@@ -55,20 +55,15 @@ export const router = {
     }
 
     try {
-      const requestHeaders: Record<string, string> = {};
       if (isLogoutVisit(url, method)) {
-        // Logout must refresh CSRF because login rotates the session token on the backend.
-        const csrfToken = await ensureCsrfToken();
-        if (csrfToken) {
-          requestHeaders['X-CSRF-Token'] = csrfToken;
-        }
+        // Refresh the XSRF cookie before logout; axios will mirror the current cookie into the header.
+        await ensureCsrfToken();
       }
       const response = await api.request({
         method,
         url: apiUrl(url),
         data,
         withCredentials: true,
-        headers: requestHeaders,
       });
       const responseData = response.data;
       if (url.includes('/logout')) {

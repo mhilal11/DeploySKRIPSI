@@ -148,20 +148,13 @@ export function useForm<T extends Record<string, any>>(initialData: T): InertiaF
     const isLoginRequest = normalizedMethod === 'post' && /\/api\/login$/i.test(normalizedUrl);
 
     try {
-      // Mutating requests, including POST /login, must preload CSRF and forward it explicitly.
-      const csrfToken =
-        normalizedMethod === 'get' || normalizedMethod === 'head' || normalizedMethod === 'options'
-          ? null
-          : await ensureCsrfToken();
+      // Refresh the XSRF cookie before mutations; axios will send the matching header from the cookie.
+      await (normalizedMethod === 'get' || normalizedMethod === 'head' || normalizedMethod === 'options'
+        ? Promise.resolve()
+        : ensureCsrfToken());
 
       const requestHeaders = {
         ...(shouldUseFormData ? { 'Content-Type': 'multipart/form-data' } : {}),
-        ...(csrfToken
-          ? {
-              'X-CSRF-Token': csrfToken,
-              'X-XSRF-TOKEN': csrfToken,
-            }
-          : {}),
       };
 
       if (isLoginRequest) {

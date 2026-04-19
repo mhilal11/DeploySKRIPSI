@@ -323,7 +323,7 @@ export function usePageManager() {
   return ctx;
 }
 
-export { Head, Link, router, useForm, usePageManager };
+export { Head, Link, router, useForm };
 export type {
   FormOptions,
   InertiaFormProps,
