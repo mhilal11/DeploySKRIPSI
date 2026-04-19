@@ -81,6 +81,25 @@ go run ./cmd/seed staff
 go run ./cmd/server
 ```
 
+## Deploy ke Railway
+- Buat service backend terpisah di Railway dari repo ini.
+- Karena repo ini monorepo, set **Root Directory** service backend ke `/backend`.
+- Set **Config File Path** ke `/backend/railway.toml`.
+- Backend sekarang otomatis memakai `PORT` dari Railway jika `APP_ADDR` tidak diisi.
+- Untuk database Railway MySQL, backend juga menerima alias env `MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD`, dan `MYSQLDATABASE` selain `DB_*`.
+
+Environment minimum yang perlu diisi di service backend:
+- `APP_ENV=production`
+- `APP_URL=https://<domain-backend-railway>`
+- `FRONTEND_URL=https://<domain-frontend>`
+- `COOKIE_SECURE=true`
+- `SESSION_SECRET=<secret-minimal-32-karakter>`
+- `CSRF_SECRET=<secret-minimal-32-karakter>`
+
+Jika memakai MySQL Railway, Anda bisa:
+- tetap mengisi `DB_*`, atau
+- langsung menambahkan env alias Railway `MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD`, `MYSQLDATABASE`.
+
 ## API Documentation
 - OpenAPI spec: `GET /openapi.yaml`
 - Swagger UI: `GET /docs`

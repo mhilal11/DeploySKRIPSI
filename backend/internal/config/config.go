@@ -55,6 +55,7 @@ type Config struct {
 }
 
 func Load() Config {
+	address := resolveAppAddress()
 	baseURL := getenv("APP_URL", "http://localhost:8080")
 	frontendURL := getenv("FRONTEND_URL", "http://localhost:5173")
 	primaryFrontendURL := firstCSVValue(frontendURL)
@@ -68,11 +69,16 @@ func Load() Config {
 		groqModelChain = parseCSVUnique(strings.Join([]string{groqModel, groqFallbackModel}, ","))
 	}
 	storagePath := resolveStoragePath(getenv("STORAGE_PATH", "./storage"))
+	dbHost := getenvAny([]string{"DB_HOST", "MYSQLHOST"}, "127.0.0.1")
+	dbPort := getenvIntAny([]string{"DB_PORT", "MYSQLPORT"}, 3306)
+	dbUser := getenvAny([]string{"DB_USER", "MYSQLUSER"}, "root")
+	dbPassword := getenvAny([]string{"DB_PASSWORD", "MYSQLPASSWORD"}, "")
+	dbName := getenvAny([]string{"DB_NAME", "MYSQLDATABASE"}, "hris")
 	sessionSecret, sessionSecretFromEnv := getenvSecret("SESSION_SECRET", 48)
 	csrfSecret, csrfSecretFromEnv := getenvSecret("CSRF_SECRET", 48)
 	return Config{
 		Env:                     getenv("APP_ENV", "development"),
-		Address:                 getenv("APP_ADDR", ":8080"),
+		Address:                 address,
 		BaseURL:                 baseURL,
 		FrontendURL:             frontendURL,
 		AppTimezone:             strings.TrimSpace(getenv("APP_TIMEZONE", "Asia/Jakarta")),
@@ -83,11 +89,11 @@ func Load() Config {
 		GroqFallbackModel:       groqFallbackModel,
 		GroqModelChain:          groqModelChain,
 		GroqRequestTimeoutSec:   getenvInt("GROQ_TIMEOUT_SECONDS", 60),
-		DBHost:                  getenv("DB_HOST", "127.0.0.1"),
-		DBPort:                  getenvInt("DB_PORT", 3306),
-		DBUser:                  getenv("DB_USER", "root"),
-		DBPassword:              getenv("DB_PASSWORD", ""),
-		DBName:                  getenv("DB_NAME", "hris"),
+		DBHost:                  dbHost,
+		DBPort:                  dbPort,
+		DBUser:                  dbUser,
+		DBPassword:              dbPassword,
+		DBName:                  dbName,
 		SessionSecret:           sessionSecret,
 		SessionSecretFromEnv:    sessionSecretFromEnv,
 		CSRFSecret:              csrfSecret,
@@ -194,9 +200,31 @@ func resolveStoragePath(raw string) string {
 	return raw
 }
 
+func resolveAppAddress() string {
+	if value, ok := lookupTrimmedEnv("APP_ADDR"); ok {
+		return value
+	}
+	if port, ok := lookupTrimmedEnv("PORT"); ok {
+		if strings.HasPrefix(port, ":") {
+			return port
+		}
+		return ":" + port
+	}
+	return ":8080"
+}
+
 func getenv(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getenvAny(keys []string, fallback string) string {
+	for _, key := range keys {
+		if value, ok := lookupTrimmedEnv(key); ok {
+			return value
+		}
 	}
 	return fallback
 }
@@ -205,6 +233,17 @@ func getenvInt(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			return i
+		}
+	}
+	return fallback
+}
+
+func getenvIntAny(keys []string, fallback int) int {
+	for _, key := range keys {
+		if value, ok := lookupTrimmedEnv(key); ok {
+			if i, err := strconv.Atoi(value); err == nil {
+				return i
+			}
 		}
 	}
 	return fallback
@@ -249,6 +288,18 @@ func parseCSVUnique(value string) []string {
 		out = append(out, trimmed)
 	}
 	return out
+}
+
+func lookupTrimmedEnv(key string) (string, bool) {
+	value, ok := os.LookupEnv(key)
+	if !ok {
+		return "", false
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", false
+	}
+	return value, true
 }
 
 func getenvSecret(key string, minBytes int) (string, bool) {
