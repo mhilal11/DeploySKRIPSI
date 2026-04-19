@@ -201,14 +201,14 @@ func resolveStoragePath(raw string) string {
 }
 
 func resolveAppAddress() string {
-	if value, ok := lookupTrimmedEnv("APP_ADDR"); ok {
-		return value
-	}
 	if port, ok := lookupTrimmedEnv("PORT"); ok {
 		if strings.HasPrefix(port, ":") {
 			return port
 		}
 		return ":" + port
+	}
+	if value, ok := lookupTrimmedEnv("APP_ADDR"); ok {
+		return value
 	}
 	return ":8080"
 }
