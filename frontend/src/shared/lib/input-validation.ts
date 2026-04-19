@@ -1,5 +1,16 @@
 export const MAX_COMMON_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
 
+export {
+    buildInternationalPhoneValue,
+    getPhoneLengthHint,
+    isPossiblePhoneNumberValue,
+    normalizePhoneInput,
+    parseStoredPhoneNumber,
+    PHONE_COUNTRY_OPTIONS,
+    DEFAULT_PHONE_COUNTRY,
+    validatePhoneNumberForCountry,
+} from '@/shared/lib/phone-number';
+
 const emailPattern =
     /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
 const personNamePattern = /^[\p{L}\p{M}]+(?:[ '-][\p{L}\p{M}]+)*$/u;
