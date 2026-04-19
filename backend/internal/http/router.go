@@ -55,20 +55,20 @@ func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	_ = basehandlers.SetDisplayLocation(cfg.AppTimezone)
 
 	r := gin.New()
-	r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
+	// CORS must run first so even early aborts and preflight requests receive the proper headers.
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:              allowedOrigins(cfg),
+		AllowMethods:              []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:              []string{"Content-Type", "X-CSRF-Token", "X-XSRF-TOKEN", "X-Requested-With"},
+		ExposeHeaders:             []string{"Content-Length"},
+		AllowCredentials:          true,
+		OptionsResponseStatusCode: http.StatusOK,
+		MaxAge:                    12 * time.Hour,
+	}))
 	r.Use(gin.Recovery())
 	r.Use(middleware.SecurityHeaders(cfg))
 	r.Use(middleware.LimitRequestBody(cfg.MaxRequestBodyBytes))
 	r.Use(middleware.Gzip())
-
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     allowedOrigins(cfg),
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-CSRF-Token", "X-XSRF-TOKEN"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}))
 
 	store := cookie.NewStore([]byte(cfg.SessionSecret))
 	store.Options(sessions.Options{
@@ -86,6 +86,7 @@ func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	r.Use(middleware.LoadCurrentUser())
 	r.Use(middleware.EnsureCSRFToken())
 
+	r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 	r.GET("/openapi.yaml", func(c *gin.Context) { c.Data(http.StatusOK, "application/yaml; charset=utf-8", openAPISpec) })
 	r.GET("/docs", func(c *gin.Context) { c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(swaggerUIHTML)) })
 	r.GET("/verify-email", authhandlers.VerifyEmail)
