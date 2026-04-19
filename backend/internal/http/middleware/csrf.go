@@ -27,7 +27,10 @@ func EnsureCSRFToken() gin.HandlerFunc {
 
 		if token != "" {
 			c.Set("csrf_token", token)
-			c.SetCookie("XSRF-TOKEN", token, 60*60*24, "/", "", false, false)
+			// Cross-site frontend on Vercel requires a Secure + SameSite=None CSRF cookie.
+			secureCookie := GetConfig(c).CookieSecure
+			c.SetSameSite(http.SameSiteNoneMode)
+			c.SetCookie("XSRF-TOKEN", token, 60*60*24, "/", "", secureCookie, false)
 		}
 
 		if c.Request.Method != http.MethodGet && c.Request.Method != http.MethodHead && c.Request.Method != http.MethodOptions {

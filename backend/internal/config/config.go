@@ -55,6 +55,7 @@ type Config struct {
 }
 
 func Load() Config {
+	env := getenv("APP_ENV", "development")
 	address := resolveAppAddress()
 	baseURL := getenv("APP_URL", "http://localhost:8080")
 	frontendURL := getenv("FRONTEND_URL", "http://localhost:5173")
@@ -77,7 +78,7 @@ func Load() Config {
 	sessionSecret, sessionSecretFromEnv := getenvSecret("SESSION_SECRET", 48)
 	csrfSecret, csrfSecretFromEnv := getenvSecret("CSRF_SECRET", 48)
 	return Config{
-		Env:                     getenv("APP_ENV", "development"),
+		Env:                     env,
 		Address:                 address,
 		BaseURL:                 baseURL,
 		FrontendURL:             frontendURL,
@@ -106,7 +107,7 @@ func Load() Config {
 		RedisPassword:           getenv("REDIS_PASSWORD", ""),
 		RedisDB:                 getenvInt("REDIS_DB", 0),
 		DisableBackgroundWorker: getenvBool("DISABLE_BACKGROUND_WORKERS", false),
-		CookieSecure:            getenvBool("COOKIE_SECURE", false),
+		CookieSecure:            getenvBool("COOKIE_SECURE", strings.EqualFold(env, "production")),
 		MaxRequestBodyBytes:     int64(getenvInt("MAX_REQUEST_BODY_MB", 25)) * 1024 * 1024,
 		SMTPHost:                getenv("SMTP_HOST", ""),
 		SMTPPort:                getenvInt("SMTP_PORT", 587),
