@@ -1,6 +1,6 @@
 import { useCallback, useContext, useMemo, useRef, useState } from 'react';
 
-import { api, apiUrl, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
+import { api, apiUrl, buildCsrfHeaders, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
 
 import { PageContext } from './inertia-context';
 import { getRouterStore } from './inertia-store';
@@ -148,21 +148,19 @@ export function useForm<T extends Record<string, any>>(initialData: T): InertiaF
     const isLoginRequest = normalizedMethod === 'post' && /\/api\/login$/i.test(normalizedUrl);
 
     try {
-      // Refresh the XSRF cookie before mutations; axios will send the matching header from the cookie.
-      await (normalizedMethod === 'get' || normalizedMethod === 'head' || normalizedMethod === 'options'
-        ? Promise.resolve()
-        : ensureCsrfToken());
+      const csrfToken =
+        normalizedMethod === 'get' || normalizedMethod === 'head' || normalizedMethod === 'options'
+          ? null
+          : await ensureCsrfToken();
 
-      const requestHeaders = {
+      const requestHeaders = buildCsrfHeaders(csrfToken, {
         ...(shouldUseFormData ? { 'Content-Type': 'multipart/form-data' } : {}),
-      };
+      });
 
       if (isLoginRequest) {
-        // Temporary CSRF/session diagnostics for Railway login.
+        // Temporary CSRF diagnostics for Railway login.
         console.log('[auth] login request headers:', requestHeaders);
         console.log('[auth] login withCredentials:', true);
-        console.log('[auth] login document.cookie:', typeof document === 'undefined' ? null : document.cookie);
-        console.log('[auth] login xsrf cookie present:', typeof document === 'undefined' ? false : document.cookie.includes('XSRF-TOKEN='));
       }
 
       const response = await api.request({

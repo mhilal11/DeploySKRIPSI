@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
+import { api, apiUrl, buildCsrfHeaders, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
 import { router } from '@/shared/lib/inertia';
 
 import {
@@ -94,6 +94,7 @@ export function useRecruitmentScoringControls({
     if (isSavingSLA) return;
     setIsSavingSLA(true);
     try {
+      const csrfToken = await ensureCsrfToken();
       const payload = {
         applied: clampSLAValue(Number(slaSettingsForm.Applied)),
         screening: clampSLAValue(Number(slaSettingsForm.Screening)),
@@ -101,7 +102,10 @@ export function useRecruitmentScoringControls({
         offering: clampSLAValue(Number(slaSettingsForm.Offering)),
       };
 
-      const response = await api.post(apiUrl('/super-admin/recruitment/sla-settings'), payload);
+      const response = await api.post(apiUrl('/super-admin/recruitment/sla-settings'), payload, {
+        withCredentials: true,
+        headers: buildCsrfHeaders(csrfToken),
+      });
       const nextSettings = normalizeSLASettings(response.data?.settings);
       setSlaSettingsForm(nextSettings);
       toast.success('Konfigurasi SLA berhasil disimpan.');

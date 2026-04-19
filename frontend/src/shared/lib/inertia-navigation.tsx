@@ -1,7 +1,7 @@
 import NextLink from 'next/link';
 import React, { useEffect } from 'react';
 
-import { api, apiUrl, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
+import { api, apiUrl, buildCsrfHeaders, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
 
 import { getRouterStore } from './inertia-store';
 import { VisitOptions } from './inertia-types';
@@ -55,17 +55,23 @@ export const router = {
     }
 
     try {
+      const csrfToken = await ensureCsrfToken();
       if (isLogoutVisit(url, method)) {
-        // Refresh the XSRF cookie before logout; axios will mirror the current cookie into the header.
-        await ensureCsrfToken();
+        console.log('[auth] logout csrf response token:', csrfToken);
+        console.log('[auth] logout header token:', csrfToken);
       }
       const response = await api.request({
         method,
         url: apiUrl(url),
         data,
         withCredentials: true,
+        headers: buildCsrfHeaders(csrfToken),
       });
       const responseData = response.data;
+      if (isLogoutVisit(url, method)) {
+        console.log('[auth] logout response status:', response.status);
+        console.log('[auth] logout response body:', responseData);
+      }
       if (url.includes('/logout')) {
         routerStore.setAuthUser(null);
         routerStore.navigate('/login', { replace: true });
@@ -78,6 +84,10 @@ export const router = {
     } catch (error) {
       if (isAxiosError(error)) {
         const responseData = error.response?.data as any;
+        if (isLogoutVisit(url, method)) {
+          console.log('[auth] logout response status:', error.response?.status);
+          console.log('[auth] logout response body:', responseData);
+        }
         options.onError?.(responseData?.errors || {});
         if (error.response?.status === 401) {
           routerStore.navigate('/login', { replace: true });

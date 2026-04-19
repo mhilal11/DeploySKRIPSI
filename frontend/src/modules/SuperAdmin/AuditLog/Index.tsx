@@ -30,7 +30,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/shared/components/ui/table';
-import { api, apiUrl } from '@/shared/lib/api';
+import { api, apiUrl, buildCsrfHeaders, ensureCsrfToken } from '@/shared/lib/api';
 import { Head, router, usePage, usePageManager } from '@/shared/lib/inertia';
 import type { PageProps } from '@/shared/types';
 
@@ -162,8 +162,12 @@ export default function AuditLogIndex(initialProps: AuditLogPageProps) {
         }
 
         try {
+            const csrfToken = await ensureCsrfToken();
             const { data } = await api.post(apiUrl('/super-admin/audit-log/mark-viewed'), {
                 ids: [id],
+            }, {
+                withCredentials: true,
+                headers: buildCsrfHeaders(csrfToken),
             });
             if (data?.sidebarNotifications && typeof data.sidebarNotifications === 'object') {
                 setSidebarNotifications(data.sidebarNotifications as Record<string, number>);

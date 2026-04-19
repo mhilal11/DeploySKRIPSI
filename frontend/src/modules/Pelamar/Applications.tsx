@@ -30,7 +30,7 @@ import {
     DialogTitle,
     DialogFooter,
 } from '@/shared/components/ui/dialog';
-import { api, apiUrl } from '@/shared/lib/api';
+import { api, apiUrl, buildCsrfHeaders, ensureCsrfToken } from '@/shared/lib/api';
 import { Head, router, useForm } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
 
@@ -186,6 +186,7 @@ export default function Applications({
         if (division.job_eligibility_criteria && Object.keys(division.job_eligibility_criteria).length > 0) {
             setCheckingEligibility(true);
             try {
+                const csrfToken = await ensureCsrfToken();
                 const payload = new URLSearchParams();
                 payload.append('division_id', String(division.id));
 
@@ -193,9 +194,10 @@ export default function Applications({
                     apiUrl(route('pelamar.applications.check-eligibility')),
                     payload,
                     {
-                        headers: {
+                        withCredentials: true,
+                        headers: buildCsrfHeaders(csrfToken, {
                             'Content-Type': 'application/x-www-form-urlencoded',
-                        },
+                        }),
                     },
                 );
 

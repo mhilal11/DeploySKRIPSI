@@ -16,7 +16,7 @@ import {
 } from '@/shared/components/ui/alert-dialog';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { api, apiUrl, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
+import { api, apiUrl, buildCsrfHeaders, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
 import { Head, useForm } from '@/shared/lib/inertia';
 import { normalizeEmail } from '@/shared/lib/input-validation';
 import { markLandingSplashSkipOnce } from '@/shared/lib/landing-splash';
@@ -212,10 +212,14 @@ export default function Login({
 
         setIsResendingVerification(true);
         try {
-            await ensureCsrfToken();
+            const csrfToken = await ensureCsrfToken();
             const { data: responseData } = await api.post(
                 apiUrl('/email/verification-notification'),
                 { email: verificationEmail },
+                {
+                    withCredentials: true,
+                    headers: buildCsrfHeaders(csrfToken),
+                },
             );
             toast.success('Email verifikasi dikirim ulang.', {
                 description:

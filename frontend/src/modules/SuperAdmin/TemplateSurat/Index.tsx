@@ -26,7 +26,7 @@ import {
 import {
     buildInitialFormState,
 } from '@/modules/SuperAdmin/TemplateSurat/components/utils';
-import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
+import { api, apiUrl, buildCsrfHeaders, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
 import { Head, router, useForm, usePage, usePageManager } from '@/shared/lib/inertia';
 import { imageUploadRule, validateFile } from '@/shared/lib/input-validation';
 import { route } from '@/shared/lib/route';
@@ -570,6 +570,7 @@ export default function TemplateSuratIndex() {
         setIsPdfPreviewVisible(true);
 
         try {
+            const csrfToken = await ensureCsrfToken();
             const payload = new FormData();
             payload.append('name', form.data.name);
             payload.append('template_content', form.data.template_content);
@@ -590,6 +591,8 @@ export default function TemplateSuratIndex() {
                 payload,
                 {
                     responseType: 'blob',
+                    withCredentials: true,
+                    headers: buildCsrfHeaders(csrfToken),
                 },
             );
 

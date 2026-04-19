@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
+import { api, apiUrl, buildCsrfHeaders, ensureCsrfToken, isAxiosError } from '@/shared/lib/api';
 import { Head, useForm } from '@/shared/lib/inertia';
 
 import { DivisionTabs } from './components/DivisionTabs';
@@ -196,9 +196,14 @@ export default function KelolaDivisiIndex({
         }
 
         try {
+            const csrfToken = await ensureCsrfToken();
             const response = await api.post(
                 apiUrl(`/super-admin/kelola-divisi/${division.id}/open-job`),
                 { job_id: job.id },
+                {
+                    withCredentials: true,
+                    headers: buildCsrfHeaders(csrfToken),
+                },
             );
             toast.success(
                 response.data?.flash?.success || 'Lowongan pekerjaan berhasil dibuka kembali.',
@@ -319,7 +324,11 @@ export default function KelolaDivisiIndex({
 
         setDeletingDivisionId(division.id);
         try {
-            const response = await api.delete(apiUrl(`/super-admin/kelola-divisi/${division.id}`));
+            const csrfToken = await ensureCsrfToken();
+            const response = await api.delete(apiUrl(`/super-admin/kelola-divisi/${division.id}`), {
+                withCredentials: true,
+                headers: buildCsrfHeaders(csrfToken),
+            });
             toast.success(response.data?.flash?.success || 'Divisi berhasil dihapus.');
             await refreshData(
                 undefined,

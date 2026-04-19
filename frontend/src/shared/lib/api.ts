@@ -42,19 +42,7 @@ if (typeof window !== 'undefined') {
 export const api = axios.create({
   baseURL: API_BASE,
   withCredentials: true,
-  xsrfCookieName: 'XSRF-TOKEN',
-  xsrfHeaderName: 'X-CSRF-Token',
-  // Cross-site requests still need to mirror the current XSRF cookie into the header.
-  withXSRFToken: true,
 });
-
-function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') {
-    return null;
-  }
-  const match = document.cookie.match(new RegExp(`(^|; )${name}=([^;]*)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
 
 function extractCsrfToken(payload: unknown): string | null {
   const candidates: unknown[] = [payload];
@@ -84,8 +72,18 @@ function extractCsrfToken(payload: unknown): string | null {
   return null;
 }
 
-export function getCsrfCookieToken(): string | null {
-  return getCookie('XSRF-TOKEN');
+export function buildCsrfHeaders(
+  csrfToken: string | null,
+  headers: Record<string, string> = {},
+): Record<string, string> {
+  if (!csrfToken) {
+    return headers;
+  }
+
+  return {
+    ...headers,
+    'X-CSRF-Token': csrfToken,
+  };
 }
 
 api.interceptors.request.use((config) => {
@@ -162,7 +160,7 @@ export function resolveAssetUrl(path?: string | null): string | null {
 
 export async function ensureCsrfToken(): Promise<string | null> {
   try {
-    // Refresh the cookie source of truth; protected requests should rely on the latest cookie value.
+    // Cross-origin frontend code cannot read Railway cookies directly, so use the JSON body token.
     const response = await api.get(apiUrl('/csrf'), {
       withCredentials: true,
     });
@@ -172,19 +170,15 @@ export async function ensureCsrfToken(): Promise<string | null> {
       typeof response.data?.csrf_token === 'string' && response.data.csrf_token.trim() !== ''
         ? response.data.csrf_token.trim()
         : extractCsrfToken(response.data);
-    const cookieToken = getCsrfCookieToken();
     console.log('[api] csrf response token:', responseToken);
-    console.log('[api] csrf cookie token:', cookieToken);
-    return cookieToken ?? responseToken;
+    return responseToken;
   } catch (error) {
     // Log the failure so the actual csrf payload or cookie problem is visible in devtools.
     if (axios.isAxiosError(error)) {
       console.log('[api] csrf response data:', error.response?.data);
       console.log('[api] csrf response headers:', error.response?.headers);
     }
-    const cookieToken = getCsrfCookieToken();
-    console.log('[api] csrf cookie token:', cookieToken);
-    return cookieToken;
+    return null;
   }
 }
 
