@@ -7,6 +7,7 @@ import { DatePickerInput } from '@/shared/components/ui/date-picker-input';
 import { Input } from '@/shared/components/ui/input';
 import { InternationalPhoneInput } from '@/shared/components/ui/international-phone-input';
 import { Label } from '@/shared/components/ui/label';
+import { RequiredLabel } from '@/shared/components/ui/required-label';
 import {
     Select,
     SelectContent,
@@ -93,7 +94,7 @@ export default function PersonalForm({
             </h3>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
-                    <Label>Nama Lengkap *</Label>
+                    <Label><RequiredLabel text="Nama Lengkap" /></Label>
                     <Input
                         value={data.full_name}
                         onChange={(event) => handleNameChange(event.target.value)}
@@ -113,7 +114,7 @@ export default function PersonalForm({
                     )}
                 </div>
                 <div>
-                    <Label>Email *</Label>
+                    <Label><RequiredLabel text="Email" /></Label>
                     <Input
                         type="email"
                         value={data.email}
@@ -136,7 +137,7 @@ export default function PersonalForm({
                     )}
                 </div>
                 <div>
-                    <Label>Nomor Telepon *</Label>
+                    <Label><RequiredLabel text="Nomor Telepon" /></Label>
                     <InternationalPhoneInput
                         value={data.phone}
                         onChange={(value) => onChange('phone', value)}
@@ -145,7 +146,7 @@ export default function PersonalForm({
                     />
                 </div>
                 <div>
-                    <Label>Tanggal Lahir *</Label>
+                    <Label><RequiredLabel text="Tanggal Lahir" /></Label>
                     <DatePickerInput
                         value={data.date_of_birth}
                         onChange={(value) => onChange('date_of_birth', value)}
@@ -164,7 +165,7 @@ export default function PersonalForm({
                     )}
                 </div>
                 <div>
-                    <Label>Jenis Kelamin *</Label>
+                    <Label><RequiredLabel text="Jenis Kelamin" /></Label>
                     <Select
                         value={data.gender}
                         onValueChange={(value) => onChange('gender', value)}
@@ -185,7 +186,7 @@ export default function PersonalForm({
                     )}
                 </div>
                 <div>
-                    <Label>Agama *</Label>
+                    <Label><RequiredLabel text="Agama" /></Label>
                     <Select
                         value={data.religion}
                         onValueChange={(value) => onChange('religion', value)}
@@ -213,7 +214,7 @@ export default function PersonalForm({
             </div>
 
             <div className="mt-6">
-                <Label>Alamat Lengkap *</Label>
+                <Label><RequiredLabel text="Alamat Lengkap" /></Label>
                 <Textarea
                     value={data.address}
                     onChange={(event) => onChange('address', event.target.value)}
@@ -230,7 +231,7 @@ export default function PersonalForm({
 
             <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div>
-                    <Label>Provinsi *</Label>
+                    <Label><RequiredLabel text="Provinsi" /></Label>
                     <AutocompleteInput
                         options={provinceOptions}
                         value={data.province}
@@ -249,7 +250,7 @@ export default function PersonalForm({
                     )}
                 </div>
                 <div>
-                    <Label>Kota/Kabupaten *</Label>
+                    <Label><RequiredLabel text="Kota/Kabupaten" /></Label>
                     <AutocompleteInput
                         options={cityOptions}
                         value={data.city}
@@ -270,7 +271,7 @@ export default function PersonalForm({
             </div>
 
             <div className="mt-6">
-                <Label>Alamat Domisili *</Label>
+                <Label><RequiredLabel text="Alamat Domisili" /></Label>
                 <Textarea
                     value={data.domicile_address}
                     onChange={(event) => onChange('domicile_address', event.target.value)}

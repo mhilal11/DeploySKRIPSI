@@ -8,6 +8,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
+import { RequiredLabel } from '@/shared/components/ui/required-label';
 import {
     Select,
     SelectContent,
@@ -231,7 +232,7 @@ export default function EducationForm({
                         </div>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <div className="md:col-span-2">
-                                <Label>Nama Institusi *</Label>
+                                <Label><RequiredLabel text="Nama Institusi" /></Label>
                                 <AutocompleteInput
                                     options={institutionOptions}
                                     value={education.institution ?? ''}
@@ -257,7 +258,7 @@ export default function EducationForm({
                                 )}
                             </div>
                             <div>
-                                <Label>Jenjang *</Label>
+                                <Label><RequiredLabel text="Jenjang" /></Label>
                                 <Select
                                     value={education.degree ?? ''}
                                     onValueChange={(value) =>
@@ -283,7 +284,7 @@ export default function EducationForm({
                                 )}
                             </div>
                             <div>
-                                <Label>Program Studi *</Label>
+                                <Label><RequiredLabel text="Program Studi" /></Label>
                                 <AutocompleteInput
                                     options={programOptions}
                                     value={education.field_of_study ?? ''}
@@ -306,7 +307,7 @@ export default function EducationForm({
                                 )}
                             </div>
                             <div>
-                                <Label>Tahun Mulai *</Label>
+                                <Label><RequiredLabel text="Tahun Mulai" /></Label>
                                 <YearPickerInput
                                     value={education.start_year ?? ''}
                                     onChange={(value) => handleStartYearChange(education, value)}
@@ -322,7 +323,7 @@ export default function EducationForm({
                                 )}
                             </div>
                             <div>
-                                <Label>Tahun Selesai *</Label>
+                                <Label><RequiredLabel text="Tahun Selesai" /></Label>
                                 <YearPickerInput
                                     value={education.end_year ?? ''}
                                     onChange={(value) => handleEndYearChange(education, value)}
@@ -351,7 +352,7 @@ export default function EducationForm({
                             {education.degree &&
                                 GPA_REQUIRED_DEGREES.includes(education.degree) && (
                                     <div>
-                                        <Label>IPK *</Label>
+                                        <Label><RequiredLabel text="IPK" /></Label>
                                         <Input
                                             type="text"
                                             inputMode="decimal"

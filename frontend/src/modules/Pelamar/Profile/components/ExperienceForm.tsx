@@ -6,6 +6,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
+import { RequiredLabel } from '@/shared/components/ui/required-label';
 import { Textarea } from '@/shared/components/ui/textarea';
 
 import {
@@ -123,7 +124,7 @@ export default function ExperienceForm({
                             </div>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div>
-                                    <Label>Nama Perusahaan *</Label>
+                                    <Label><RequiredLabel text="Nama Perusahaan" /></Label>
                                     <Input
                                         value={experience.company ?? ''}
                                         onChange={(event) =>
@@ -139,7 +140,7 @@ export default function ExperienceForm({
                                     )}
                                 </div>
                                 <div>
-                                    <Label>Posisi *</Label>
+                                    <Label><RequiredLabel text="Posisi" /></Label>
                                     <Input
                                         value={experience.position ?? ''}
                                         onChange={(event) =>
@@ -155,7 +156,7 @@ export default function ExperienceForm({
                                     )}
                                 </div>
                                 <div>
-                                    <Label>Tanggal Mulai *</Label>
+                                    <Label><RequiredLabel text="Tanggal Mulai" /></Label>
                                     <Input
                                         type="month"
                                         value={experience.start_date ?? ''}
@@ -171,7 +172,12 @@ export default function ExperienceForm({
                                     )}
                                 </div>
                                 <div>
-                                    <Label>Tanggal Selesai {!experience.is_current ? '*' : ''}</Label>
+                                    <Label>
+                                        <RequiredLabel
+                                            text="Tanggal Selesai"
+                                            required={!experience.is_current}
+                                        />
+                                    </Label>
                                     <Input
                                         type="month"
                                         value={experience.end_date ?? ''}
@@ -214,7 +220,7 @@ export default function ExperienceForm({
                             </div>
 
                             <div className="mt-4">
-                                <Label>Deskripsi Tugas *</Label>
+                                <Label><RequiredLabel text="Deskripsi Tugas" /></Label>
                                 <Textarea
                                     value={experience.description ?? ''}
                                     onChange={(event) =>
