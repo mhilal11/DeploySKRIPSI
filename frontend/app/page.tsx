@@ -1,4 +1,5 @@
 import LandingPage from '@/modules/LandingPage/Index';
+import { apiUrl } from '@/shared/lib/api';
 
 type LandingJob = {
   id?: number;
@@ -26,14 +27,6 @@ type LandingData = {
 
 export const revalidate = 60;
 
-function backendBaseURL(): string {
-  const envOrigin = process.env.NEXT_PUBLIC_BACKEND_ORIGIN;
-  if (envOrigin && envOrigin.trim() !== '') {
-    return envOrigin.replace(/\/$/, '');
-  }
-  return 'http://localhost:8080';
-}
-
 async function fetchLandingData(): Promise<LandingData> {
   const fallback: LandingData = {
     canLogin: true,
@@ -42,7 +35,7 @@ async function fetchLandingData(): Promise<LandingData> {
   };
 
   try {
-    const response = await fetch(`${backendBaseURL()}/api/public/landing`, {
+    const response = await fetch(apiUrl('/public/landing'), {
       next: { revalidate: 60 },
     });
     if (!response.ok) {

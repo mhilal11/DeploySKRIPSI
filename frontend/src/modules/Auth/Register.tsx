@@ -29,18 +29,13 @@ import {
     PASSWORD_POLICY_ERROR_MESSAGE,
     passwordViolatesPolicy,
 } from "@/shared/lib/password-policy";
+import { getApiOrigin } from "@/shared/lib/api";
 
 const logo = "/img/LogoLDP.png";
 const REGISTER_SUCCESS_TOAST_KEY = "auth_register_success_toast";
 
 function buildGoogleRegisterUrl(): string {
-    const apiBase = process.env.NEXT_PUBLIC_API_URL || process.env.VITE_API_URL || "/api";
-    if (/^https?:\/\//i.test(apiBase)) {
-        return `${apiBase.replace(/\/$/, "")}/auth/google/register`;
-    }
-
-    const backendOrigin = process.env.NEXT_PUBLIC_BACKEND_ORIGIN || "http://localhost:8080";
-    return `${backendOrigin.replace(/\/$/, "")}/api/auth/google/register`;
+    return `${getApiOrigin()}/api/auth/google/register`;
 }
 
 export default function Register({

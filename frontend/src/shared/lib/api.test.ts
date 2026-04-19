@@ -1,4 +1,4 @@
-import { resolveAssetUrl } from './api';
+import { apiUrl, resolveAssetUrl } from './api';
 
 describe('resolveAssetUrl', () => {
   it('returns null for empty values', () => {
@@ -15,5 +15,10 @@ describe('resolveAssetUrl', () => {
   it('normalizes storage-relative path', () => {
     const result = resolveAssetUrl('complaints/sample.pdf');
     expect(result).toContain('/storage/complaints/sample.pdf');
+  });
+
+  it('normalizes csrf endpoints under /api', () => {
+    expect(apiUrl('/csrf')).toContain('/api/csrf');
+    expect(apiUrl('/api/csrf')).toContain('/api/csrf');
   });
 });

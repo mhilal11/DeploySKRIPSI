@@ -10,7 +10,7 @@ import {
     PaginatedAccounts,
 } from '@/modules/SuperAdmin/components/accounts/types';
 import SuperAdminLayout from '@/modules/SuperAdmin/Layout';
-import { api, apiUrl, isAxiosError } from '@/shared/lib/api';
+import { api, apiUrl, getApiOrigin, isAxiosError } from '@/shared/lib/api';
 import { Head, Link, router, usePageManager } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
 
@@ -278,7 +278,7 @@ export default function Index(props: IndexPageProps) {
         const baseOrigin =
             typeof window !== 'undefined'
                 ? window.location.origin
-                : 'http://localhost';
+                : getApiOrigin();
         const parsed = new URL(url, baseOrigin);
         const params: Record<string, string> = {};
         parsed.searchParams.forEach((value, key) => {
