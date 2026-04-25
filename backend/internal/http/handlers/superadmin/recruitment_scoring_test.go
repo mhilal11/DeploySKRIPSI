@@ -1,6 +1,7 @@
 package superadmin
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -189,6 +190,37 @@ func TestEvaluateRecruitmentScore_ProgramStudyMatchHigherThanMismatch(t *testing
 	}
 	if matchScore.Total <= mismatchScore.Total {
 		t.Fatalf("expected total score %.2f to be higher than mismatch %.2f", matchScore.Total, mismatchScore.Total)
+	}
+}
+
+func TestEvaluateRecruitmentScore_ProgramStudyDoesNotFalseMatchGenericAcademicWord(t *testing.T) {
+	app := models.Application{
+		Position: "Software Engineer",
+	}
+
+	criteria := vacancyScoringCriteria{
+		DivisionName: "IT",
+		Position:     "Software Engineer",
+		Eligibility: map[string]any{
+			"min_education":   "S1",
+			"program_studies": []any{"Ilmu Komputer"},
+		},
+	}
+
+	profile := &models.ApplicantProfile{
+		Educations: models.JSON(`[{"degree":"S1","field_of_study":"Ilmu Komunikasi"}]`),
+	}
+
+	score := evaluateRecruitmentScore(app, profile, criteria)
+	educationBreakdown, ok := breakdownByKey(score.Breakdown, "education")
+	if !ok {
+		t.Fatal("expected education breakdown to exist")
+	}
+	if strings.Contains(educationBreakdown.Detail, "Program studi Ilmu Komunikasi sesuai dengan kriteria") {
+		t.Fatalf("expected Ilmu Komunikasi not to match Ilmu Komputer, got detail %q", educationBreakdown.Detail)
+	}
+	if educationBreakdown.Explanation == "" {
+		t.Fatal("expected mismatch explanation to be present")
 	}
 }
 

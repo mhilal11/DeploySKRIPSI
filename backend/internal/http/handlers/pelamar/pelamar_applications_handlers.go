@@ -102,9 +102,6 @@ func PelamarApplicationsStore(c *gin.Context) {
 	if email == "" {
 		validationErrors["email"] = "Email wajib diisi."
 	}
-	if skills == "" {
-		validationErrors["skills"] = "Keahlian wajib diisi."
-	}
 	handlers.ValidateFieldLength(validationErrors, "full_name", "Nama", fullName, 255)
 	handlers.ValidatePersonName(validationErrors, "full_name", "Nama", fullName)
 	handlers.ValidateFieldLength(validationErrors, "email", "Email", email, 254)

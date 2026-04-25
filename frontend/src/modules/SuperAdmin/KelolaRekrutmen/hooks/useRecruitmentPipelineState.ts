@@ -58,6 +58,8 @@ export function useRecruitmentPipelineState({
 
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [updatingApplicantId, setUpdatingApplicantId] = useState<number | null>(null);
+  const [isDeletingApplication, setIsDeletingApplication] = useState(false);
+  const [deletingApplicationId, setDeletingApplicationId] = useState<number | null>(null);
 
   useEffect(() => {
     setApplicationRows(applications);
@@ -313,6 +315,58 @@ export function useRecruitmentPipelineState({
     }
   };
 
+  const handleDeleteApplication = (application: ApplicantRecord) => {
+    if (isDeletingApplication) {
+      return;
+    }
+
+    setIsDeletingApplication(true);
+    setDeletingApplicationId(application.id);
+
+    router.delete(route('super-admin.recruitment.destroy', application.id), {}, {
+      preserveScroll: true,
+      onSuccess: (responseData) => {
+        setApplicationRows((prev) =>
+          prev.filter((row) => row.id !== application.id),
+        );
+        setInterviewRows((prev) =>
+          prev.filter((row) => row.application_id !== application.id),
+        );
+        setOnboardingRows((prev) =>
+          prev.filter((row) => row.application_id !== application.id),
+        );
+        setSelectedApplicant((prev) => {
+          if (!prev) {
+            return prev;
+          }
+          return prev.id === application.id ? null : prev;
+        });
+        setProfileOpen(false);
+        setScheduleOpen(false);
+        setInterviewDetailOpen(false);
+
+        if (responseData?.sidebarNotifications && typeof responseData.sidebarNotifications === 'object') {
+          onSidebarNotificationsChange(
+            responseData.sidebarNotifications as Record<string, number>,
+          );
+        }
+
+        toast.success('Lamaran berhasil dihapus.', {
+          description: `Lamaran ${application.name} untuk posisi ${application.position} telah dihapus.`,
+        });
+      },
+      onError: (errors) => {
+        toast.error('Gagal menghapus lamaran.', {
+          description: getFirstErrorMessage(errors),
+        });
+      },
+      onFinish: () => {
+        setIsDeletingApplication(false);
+        setDeletingApplicationId(null);
+      },
+    });
+  };
+
   const handleOpenScheduleDialog = (application: ApplicantRecord) => {
     setSelectedApplicant(application);
     setScheduleOpen(true);
@@ -456,8 +510,11 @@ export function useRecruitmentPipelineState({
     selectedApplicant,
     isUpdatingStatus,
     updatingApplicantId,
+    isDeletingApplication,
+    deletingApplicationId,
     handleStatusUpdate,
     handleReject,
+    handleDeleteApplication,
     handleViewProfile,
     handleOpenScheduleDialog,
     handleScheduleSuccess,

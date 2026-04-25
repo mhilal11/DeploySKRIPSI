@@ -1,4 +1,4 @@
-﻿import { FileText, ChevronDown, ChevronUp, ExternalLink, Briefcase, Calendar, GraduationCap, Award } from 'lucide-react';
+import { FileText, ChevronDown, ChevronUp, ExternalLink, Briefcase, Calendar, GraduationCap } from 'lucide-react';
 import { useState } from 'react';
 
 import { Badge } from '@/shared/components/ui/badge';
@@ -82,7 +82,6 @@ export default function DocumentsCard({
                             key={app.id}
                             className="rounded-lg border border-slate-200 bg-white overflow-hidden"
                         >
-                            {/* Header - Always Visible */}
                             <div
                                 className="flex items-center gap-3 p-3 cursor-pointer hover:bg-slate-50 transition-colors"
                                 onClick={() => toggleExpand(app.id)}
@@ -109,10 +108,8 @@ export default function DocumentsCard({
                                 )}
                             </div>
 
-                            {/* Expanded Details */}
                             {expandedId === app.id && (
                                 <div className="border-t border-slate-200 bg-slate-50 p-4 space-y-3">
-                                    {/* Personal Info */}
                                     <div className="grid grid-cols-1 gap-2">
                                         <div>
                                             <p className="text-xs font-medium text-slate-500">Nama Lengkap</p>
@@ -132,7 +129,6 @@ export default function DocumentsCard({
                                         </div>
                                     </div>
 
-                                    {/* Position & Division */}
                                     {app.division && (
                                         <div>
                                             <p className="text-xs font-medium text-slate-500">Divisi</p>
@@ -140,7 +136,6 @@ export default function DocumentsCard({
                                         </div>
                                     )}
 
-                                    {/* Education & Experience */}
                                     <div className="grid grid-cols-2 gap-2">
                                         {app.education && (
                                             <div className="flex items-start gap-2">
@@ -162,18 +157,6 @@ export default function DocumentsCard({
                                         )}
                                     </div>
 
-                                    {/* Skills */}
-                                    {app.skills && (
-                                        <div className="flex items-start gap-2">
-                                            <Award className="h-4 w-4 text-blue-900 mt-0.5 flex-shrink-0" />
-                                            <div>
-                                                <p className="text-xs font-medium text-slate-500">Keterampilan</p>
-                                                <p className="text-sm text-slate-900">{app.skills}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Rejection Reason */}
                                     {app.status === 'Rejected' && app.rejection_reason && (
                                         <div className="pt-2 border-t border-red-200">
                                             <p className="text-xs font-medium text-red-700 mb-1">
@@ -185,7 +168,6 @@ export default function DocumentsCard({
                                         </div>
                                     )}
 
-                                    {/* CV File */}
                                     {app.cv_file && (
                                         <div className="pt-2 border-t border-slate-200">
                                             <Button
@@ -201,7 +183,6 @@ export default function DocumentsCard({
                                         </div>
                                     )}
 
-                                    {/* Notes */}
                                     {app.notes && (
                                         <div className="pt-2 border-t border-slate-200">
                                             <p className="text-xs font-medium text-slate-500 mb-1">Catatan</p>
@@ -219,5 +200,3 @@ export default function DocumentsCard({
         </Card>
     );
 }
-
-

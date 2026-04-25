@@ -25,6 +25,7 @@ Salin template:
 - `REDIS_PASSWORD` : password Redis (opsional)
 - `REDIS_DB` : index database Redis (default `0`)
 - `DISABLE_BACKGROUND_WORKERS` : `true|false` untuk menonaktifkan worker background (berguna untuk test/integration environment)
+- `GROQ_TPM_LIMIT` : budget token per minute untuk worker AI CV screening (default `8000`, dipakai untuk memberi jeda aman antar job)
 - `COOKIE_SECURE` : `true` jika pakai HTTPS
 - `GOOGLE_OAUTH_CLIENT_ID` : Client ID OAuth 2.0 dari Google Cloud Console (opsional, untuk Daftar via Google)
 - `GOOGLE_OAUTH_CLIENT_SECRET` : Client Secret OAuth 2.0 (opsional)
@@ -107,6 +108,8 @@ Jika memakai MySQL Railway, Anda bisa:
 ## Background Job Queue
 - AI CV Screening otomatis dijalankan melalui tabel `jobs` (`queue = recruitment_ai_screening`).
 - Worker dipanggil saat server berjalan dan akan retry dengan backoff jika proses gagal.
+- Worker screening memakai lock database lintas instance, jadi job CV diproses serial satu per satu.
+- Setelah request Groq sukses atau terkena rate limit, worker menahan job berikutnya sesuai budget `GROQ_TPM_LIMIT` atau `retry-after` dari Groq agar tidak menembak serentak.
 
 ## Caching
 - Endpoint `GET /api/public/landing` menggunakan cache Redis (jika dikonfigurasi) dengan fallback cache in-memory TTL 30 detik.

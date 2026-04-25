@@ -104,3 +104,46 @@ func TestGetLatestSuccessfulAIScoresByApplicationIDs_SelectErrorWrapped(t *testi
 		t.Fatalf("expected contextual error, got %v", err)
 	}
 }
+
+func TestGetSuccessfulAIScreeningHistoryByApplicationID_SelectErrorWrapped(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	selectErr := errors.New("history select fail")
+	mock.ExpectQuery("(?s)SELECT\\s+s\\.application_id,\\s+a\\.position,\\s+a\\.division,\\s+a\\.status AS application_status").
+		WithArgs(int64(15), 2).
+		WillReturnError(selectErr)
+
+	_, err := repository.GetSuccessfulAIScreeningHistoryByApplicationID(db, 15, 2)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !errors.Is(err, selectErr) {
+		t.Fatalf("expected wrapped select error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "get successful ai screening history by application id") {
+		t.Fatalf("expected contextual error, got %v", err)
+	}
+}
+
+func TestGetSimilarSuccessfulAIScreeningMemories_SelectErrorWrapped(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	selectErr := errors.New("similar memories select fail")
+	division := "IT"
+	mock.ExpectQuery("(?s)SELECT\\s+s\\.application_id,\\s+a\\.position,\\s+a\\.division,\\s+a\\.status AS application_status").
+		WithArgs(int64(33), "Backend Engineer", "IT", 4).
+		WillReturnError(selectErr)
+
+	_, err := repository.GetSimilarSuccessfulAIScreeningMemories(db, "Backend Engineer", &division, 33, 4)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if !errors.Is(err, selectErr) {
+		t.Fatalf("expected wrapped select error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "get similar successful ai screening memories") {
+		t.Fatalf("expected contextual error, got %v", err)
+	}
+}

@@ -100,6 +100,7 @@ func evaluateRecruitmentScoreWithAI(
 			Score:        component.Score,
 			Contribution: component.Contribution,
 			Detail:       component.Detail,
+			Explanation:  component.Explanation,
 		})
 	}
 

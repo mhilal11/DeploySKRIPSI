@@ -46,6 +46,20 @@ type RecruitmentAIScreeningSuccessInput struct {
 	Now                time.Time
 }
 
+type RecruitmentAIScreeningMemoryRecord struct {
+	ApplicationID      int64       `db:"application_id"`
+	Position           string      `db:"position"`
+	Division           *string     `db:"division"`
+	ApplicationStatus  string      `db:"application_status"`
+	MatchScore         *float64    `db:"match_score"`
+	Recommendation     *string     `db:"recommendation"`
+	Summary            *string     `db:"summary"`
+	StrengthsJSON      models.JSON `db:"strengths_json"`
+	GapsJSON           models.JSON `db:"gaps_json"`
+	RedFlagsJSON       models.JSON `db:"red_flags_json"`
+	ScreeningCreatedAt *time.Time  `db:"screening_created_at"`
+}
+
 func GetApplicationByID(db *sqlx.DB, applicationID int64) (*models.Application, error) {
 	if db == nil {
 		return nil, errors.New("database tidak tersedia")
@@ -185,6 +199,115 @@ func GetLatestRecruitmentAIScreeningByApplicationID(db *sqlx.DB, applicationID i
 		return nil, wrapRepoErr("get latest ai screening by application id", err)
 	}
 	return &row, nil
+}
+
+func GetSuccessfulAIScreeningHistoryByApplicationID(db *sqlx.DB, applicationID int64, limit int) ([]RecruitmentAIScreeningMemoryRecord, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	if applicationID <= 0 {
+		return []RecruitmentAIScreeningMemoryRecord{}, nil
+	}
+	if limit <= 0 {
+		limit = 3
+	}
+
+	rows := []RecruitmentAIScreeningMemoryRecord{}
+	if err := db.Select(&rows, `
+		SELECT
+			s.application_id,
+			a.position,
+			a.division,
+			a.status AS application_status,
+			s.match_score,
+			s.recommendation,
+			s.summary,
+			s.strengths_json,
+			s.gaps_json,
+			s.red_flags_json,
+			s.created_at AS screening_created_at
+		FROM recruitment_ai_screenings s
+		INNER JOIN applications a ON a.id = s.application_id
+		WHERE s.application_id = ?
+		  AND s.status = 'success'
+		ORDER BY s.id DESC
+		LIMIT ?
+	`, applicationID, limit); err != nil {
+		return nil, wrapRepoErr("get successful ai screening history by application id", err)
+	}
+	return rows, nil
+}
+
+func GetSimilarSuccessfulAIScreeningMemories(
+	db *sqlx.DB,
+	position string,
+	division *string,
+	excludeApplicationID int64,
+	limit int,
+) ([]RecruitmentAIScreeningMemoryRecord, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	position = strings.TrimSpace(position)
+	if position == "" {
+		return []RecruitmentAIScreeningMemoryRecord{}, nil
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+
+	rows := []RecruitmentAIScreeningMemoryRecord{}
+	trimmedDivision := ""
+	if division != nil {
+		trimmedDivision = strings.TrimSpace(*division)
+	}
+
+	baseQuery := `
+		SELECT
+			s.application_id,
+			a.position,
+			a.division,
+			a.status AS application_status,
+			s.match_score,
+			s.recommendation,
+			s.summary,
+			s.strengths_json,
+			s.gaps_json,
+			s.red_flags_json,
+			s.created_at AS screening_created_at
+		FROM recruitment_ai_screenings s
+		INNER JOIN (
+			SELECT application_id, MAX(id) AS latest_id
+			FROM recruitment_ai_screenings
+			WHERE status = 'success'
+			  AND application_id <> ?
+			GROUP BY application_id
+		) latest ON latest.latest_id = s.id
+		INNER JOIN applications a ON a.id = s.application_id
+		WHERE LOWER(TRIM(a.position)) = LOWER(TRIM(?))
+	`
+
+	args := []any{excludeApplicationID, position}
+	if trimmedDivision != "" {
+		baseQuery += " AND LOWER(TRIM(COALESCE(a.division, ''))) = LOWER(TRIM(?))"
+		args = append(args, trimmedDivision)
+	}
+	baseQuery += `
+		ORDER BY
+			CASE
+				WHEN a.status IN ('Hired', 'Rejected') THEN 0
+				WHEN a.status IN ('Offering', 'Interview') THEN 1
+				ELSE 2
+			END,
+			COALESCE(s.updated_at, s.created_at) DESC
+		LIMIT ?
+	`
+	args = append(args, limit)
+
+	if err := db.Select(&rows, baseQuery, args...); err != nil {
+		return nil, wrapRepoErr("get similar successful ai screening memories", err)
+	}
+	return rows, nil
 }
 
 func InsertRecruitmentAIScreeningFailure(db *sqlx.DB, input RecruitmentAIScreeningFailureInput) error {

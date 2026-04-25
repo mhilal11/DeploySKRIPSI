@@ -31,7 +31,7 @@ import {
     DialogFooter,
 } from '@/shared/components/ui/dialog';
 import { api, apiUrl, buildCsrfHeaders, ensureCsrfToken } from '@/shared/lib/api';
-import { Head, router, useForm } from '@/shared/lib/inertia';
+import { Head, useForm } from '@/shared/lib/inertia';
 import { PageProps } from '@/shared/types';
 
 type ApplicationsPageProps = PageProps<{
@@ -75,13 +75,23 @@ export default function Applications({
     const [eligibilityPassed, setEligibilityPassed] = useState<EligibilityCriteriaResult[]>([]);
     const [rejectedJobTitle, setRejectedJobTitle] = useState<string | null>(null);
 
+    const buildFormData = (
+        division: DivisionSummary | null,
+    ): ApplicationFormData => ({
+        division_id: division?.id ?? null,
+        full_name: defaultForm?.full_name ?? '',
+        email: defaultForm?.email ?? '',
+        phone: defaultForm?.phone ?? '',
+        position: division?.job_title ?? '',
+        cv: null,
+    });
+
     const form = useForm<ApplicationFormData>({
         division_id: formDivision?.id ?? null,
         full_name: defaultForm?.full_name ?? '',
         email: defaultForm?.email ?? '',
         phone: defaultForm?.phone ?? '',
         position: formDivision?.job_title ?? '',
-        skills: '',
         cv: null,
     });
 
@@ -115,12 +125,6 @@ export default function Applications({
             onSuccess: () => {
                 const currentDivision = formDivision;
                 const currentJobTitle = currentDivision?.job_title?.trim() ?? '';
-                const fallbackDivision = safeDivisions.find(
-                    (division) =>
-                        division.is_hiring &&
-                        division.available_slots > 0 &&
-                        division.id !== currentDivision?.id,
-                );
 
                 if (currentDivision && currentJobTitle !== '') {
                     setApplicationRows((prev) => {
@@ -146,19 +150,9 @@ export default function Applications({
                 }
 
                 handleCloseForm();
-                if (currentDivision && currentDivision.available_slots > 1) {
-                    setFormDivision(currentDivision);
-                } else if (fallbackDivision) {
-                    setFormDivision(fallbackDivision);
-                }
 
                 toast.success('Lamaran berhasil dikirim', {
                     description: 'Tim rekrutmen akan meninjau berkas Anda.',
-                });
-
-                void router.reload({
-                    only: ['applications', 'divisions', 'defaultForm', 'flash'],
-                    preserveScroll: true,
                 });
             },
             onError: (formErrors) => {
@@ -219,24 +213,14 @@ export default function Applications({
         }
 
         setFormDivision(division);
-        form.setData((previous) => ({
-            ...previous,
-            division_id: division.id,
-            position: division.job_title ?? '',
-        }));
+        form.clearErrors();
+        form.setData(buildFormData(division));
         setFormOpen(true);
     };
 
     const handleCloseForm = () => {
         setFormOpen(false);
-        setFormDivision(null);
-        form.setData((previous) => ({
-            ...previous,
-            division_id: null,
-            position: '',
-            skills: '',
-            cv: null,
-        }));
+        form.clearErrors();
     };
 
     const openDivisions = safeDivisions.filter(
@@ -313,7 +297,7 @@ export default function Applications({
 
                 {/* RESPONSIVE DIALOG */}
                 <Dialog
-                    open={formOpen && Boolean(formDivision)}
+                    open={formOpen}
                     onOpenChange={(open) => {
                         if (!open) {
                             handleCloseForm();

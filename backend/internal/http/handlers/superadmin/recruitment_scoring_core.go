@@ -54,6 +54,7 @@ type recruitmentScoreBreakdown struct {
 	Score        float64 `json:"score"`
 	Contribution float64 `json:"contribution"`
 	Detail       string  `json:"detail"`
+	Explanation  string  `json:"explanation,omitempty"`
 }
 
 type recruitmentScoreResult struct {

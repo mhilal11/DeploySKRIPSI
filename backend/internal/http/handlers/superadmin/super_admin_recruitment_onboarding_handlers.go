@@ -55,7 +55,10 @@ func SuperAdminRecruitmentDelete(c *gin.Context) {
 			"status":   existing.Status,
 		},
 	})
-	c.JSON(http.StatusOK, gin.H{"status": "Lamaran berhasil dihapus."})
+	c.JSON(http.StatusOK, gin.H{
+		"status":               "Lamaran berhasil dihapus.",
+		"sidebarNotifications": handlers.ComputeSuperAdminSidebarNotifications(db, user.ID),
+	})
 }
 
 func SuperAdminOnboardingUpdateChecklist(c *gin.Context) {

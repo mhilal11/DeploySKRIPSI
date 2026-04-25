@@ -71,11 +71,15 @@ func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 	r.Use(middleware.Gzip())
 
 	store := cookie.NewStore([]byte(cfg.SessionSecret))
+	sameSiteMode := http.SameSiteLaxMode
+	if cfg.CookieSecure {
+		sameSiteMode = http.SameSiteNoneMode
+	}
 	store.Options(sessions.Options{
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   cfg.CookieSecure,
-		SameSite: http.SameSiteNoneMode,
+		SameSite: sameSiteMode,
 		MaxAge:   60 * 60 * 24 * 7,
 	})
 

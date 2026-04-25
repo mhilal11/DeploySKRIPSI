@@ -1,9 +1,21 @@
-import { User } from 'lucide-react';
+import { Trash2, User } from 'lucide-react';
+import { useState } from 'react';
 
 import {
     ApplicantRecord,
     formatApplicationId,
 } from '@/modules/SuperAdmin/KelolaRekrutmen/types';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/shared/components/ui/alert-dialog';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import {
@@ -32,6 +44,9 @@ type ApplicantsResultsSectionProps = {
     isUpdatingStatus: boolean;
     updatingApplicantId: number | null;
     onViewProfile?: (application: ApplicantRecord) => void;
+    onDeleteApplication: (application: ApplicantRecord) => void;
+    isDeletingApplication: boolean;
+    deletingApplicationId: number | null;
     rawTotalPages: number;
     startIndex: number;
     itemsPerPage: number;
@@ -46,6 +61,9 @@ export function ApplicantsResultsSection({
     isUpdatingStatus,
     updatingApplicantId,
     onViewProfile,
+    onDeleteApplication,
+    isDeletingApplication,
+    deletingApplicationId,
     rawTotalPages,
     startIndex,
     itemsPerPage,
@@ -125,16 +143,25 @@ export function ApplicantsResultsSection({
                                 </div>
                                 {onViewProfile && (
                                     <div className="border-t border-slate-100 pt-1.5">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => onViewProfile(application)}
-                                            disabled={isCurrentlyUpdating}
-                                            className="h-7 w-full justify-center px-2 text-xs"
-                                        >
-                                            <User className="mr-1 h-3 w-3 text-blue-600" />
-                                            Lihat Profil
-                                        </Button>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => onViewProfile(application)}
+                                                disabled={isCurrentlyUpdating}
+                                                className="h-7 flex-1 justify-center px-2 text-xs"
+                                            >
+                                                <User className="mr-1 h-3 w-3 text-blue-600" />
+                                                Lihat Profil
+                                            </Button>
+                                            <DeleteApplicationButton
+                                                application={application}
+                                                onDeleteApplication={onDeleteApplication}
+                                                isDeletingApplication={isDeletingApplication}
+                                                deletingApplicationId={deletingApplicationId}
+                                                mode="icon"
+                                            />
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -227,6 +254,12 @@ export function ApplicantsResultsSection({
                                                     <User className="h-4 w-4" />
                                                 </Button>
                                             )}
+                                            <DeleteApplicationButton
+                                                application={application}
+                                                onDeleteApplication={onDeleteApplication}
+                                                isDeletingApplication={isDeletingApplication}
+                                                deletingApplicationId={deletingApplicationId}
+                                            />
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -278,5 +311,75 @@ export function ApplicantsResultsSection({
                 </div>
             )}
         </>
+    );
+}
+
+type DeleteApplicationButtonProps = {
+    application: ApplicantRecord;
+    onDeleteApplication: (application: ApplicantRecord) => void;
+    isDeletingApplication: boolean;
+    deletingApplicationId: number | null;
+    mode?: 'default' | 'icon';
+};
+
+function DeleteApplicationButton({
+    application,
+    onDeleteApplication,
+    isDeletingApplication,
+    deletingApplicationId,
+    mode = 'default',
+}: DeleteApplicationButtonProps) {
+    const [open, setOpen] = useState(false);
+    const isDeletingCurrent = isDeletingApplication && deletingApplicationId === application.id;
+
+    const trigger =
+        mode === 'icon' ? (
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-red-600 hover:bg-red-50 hover:text-red-700"
+                disabled={isDeletingApplication}
+                aria-label={`Hapus lamaran ${application.name}`}
+            >
+                <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+        ) : (
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                disabled={isDeletingApplication}
+                aria-label={`Hapus lamaran ${application.name}`}
+            >
+                <Trash2 className="h-4 w-4" />
+            </Button>
+        );
+
+    return (
+        <AlertDialog open={open} onOpenChange={setOpen}>
+            <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
+            <AlertDialogContent className="bg-white">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Hapus lamaran {application.name}?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Tindakan ini hanya akan menghapus data lamaran recruitment untuk posisi
+                        {` ${application.position}`}. Akun pelamar tidak akan dihapus.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeletingApplication}>Batal</AlertDialogCancel>
+                    <AlertDialogAction
+                        className="bg-red-600 text-white hover:bg-red-500"
+                        disabled={isDeletingApplication}
+                        onClick={() => {
+                            onDeleteApplication(application);
+                            setOpen(false);
+                        }}
+                    >
+                        {isDeletingCurrent ? 'Menghapus...' : 'Ya, hapus lamaran'}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     );
 }

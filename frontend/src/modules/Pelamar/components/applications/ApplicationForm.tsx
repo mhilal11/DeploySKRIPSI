@@ -7,7 +7,6 @@ import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { InternationalPhoneInput } from '@/shared/components/ui/international-phone-input';
 import { Label } from '@/shared/components/ui/label';
-import { Textarea } from '@/shared/components/ui/textarea';
 import {
     parseStoredPhoneNumber,
     validatePhoneNumberForCountry,
@@ -24,7 +23,6 @@ export interface ApplicationFormData {
     email: string;
     phone: string;
     position: string;
-    skills: string;
     cv: File | null;
 }
 
@@ -70,7 +68,6 @@ export default function ApplicationForm({
         Boolean(data.email?.trim()) &&
         Boolean(data.phone?.trim()) &&
         isPhoneValid &&
-        Boolean(data.skills?.trim()) &&
         Boolean(data.cv);
 
     const handleNameChange = (value: string) => {
@@ -214,20 +211,6 @@ export default function ApplicationForm({
                         placeholder="Pilih divisi terlebih dahulu"
                         className="bg-slate-50"
                     />
-                </div>
-                
-                <div className="md:col-span-2">
-                    <Label htmlFor="skills">Keahlian</Label>
-                    <Textarea
-                        id="skills"
-                        required
-                        value={data.skills}
-                        onChange={(event) => setData('skills', event.target.value)}
-                        placeholder="Sebutkan keahlian Anda (pisahkan dengan koma)"
-                    />
-                    {errors.skills && (
-                        <p className="mt-1 text-xs text-red-500">{errors.skills}</p>
-                    )}
                 </div>
                 <div className="md:col-span-2">
                     <Label htmlFor="cv-upload">Upload CV (PDF)</Label>

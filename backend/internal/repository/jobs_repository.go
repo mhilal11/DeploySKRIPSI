@@ -2,8 +2,10 @@ package db
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -119,4 +121,117 @@ func MoveJobToFailed(db *sqlx.DB, job JobRecord, exception string) error {
 		now,
 	)
 	return wrapRepoErr("move job to failed", err)
+}
+
+func AcquireExpiringLock(db *sqlx.DB, key, owner string, ttl time.Duration) (bool, error) {
+	if db == nil {
+		return false, errors.New("database tidak tersedia")
+	}
+	key = strings.TrimSpace(key)
+	owner = strings.TrimSpace(owner)
+	if key == "" || owner == "" {
+		return false, errors.New("parameter lock tidak valid")
+	}
+	if ttl <= 0 {
+		ttl = 60 * time.Second
+	}
+
+	now := time.Now().Unix()
+	expiresAt := time.Now().Add(ttl).Unix()
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return false, wrapRepoErr("acquire expiring lock begin tx", err)
+	}
+	defer tx.Rollback()
+
+	var row struct {
+		Owner      string `db:"owner"`
+		Expiration int64  `db:"expiration"`
+	}
+	err = tx.Get(&row, "SELECT owner, expiration FROM cache_locks WHERE `key` = ? FOR UPDATE", key)
+	switch {
+	case err == nil:
+		if row.Owner != owner && row.Expiration > now {
+			return false, nil
+		}
+		if _, err := tx.Exec("UPDATE cache_locks SET owner = ?, expiration = ? WHERE `key` = ?", owner, expiresAt, key); err != nil {
+			return false, wrapRepoErr("acquire expiring lock update", err)
+		}
+	case errors.Is(err, sql.ErrNoRows):
+		if _, err := tx.Exec("INSERT INTO cache_locks (`key`, owner, expiration) VALUES (?, ?, ?)", key, owner, expiresAt); err != nil {
+			return false, wrapRepoErr("acquire expiring lock insert", err)
+		}
+	default:
+		return false, wrapRepoErr("acquire expiring lock select", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return false, wrapRepoErr("acquire expiring lock commit", err)
+	}
+	return true, nil
+}
+
+func ReleaseExpiringLock(db *sqlx.DB, key, owner string) error {
+	if db == nil {
+		return errors.New("database tidak tersedia")
+	}
+	key = strings.TrimSpace(key)
+	owner = strings.TrimSpace(owner)
+	if key == "" || owner == "" {
+		return errors.New("parameter lock tidak valid")
+	}
+	_, err := db.Exec("DELETE FROM cache_locks WHERE `key` = ? AND owner = ?", key, owner)
+	return wrapRepoErr("release expiring lock", err)
+}
+
+func ListJobsByQueue(db *sqlx.DB, queue string) ([]JobRecord, error) {
+	if db == nil {
+		return nil, errors.New("database tidak tersedia")
+	}
+	rows := []JobRecord{}
+	if err := db.Select(&rows, "SELECT id, queue, payload, attempts, reserved_at, available_at, created_at FROM jobs WHERE queue = ? ORDER BY id ASC", queue); err != nil {
+		return nil, wrapRepoErr("list jobs by queue", err)
+	}
+	return rows, nil
+}
+
+func FindQueuedApplicationJobIndex(db *sqlx.DB, queue string, applicationIDs []int64) (map[int64]JobRecord, error) {
+	out := make(map[int64]JobRecord, len(applicationIDs))
+	if db == nil || len(applicationIDs) == 0 {
+		return out, nil
+	}
+
+	targets := make(map[int64]struct{}, len(applicationIDs))
+	for _, applicationID := range applicationIDs {
+		if applicationID > 0 {
+			targets[applicationID] = struct{}{}
+		}
+	}
+	if len(targets) == 0 {
+		return out, nil
+	}
+
+	rows, err := ListJobsByQueue(db, queue)
+	if err != nil {
+		return out, err
+	}
+
+	for _, row := range rows {
+		var payload struct {
+			ApplicationID int64 `json:"application_id"`
+		}
+		if err := json.Unmarshal([]byte(row.Payload), &payload); err != nil {
+			continue
+		}
+		if _, ok := targets[payload.ApplicationID]; !ok || payload.ApplicationID <= 0 {
+			continue
+		}
+		if _, exists := out[payload.ApplicationID]; exists {
+			continue
+		}
+		out[payload.ApplicationID] = row
+	}
+
+	return out, nil
 }

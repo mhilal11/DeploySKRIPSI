@@ -47,6 +47,7 @@ type RecruitmentScoringBreakdown struct {
 	Score        float64
 	Contribution float64
 	Detail       string
+	Explanation  string
 }
 
 type RecruitmentScoringResult struct {
@@ -61,6 +62,15 @@ type RecruitmentScoringResult struct {
 
 var scoringNonWordPattern = regexp.MustCompile(`[^\pL\pN]+`)
 
+var genericProgramStudyTokensEngine = map[string]struct{}{
+	"ilmu":    {},
+	"teknik":  {},
+	"studi":   {},
+	"study":   {},
+	"program": {},
+	"science": {},
+}
+
 func EvaluateRecruitmentScoring(input RecruitmentScoringInput) RecruitmentScoringResult {
 	cfg := input.Config
 	requiredEducation := normalizeEducationLevelEngine(input.RequiredEducation)
@@ -68,7 +78,7 @@ func EvaluateRecruitmentScoring(input RecruitmentScoringInput) RecruitmentScorin
 	requiredGender := strings.TrimSpace(input.RequiredGender)
 
 	educationScore, educationDetail, educationPass := scoreEducationCriterionEngine(input.HighestEducation, requiredEducation)
-	educationScore, educationDetail = adjustEducationScoreByProgramStudyEngine(
+	educationScore, educationDetail, educationExplanation := adjustEducationScoreByProgramStudyEngine(
 		educationScore,
 		educationDetail,
 		educationPass,
@@ -99,7 +109,7 @@ func EvaluateRecruitmentScoring(input RecruitmentScoringInput) RecruitmentScorin
 	weightAI /= totalWeight
 
 	breakdown := []RecruitmentScoringBreakdown{
-		componentScoreEngine("education", "Pendidikan", weightEducation, educationScore, educationDetail),
+		componentScoreEngine("education", "Pendidikan", weightEducation, educationScore, educationDetail, educationExplanation),
 		componentScoreEngine("experience", "Pengalaman", weightExperience, experienceScore, experienceDetail),
 		componentScoreEngine("certification", "Sertifikasi", weightCertifications, certificationScore, certificationDetail),
 		componentScoreEngine("profile", "Kelengkapan Profil", weightProfile, completenessScore, completenessDetail),
@@ -111,6 +121,7 @@ func EvaluateRecruitmentScoring(input RecruitmentScoringInput) RecruitmentScorin
 			weightAI,
 			clampEngine(*input.AIMatchScore, 0, 100),
 			fmt.Sprintf("Skor kecocokan AI terhadap lowongan: %.1f/100.", clampEngine(*input.AIMatchScore, 0, 100)),
+			"",
 		))
 	}
 
@@ -235,7 +246,11 @@ func EvaluateRecruitmentScoring(input RecruitmentScoringInput) RecruitmentScorin
 	}
 }
 
-func componentScoreEngine(key, label string, weight, score float64, detail string) RecruitmentScoringBreakdown {
+func componentScoreEngine(key, label string, weight, score float64, detail string, explanation ...string) RecruitmentScoringBreakdown {
+	info := ""
+	if len(explanation) > 0 {
+		info = strings.TrimSpace(explanation[0])
+	}
 	return RecruitmentScoringBreakdown{
 		Key:          key,
 		Label:        label,
@@ -243,6 +258,7 @@ func componentScoreEngine(key, label string, weight, score float64, detail strin
 		Score:        clampEngine(score, 0, 100),
 		Contribution: clampEngine(score, 0, 100) * weight,
 		Detail:       detail,
+		Explanation:  info,
 	}
 }
 
@@ -319,42 +335,118 @@ func recommendationEngine(total float64, eligible bool, cfg RecruitmentScoringCo
 	}
 }
 
-func adjustEducationScoreByProgramStudyEngine(score float64, detail string, educationPass bool, candidateProgram string, requiredPrograms []string) (float64, string) {
+func adjustEducationScoreByProgramStudyEngine(score float64, detail string, educationPass bool, candidateProgram string, requiredPrograms []string) (float64, string, string) {
 	cleanedPrograms := cleanRequirementListEngine(requiredPrograms)
 	if len(cleanedPrograms) == 0 || !educationPass {
-		return clampEngine(score, 0, 100), detail
+		return clampEngine(score, 0, 100), detail, ""
 	}
 	candidateProgram = strings.TrimSpace(candidateProgram)
 	if candidateProgram == "" {
 		adjusted := math.Min(score, 65)
-		return clampEngine(adjusted, 0, 100), fmt.Sprintf("%s Program studi kandidat belum terdeteksi; target prodi: %s.", detail, strings.Join(cleanedPrograms, ", "))
+		return clampEngine(adjusted, 0, 100),
+			fmt.Sprintf("%s Program studi kandidat belum terdeteksi; target prodi: %s.", detail, strings.Join(cleanedPrograms, ", ")),
+			"Program studi kandidat tidak bisa diverifikasi karena data field of study belum tersedia."
 	}
-	if matchedProgram := matchingProgramStudyEngine(candidateProgram, cleanedPrograms); matchedProgram != "" {
-		return clampEngine(score, 0, 100), fmt.Sprintf("%s Program studi %s sesuai dengan kriteria (%s).", detail, candidateProgram, matchedProgram)
+	if match := matchingProgramStudyEngine(candidateProgram, cleanedPrograms); match.MatchedProgram != "" {
+		return clampEngine(score, 0, 100),
+			fmt.Sprintf("%s Program studi %s sesuai dengan kriteria (%s).", detail, candidateProgram, match.MatchedProgram),
+			match.Explanation
 	}
 	adjusted := math.Min(score, 75)
-	return clampEngine(adjusted, 0, 100), fmt.Sprintf("%s Program studi %s belum sesuai dengan kriteria (%s).", detail, candidateProgram, strings.Join(cleanedPrograms, ", "))
+	return clampEngine(adjusted, 0, 100),
+		fmt.Sprintf("%s Program studi %s belum sesuai dengan kriteria (%s).", detail, candidateProgram, strings.Join(cleanedPrograms, ", ")),
+		"Tidak ditemukan kecocokan nama program studi secara langsung maupun pada kata kunci utamanya. Kata umum akademik seperti 'ilmu' dan 'teknik' tidak dipakai sendiri sebagai dasar kecocokan."
 }
 
-func matchingProgramStudyEngine(candidateProgram string, requiredPrograms []string) string {
+type programStudyMatchEngineResult struct {
+	MatchedProgram string
+	Explanation    string
+}
+
+func matchingProgramStudyEngine(candidateProgram string, requiredPrograms []string) programStudyMatchEngineResult {
 	candidateNorm := normalizeForMatchEngine(candidateProgram)
 	if candidateNorm == "" {
-		return ""
+		return programStudyMatchEngineResult{}
 	}
-	candidateSet := tokenizeToSetEngine(candidateNorm)
+	candidateTokens := normalizeProgramStudyTokensEngine(candidateNorm)
+	candidateSet := tokensToSetEngine(candidateTokens)
 	for _, requiredProgram := range requiredPrograms {
 		requiredNorm := normalizeForMatchEngine(requiredProgram)
 		if requiredNorm == "" {
 			continue
 		}
-		if strings.Contains(candidateNorm, requiredNorm) || strings.Contains(requiredNorm, candidateNorm) {
-			return requiredProgram
+		if candidateNorm == requiredNorm {
+			return programStudyMatchEngineResult{
+				MatchedProgram: requiredProgram,
+				Explanation:    "Dicocokkan karena nama program studi kandidat sama persis dengan target lowongan.",
+			}
 		}
-		if requirementMatchesEngine(requiredProgram, candidateNorm, candidateSet) {
-			return requiredProgram
+		if strings.Contains(candidateNorm, requiredNorm) {
+			return programStudyMatchEngineResult{
+				MatchedProgram: requiredProgram,
+				Explanation:    "Dicocokkan karena nama program studi kandidat memuat nama target lowongan secara langsung.",
+			}
+		}
+		requiredTokens := normalizeProgramStudyTokensEngine(requiredNorm)
+		if match, matchedTokens := programStudyTokensMatchEngine(requiredTokens, candidateSet); match {
+			return programStudyMatchEngineResult{
+				MatchedProgram: requiredProgram,
+				Explanation: fmt.Sprintf(
+					"Dicocokkan berdasarkan kata kunci utama yang sama: %s. Kata umum akademik seperti 'ilmu' dan 'teknik' diabaikan agar tidak menghasilkan kecocokan palsu.",
+					strings.Join(matchedTokens, ", "),
+				),
+			}
 		}
 	}
-	return ""
+	return programStudyMatchEngineResult{}
+}
+
+func normalizeProgramStudyTokensEngine(text string) []string {
+	parts := strings.Fields(normalizeForMatchEngine(text))
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if len(part) < 2 {
+			continue
+		}
+		if _, generic := genericProgramStudyTokensEngine[part]; generic {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
+}
+
+func tokensToSetEngine(tokens []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(tokens))
+	for _, token := range tokens {
+		set[token] = struct{}{}
+	}
+	return set
+}
+
+func programStudyTokensMatchEngine(requiredTokens []string, candidateSet map[string]struct{}) (bool, []string) {
+	if len(requiredTokens) == 0 {
+		return false, nil
+	}
+	matchedTokens := make([]string, 0, len(requiredTokens))
+	for _, token := range requiredTokens {
+		if _, ok := candidateSet[token]; ok {
+			matchedTokens = append(matchedTokens, token)
+		}
+	}
+	threshold := requiredProgramStudyThresholdEngine(len(requiredTokens))
+	return len(matchedTokens) >= threshold, matchedTokens
+}
+
+func requiredProgramStudyThresholdEngine(tokenCount int) int {
+	switch {
+	case tokenCount <= 1:
+		return 1
+	case tokenCount == 2:
+		return 2
+	default:
+		return tokenCount - 1
+	}
 }
 
 func cleanRequirementListEngine(requirements []string) []string {

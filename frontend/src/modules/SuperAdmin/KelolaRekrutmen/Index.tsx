@@ -102,6 +102,9 @@ export default function KelolaRekrutmenIndex({
               onReject={pipeline.handleReject}
               isUpdatingStatus={pipeline.isUpdatingStatus}
               updatingApplicantId={pipeline.updatingApplicantId}
+              onDeleteApplication={pipeline.handleDeleteApplication}
+              isDeletingApplication={pipeline.isDeletingApplication}
+              deletingApplicationId={pipeline.deletingApplicationId}
               onScheduleInterview={pipeline.handleOpenScheduleDialog}
               onViewProfile={pipeline.handleViewProfile}
               slaOverviewState={scoring.slaOverviewState}

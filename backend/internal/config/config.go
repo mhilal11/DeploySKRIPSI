@@ -18,12 +18,15 @@ type Config struct {
 	FrontendURL             string
 	AppTimezone             string
 	EducationReferencePath  string
-	GroqAPIKey              string
+	GroqAPIKeys             []string
 	GroqBaseURL             string
 	GroqModel               string
 	GroqFallbackModel       string
+	GroqFallbackEnabled     bool
 	GroqModelChain          []string
 	GroqRequestTimeoutSec   int
+	GroqTPMLimit            int
+	CVScreeningUseMemory    bool
 	DBHost                  string
 	DBPort                  int
 	DBUser                  string
@@ -65,9 +68,14 @@ func Load() Config {
 	}
 	groqModel := strings.TrimSpace(getenv("GROQ_MODEL", ""))
 	groqFallbackModel := strings.TrimSpace(getenv("GROQ_FALLBACK_MODEL", ""))
+	groqFallbackEnabled := getenvBool("GROQ_FALLBACK_ENABLED", true)
 	groqModelChain := parseCSVUnique(getenv("GROQ_MODEL_CHAIN", ""))
 	if len(groqModelChain) == 0 {
-		groqModelChain = parseCSVUnique(strings.Join([]string{groqModel, groqFallbackModel}, ","))
+		if groqFallbackEnabled {
+			groqModelChain = parseCSVUnique(strings.Join([]string{groqModel, groqFallbackModel}, ","))
+		} else {
+			groqModelChain = parseCSVUnique(groqModel)
+		}
 	}
 	storagePath := resolveStoragePath(getenv("STORAGE_PATH", "./storage"))
 	dbHost := getenvAny([]string{"DB_HOST", "MYSQLHOST"}, "127.0.0.1")
@@ -84,12 +92,15 @@ func Load() Config {
 		FrontendURL:             frontendURL,
 		AppTimezone:             strings.TrimSpace(getenv("APP_TIMEZONE", "Asia/Jakarta")),
 		EducationReferencePath:  getenv("EDUCATION_REFERENCE_PATH", "./data/education_reference_id.json"),
-		GroqAPIKey:              strings.TrimSpace(getenv("GROQ_API_KEY", "")),
+		GroqAPIKeys:             loadGroqAPIKeys(),
 		GroqBaseURL:             strings.TrimSpace(getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")),
 		GroqModel:               groqModel,
 		GroqFallbackModel:       groqFallbackModel,
+		GroqFallbackEnabled:     groqFallbackEnabled,
 		GroqModelChain:          groqModelChain,
 		GroqRequestTimeoutSec:   getenvInt("GROQ_TIMEOUT_SECONDS", 60),
+		GroqTPMLimit:            getenvInt("GROQ_TPM_LIMIT", 8000),
+		CVScreeningUseMemory:    getenvBool("AI_CV_SCREENING_USE_MEMORY", false),
 		DBHost:                  dbHost,
 		DBPort:                  dbPort,
 		DBUser:                  dbUser,
@@ -319,4 +330,36 @@ func randomSecret(minBytes int) string {
 		return strings.Repeat("x", minBytes)
 	}
 	return base64.RawURLEncoding.EncodeToString(buf)
+}
+
+// loadGroqAPIKeys reads numbered API keys (GROQ_API_KEY_1, GROQ_API_KEY_2, ...)
+// and returns only the enabled, non-empty ones. Falls back to legacy GROQ_API_KEY.
+func loadGroqAPIKeys() []string {
+	var keys []string
+	for i := 1; i <= 10; i++ {
+		keyEnv := fmt.Sprintf("GROQ_API_KEY_%d", i)
+		enabledEnv := fmt.Sprintf("GROQ_API_KEY_%d_ENABLED", i)
+
+		apiKey := strings.TrimSpace(os.Getenv(keyEnv))
+		if apiKey == "" {
+			continue
+		}
+
+		enabled := getenvBool(enabledEnv, true)
+		if !enabled {
+			continue
+		}
+
+		keys = append(keys, apiKey)
+	}
+
+	// Fallback: support legacy single GROQ_API_KEY if no numbered keys found
+	if len(keys) == 0 {
+		legacy := strings.TrimSpace(os.Getenv("GROQ_API_KEY"))
+		if legacy != "" {
+			keys = append(keys, legacy)
+		}
+	}
+
+	return keys
 }

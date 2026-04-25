@@ -68,6 +68,9 @@ interface ApplicantsTabProps {
     updatingApplicantId: number | null;
     onScheduleInterview: (application: ApplicantRecord) => void;
     onViewProfile?: (application: ApplicantRecord) => void;
+    onDeleteApplication: (application: ApplicantRecord) => void;
+    isDeletingApplication: boolean;
+    deletingApplicationId: number | null;
     slaOverviewState: RecruitmentSLAOverview;
     slaSettingsForm: RecruitmentSLASettings;
     slaReminderRows: RecruitmentSLAReminder[];
@@ -94,6 +97,9 @@ export default function ApplicantsTab({
     updatingApplicantId,
     onScheduleInterview,
     onViewProfile,
+    onDeleteApplication,
+    isDeletingApplication,
+    deletingApplicationId,
     slaOverviewState,
     slaSettingsForm,
     slaReminderRows,
@@ -565,6 +571,9 @@ export default function ApplicantsTab({
                     isUpdatingStatus={isUpdatingStatus}
                     updatingApplicantId={updatingApplicantId}
                     onViewProfile={onViewProfile}
+                    onDeleteApplication={onDeleteApplication}
+                    isDeletingApplication={isDeletingApplication}
+                    deletingApplicationId={deletingApplicationId}
                     rawTotalPages={rawTotalPages}
                     startIndex={startIndex}
                     itemsPerPage={ITEMS_PER_PAGE}

@@ -15,7 +15,7 @@ func main() {
 	_ = godotenv.Load()
 
 	if len(os.Args) < 2 {
-		log.Printf("usage: go run ./cmd/seed [users|staff]")
+		log.Printf("usage: go run ./cmd/seed [users|staff|pelamar|pelamar-web]")
 		os.Exit(1)
 	}
 
@@ -39,9 +39,21 @@ func main() {
 			os.Exit(1)
 		}
 		log.Printf("seed staff completed")
+	case "pelamar":
+		if err := seed.RunApplicantSeeder(database); err != nil {
+			log.Printf("seed pelamar failed: %v", err)
+			os.Exit(1)
+		}
+		log.Printf("seed pelamar completed")
+	case "pelamar-web":
+		if err := seed.RunWebApplicantProfileSeeder(database); err != nil {
+			log.Printf("seed pelamar-web failed: %v", err)
+			os.Exit(1)
+		}
+		log.Printf("seed pelamar-web completed")
 	default:
 		log.Printf("unknown seeder: %s", os.Args[1])
-		log.Printf("available seeders: users, staff")
+		log.Printf("available seeders: users, staff, pelamar, pelamar-web")
 		os.Exit(1)
 	}
 }

@@ -16,6 +16,9 @@ export function ApplicantAIScreeningTab({
   aiScoreBadgeClassName,
   aiScreeningStatus,
 }: ApplicantAIScreeningTabProps) {
+  const friendlyErrorMessage = humanizeAIScreeningErrorMessage(aiScreening?.error_message);
+  const statusPresentation = getAIScreeningStatusPresentation(aiScreeningStatus);
+
   return (
     <Card className="border-0 shadow-md">
       <div className="p-6 space-y-5">
@@ -55,12 +58,8 @@ export function ApplicantAIScreeningTab({
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-wide text-slate-500">Status</p>
-                <p
-                  className={`text-sm font-medium mt-1 ${
-                    aiScreeningStatus === 'success' ? 'text-emerald-700' : 'text-rose-700'
-                  }`}
-                >
-                  {aiScreening.status ?? '-'}
+                <p className={`text-sm font-medium mt-1 ${statusPresentation.className}`}>
+                  {statusPresentation.label}
                 </p>
               </div>
             </div>
@@ -158,8 +157,8 @@ export function ApplicantAIScreeningTab({
                   </span>
                 </p>
               </div>
-              {aiScreening.error_message && (
-                <p className="mt-2 text-xs text-rose-700">{aiScreening.error_message}</p>
+              {friendlyErrorMessage && (
+                <p className="mt-2 text-xs text-rose-700">{friendlyErrorMessage}</p>
               )}
             </div>
           </>
@@ -167,4 +166,49 @@ export function ApplicantAIScreeningTab({
       </div>
     </Card>
   );
+}
+
+function humanizeAIScreeningErrorMessage(message?: string | null) {
+  const trimmed = (message ?? '').trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const normalized = trimmed.toLowerCase();
+  if (
+    normalized.includes('status 429') ||
+    normalized.includes('rate limit reached') ||
+    normalized.includes('layanan ai sedang padat')
+  ) {
+    return 'Layanan AI sedang padat. Screening CV akan dicoba lagi otomatis setelah kapasitas tersedia.';
+  }
+  if (
+    normalized.includes('failed to validate json') ||
+    normalized.includes('failed_generation') ||
+    normalized.includes('bukan json object valid') ||
+    normalized.includes('respons ai belum stabil')
+  ) {
+    return 'Respons AI belum stabil saat membaca CV. Sistem akan mencoba memproses ulang secara otomatis.';
+  }
+  if (normalized.includes('timeout') || normalized.includes('batas waktu')) {
+    return 'Permintaan ke layanan AI melebihi batas waktu. Screening CV akan dicoba lagi.';
+  }
+
+  return 'Screening AI belum berhasil diproses. Silakan cek lagi beberapa saat.';
+}
+
+function getAIScreeningStatusPresentation(status?: string | null) {
+  const normalized = (status ?? '').trim().toLowerCase();
+  switch (normalized) {
+    case 'success':
+      return { label: 'Berhasil', className: 'text-emerald-700' };
+    case 'processing':
+      return { label: 'Sedang Diproses', className: 'text-sky-700' };
+    case 'retrying':
+      return { label: 'Mencoba Ulang', className: 'text-amber-700' };
+    case 'failed':
+      return { label: 'Gagal', className: 'text-rose-700' };
+    default:
+      return { label: status?.trim() || '-', className: 'text-slate-700' };
+  }
 }

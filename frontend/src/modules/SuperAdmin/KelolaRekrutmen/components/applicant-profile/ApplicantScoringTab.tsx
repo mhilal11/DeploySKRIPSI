@@ -1,7 +1,12 @@
-import { CheckCircle, ShieldAlert } from 'lucide-react';
+import { CheckCircle, Info, ShieldAlert } from 'lucide-react';
 
 import { Badge } from '@/shared/components/ui/badge';
 import { Card } from '@/shared/components/ui/card';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/shared/components/ui/tooltip';
 
 import { RecruitmentScore, RecruitmentScoreBreakdown } from '../../types';
 
@@ -79,7 +84,25 @@ export function ApplicantScoringTab({
                 <div key={item.key} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                        {item.explanation && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+                                aria-label={`Info penjelasan ${item.label}`}
+                              >
+                                <Info className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" sideOffset={8} className="max-w-xs bg-slate-900 px-3 py-2 text-left text-xs leading-relaxed text-white">
+                              {item.explanation}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500 mt-0.5">{item.detail}</p>
                     </div>
                     <div className="text-right">

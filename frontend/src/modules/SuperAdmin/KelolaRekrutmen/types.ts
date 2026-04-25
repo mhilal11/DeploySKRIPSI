@@ -106,6 +106,7 @@ export interface RecruitmentScoreBreakdown {
     score: number;
     contribution: number;
     detail: string;
+    explanation?: string;
 }
 
 export interface RecruitmentScore {
