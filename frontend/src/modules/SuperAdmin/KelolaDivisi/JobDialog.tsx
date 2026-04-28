@@ -32,6 +32,8 @@ const MAX_REQUIREMENTS = 5;
 const MAX_PROGRAM_STUDIES = 10;
 const EDUCATION_REFERENCE_LIMIT = 50;
 const MIN_SEARCH_CHARACTERS = 2;
+const MIN_JOB_SALARY = 500000;
+const WORK_MODE_OPTIONS = ['WFO', 'WFA', 'Fleksibel'] as const;
 
 const DEFAULT_SCORING_WEIGHTS = {
     education: 25,
@@ -55,6 +57,8 @@ export type JobFormFields = {
     job_id?: number | null;
     job_title: string;
     job_description: string;
+    job_salary_min: string | number;
+    job_work_mode: string;
     job_requirements: string[];
     job_eligibility_criteria: EligibilityCriteria;
 };
@@ -302,6 +306,21 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
     };
 
     const validateRequirements = () => {
+        const salaryValue = Number(String(form.data.job_salary_min).replace(/\D/g, ''));
+        if (!Number.isFinite(salaryValue) || salaryValue < MIN_JOB_SALARY) {
+            form.setError('job_salary_min', 'Gaji minimal Rp 500.000.');
+            window.alert('Gaji minimal Rp 500.000.');
+            return false;
+        }
+        form.clearErrors('job_salary_min');
+
+        if (!WORK_MODE_OPTIONS.includes(form.data.job_work_mode as typeof WORK_MODE_OPTIONS[number])) {
+            form.setError('job_work_mode', 'Pilih mode kerja WFO, WFA, atau Fleksibel.');
+            window.alert('Pilih mode kerja sebelum menyimpan.');
+            return false;
+        }
+        form.clearErrors('job_work_mode');
+
         // Filter out empty requirements
         const nonEmptyRequirements = form.data.job_requirements.filter(
             (requirement) => requirement && requirement.trim() !== ''
@@ -384,6 +403,59 @@ export default function JobDialog({ division, form, onClose, onSubmit }: JobDial
                                 {form.errors.job_description && (
                                     <p className="text-xs text-destructive">{form.errors.job_description}</p>
                                 )}
+                            </div>
+
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label htmlFor="job-salary">Gaji Minimum</Label>
+                                    <div className="flex overflow-hidden rounded-md border border-input bg-white focus-within:ring-2 focus-within:ring-ring/50">
+                                        <span className="inline-flex items-center border-r border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-600">
+                                            Rp
+                                        </span>
+                                        <Input
+                                            id="job-salary"
+                                            type="number"
+                                            min={MIN_JOB_SALARY}
+                                            step={50000}
+                                            value={form.data.job_salary_min ?? ''}
+                                            onChange={(event) => {
+                                                form.setData('job_salary_min', event.target.value);
+                                                form.clearErrors('job_salary_min');
+                                            }}
+                                            placeholder="500000"
+                                            className="border-0 focus-visible:ring-0"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Minimal Rp 500.000.</p>
+                                    {form.errors.job_salary_min && (
+                                        <p className="text-xs text-destructive">{form.errors.job_salary_min}</p>
+                                    )}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Mode Kerja</Label>
+                                    <Select
+                                        value={form.data.job_work_mode ?? ''}
+                                        onValueChange={(value) => {
+                                            form.setData('job_work_mode', value);
+                                            form.clearErrors('job_work_mode');
+                                        }}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Pilih mode kerja" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {WORK_MODE_OPTIONS.map((mode) => (
+                                                <SelectItem key={mode} value={mode}>
+                                                    {mode === 'Fleksibel' ? 'Fleksibel (WFA/WFO)' : mode}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {form.errors.job_work_mode && (
+                                        <p className="text-xs text-destructive">{form.errors.job_work_mode}</p>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="space-y-3">

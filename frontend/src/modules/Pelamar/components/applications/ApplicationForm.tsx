@@ -31,6 +31,8 @@ interface SelectedDivisionSummary {
     name: string;
     job_title: string | null;
     job_description: string | null;
+    job_salary_min?: number | null;
+    job_work_mode?: string | null;
     job_requirements: string[];
 }
 
@@ -69,6 +71,11 @@ export default function ApplicationForm({
         Boolean(data.phone?.trim()) &&
         isPhoneValid &&
         Boolean(data.cv);
+
+    const salaryLabel =
+        typeof selectedDivision?.job_salary_min === 'number' && Number.isFinite(selectedDivision.job_salary_min)
+            ? `Rp ${new Intl.NumberFormat('id-ID').format(selectedDivision.job_salary_min)}`
+            : null;
 
     const handleNameChange = (value: string) => {
         setData('full_name', sanitizePersonNameInput(value));
@@ -145,6 +152,20 @@ export default function ApplicationForm({
                     <p className="text-xs text-slate-600">
                         Divisi {selectedDivision.name}
                     </p>
+                    {(salaryLabel || selectedDivision.job_work_mode) && (
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                            {salaryLabel && (
+                                <span className="rounded-full border border-blue-200 bg-white px-2.5 py-1 font-medium text-blue-900">
+                                    Gaji: {salaryLabel}
+                                </span>
+                            )}
+                            {selectedDivision.job_work_mode && (
+                                <span className="rounded-full border border-blue-200 bg-white px-2.5 py-1 font-medium text-blue-900">
+                                    Mode: {selectedDivision.job_work_mode}
+                                </span>
+                            )}
+                        </div>
+                    )}
                     {selectedDivision.job_description && (
                         <p className="mt-2 text-sm text-slate-700">
                             {selectedDivision.job_description}

@@ -2,8 +2,11 @@ import { Calendar, Clock, FileText } from 'lucide-react';
 
 import { Button } from '@/shared/components/ui/button';
 
+import { openCvViewer } from '../openCvViewer';
+
 interface ApplicantProfileActionsProps {
   cvUrl: string | null;
+  cvDisplayName?: string | null;
   isHired: boolean;
   isRejected: boolean;
   hasInterviewSchedule: boolean;
@@ -17,6 +20,7 @@ interface ApplicantProfileActionsProps {
 
 export function ApplicantProfileActions({
   cvUrl,
+  cvDisplayName,
   isHired,
   isRejected,
   hasInterviewSchedule,
@@ -33,7 +37,7 @@ export function ApplicantProfileActions({
         <Button
           variant="outline"
           className="shadow-sm hover:shadow-md transition-all hover:bg-gray-50"
-          onClick={() => cvUrl && window.open(cvUrl, '_blank')}
+          onClick={() => openCvViewer(cvUrl, cvDisplayName)}
         >
           <FileText className="w-4 h-4 mr-2" />
           Lihat CV

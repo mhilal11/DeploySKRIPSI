@@ -11,6 +11,8 @@ type OpenJobRequest struct {
 	JobDescription         string                 `json:"job_description" form:"job_description"`
 	JobRequirements        []string               `json:"job_requirements" form:"job_requirements"`
 	JobEligibilityCriteria map[string]interface{} `json:"job_eligibility_criteria" form:"job_eligibility_criteria"`
+	JobSalaryMin           *int                   `json:"job_salary_min" form:"job_salary_min"`
+	JobWorkMode            string                 `json:"job_work_mode" form:"job_work_mode"`
 }
 
 type CreateDivisionRequest struct {

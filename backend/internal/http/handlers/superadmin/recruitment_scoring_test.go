@@ -89,6 +89,42 @@ func TestEvaluateRecruitmentScore_HigherForStrongerCandidate(t *testing.T) {
 	}
 }
 
+func TestEvaluateRecruitmentScore_LowScoreBelowConsiderThresholdBecomesIneligible(t *testing.T) {
+	app := models.Application{
+		Position: "Software Engineer",
+	}
+
+	criteria := vacancyScoringCriteria{
+		DivisionName: "IT",
+		Position:     "Software Engineer",
+		Eligibility: map[string]any{
+			"scoring_weights": map[string]any{
+				"education":     100,
+				"experience":    0,
+				"certification": 0,
+				"profile":       0,
+				"ai_screening":  0,
+			},
+			"scoring_thresholds": map[string]any{
+				"priority":    85,
+				"recommended": 70,
+				"consider":    55,
+			},
+		},
+	}
+
+	score := evaluateRecruitmentScore(app, nil, criteria)
+	if score.Total >= 55 {
+		t.Fatalf("expected total score below consider threshold, got %.2f", score.Total)
+	}
+	if score.Eligible {
+		t.Fatalf("expected low score %.2f to be marked ineligible", score.Total)
+	}
+	if score.Recommendation != "Tidak Direkomendasikan" {
+		t.Fatalf("expected recommendation 'Tidak Direkomendasikan', got %q", score.Recommendation)
+	}
+}
+
 func TestScoreEducationCriterion_MeetsMinimumGetsFullScore(t *testing.T) {
 	score, _, pass := scoreEducationCriterion("S1", "S1")
 	if !pass {
@@ -193,6 +229,38 @@ func TestEvaluateRecruitmentScore_ProgramStudyMatchHigherThanMismatch(t *testing
 	}
 }
 
+func TestEvaluateRecruitmentScore_ProgramStudyMatchWithoutMinimumEducationGetsFullEducationScore(t *testing.T) {
+	app := models.Application{
+		Position: "Software Engineer",
+	}
+
+	criteria := vacancyScoringCriteria{
+		DivisionName: "IT",
+		Position:     "Software Engineer",
+		Eligibility: map[string]any{
+			"program_studies": []any{"Teknik Informatika"},
+		},
+	}
+
+	profile := &models.ApplicantProfile{
+		Educations: models.JSON(`[{"degree":"S1","field_of_study":"Teknik Informatika"}]`),
+	}
+
+	score := evaluateRecruitmentScore(app, profile, criteria)
+	educationScore := scoreByComponentKey(score.Breakdown, "education")
+	if educationScore != 100 {
+		t.Fatalf("expected education score to be full (100) when study program matches without minimum education, got %.2f", educationScore)
+	}
+
+	educationBreakdown, ok := breakdownByKey(score.Breakdown, "education")
+	if !ok {
+		t.Fatal("expected education breakdown to exist")
+	}
+	if !strings.Contains(educationBreakdown.Detail, "indikator utama komponen pendidikan") {
+		t.Fatalf("expected education detail to explain full score reason, got %q", educationBreakdown.Detail)
+	}
+}
+
 func TestEvaluateRecruitmentScore_ProgramStudyDoesNotFalseMatchGenericAcademicWord(t *testing.T) {
 	app := models.Application{
 		Position: "Software Engineer",
@@ -215,6 +283,9 @@ func TestEvaluateRecruitmentScore_ProgramStudyDoesNotFalseMatchGenericAcademicWo
 	educationBreakdown, ok := breakdownByKey(score.Breakdown, "education")
 	if !ok {
 		t.Fatal("expected education breakdown to exist")
+	}
+	if educationBreakdown.Score != 60 {
+		t.Fatalf("expected mismatched study program to be capped at 60, got %.2f", educationBreakdown.Score)
 	}
 	if strings.Contains(educationBreakdown.Detail, "Program studi Ilmu Komunikasi sesuai dengan kriteria") {
 		t.Fatalf("expected Ilmu Komunikasi not to match Ilmu Komputer, got detail %q", educationBreakdown.Detail)

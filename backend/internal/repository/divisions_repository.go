@@ -34,6 +34,8 @@ type DivisionJobMutationInput struct {
 	JobDescription    string
 	JobRequirements   string
 	JobEligibility    string
+	JobSalaryMin      *int
+	JobWorkMode       *string
 	Now               time.Time
 }
 
@@ -198,12 +200,14 @@ func UpdateDivisionJob(db *sqlx.DB, input DivisionJobMutationInput) error {
 	}
 	_, err := db.Exec(
 		`UPDATE division_jobs
-		 SET job_title = ?, job_description = ?, job_requirements = ?, job_eligibility_criteria = ?, updated_at = ?
+		 SET job_title = ?, job_description = ?, job_requirements = ?, job_eligibility_criteria = ?, job_salary_min = ?, job_work_mode = ?, updated_at = ?
 		 WHERE id = ? AND division_profile_id = ?`,
 		input.JobTitle,
 		input.JobDescription,
 		input.JobRequirements,
 		input.JobEligibility,
+		input.JobSalaryMin,
+		input.JobWorkMode,
 		input.Now,
 		input.ID,
 		input.DivisionProfileID,
@@ -219,13 +223,15 @@ func CreateDivisionJob(db *sqlx.DB, input DivisionJobMutationInput) (int64, erro
 		input.Now = time.Now()
 	}
 	result, err := db.Exec(
-		`INSERT INTO division_jobs (division_profile_id, job_title, job_description, job_requirements, job_eligibility_criteria, is_active, opened_at, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+		`INSERT INTO division_jobs (division_profile_id, job_title, job_description, job_requirements, job_eligibility_criteria, job_salary_min, job_work_mode, is_active, opened_at, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
 		input.DivisionProfileID,
 		input.JobTitle,
 		input.JobDescription,
 		input.JobRequirements,
 		input.JobEligibility,
+		input.JobSalaryMin,
+		input.JobWorkMode,
 		input.Now,
 		input.Now,
 		input.Now,
@@ -390,6 +396,8 @@ func ClearDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64, updatedAt tim
 		     job_description = NULL,
 		     job_requirements = NULL,
 		     job_eligibility_criteria = NULL,
+		     job_salary_min = NULL,
+		     job_work_mode = NULL,
 		     hiring_opened_at = NULL,
 		     updated_at = ?
 		 WHERE id = ?`,
@@ -417,6 +425,8 @@ func SetDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64, job models.Divi
 		     job_description = ?,
 		     job_requirements = ?,
 		     job_eligibility_criteria = ?,
+		     job_salary_min = ?,
+		     job_work_mode = ?,
 		     hiring_opened_at = ?,
 		     updated_at = ?
 		 WHERE id = ?`,
@@ -424,6 +434,8 @@ func SetDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64, job models.Divi
 		job.JobDescription,
 		job.JobRequirements,
 		job.JobEligibility,
+		job.JobSalaryMin,
+		job.JobWorkMode,
 		openedAt,
 		updatedAt,
 		divisionID,

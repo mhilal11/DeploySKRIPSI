@@ -12,6 +12,8 @@ type DivisionJob struct {
 	JobDescription    string          `db:"job_description" json:"job_description"`
 	JobRequirements   modeltypes.JSON `db:"job_requirements" json:"job_requirements"`
 	JobEligibility    modeltypes.JSON `db:"job_eligibility_criteria" json:"job_eligibility_criteria"`
+	JobSalaryMin      *int            `db:"job_salary_min" json:"job_salary_min"`
+	JobWorkMode       *string         `db:"job_work_mode" json:"job_work_mode"`
 	IsActive          bool            `db:"is_active" json:"is_active"`
 	OpenedAt          *time.Time      `db:"opened_at" json:"opened_at"`
 	ClosedAt          *time.Time      `db:"closed_at" json:"closed_at"`

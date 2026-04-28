@@ -36,7 +36,8 @@
         "./src/*"
       ]
     },
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
   },
   "include": [
     "next-env.d.ts",

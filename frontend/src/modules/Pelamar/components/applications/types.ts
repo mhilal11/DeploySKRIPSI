@@ -18,6 +18,8 @@ export type DivisionSummary = {
     is_hiring: boolean;
     job_title: string | null;
     job_description: string | null;
+    job_salary_min?: number | null;
+    job_work_mode?: string | null;
     job_requirements: string[];
     job_eligibility_criteria?: EligibilityCriteria | null;
 };

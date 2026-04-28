@@ -73,6 +73,8 @@ func LandingData(c *gin.Context) {
 				"description":          job.JobDescription,
 				"requirements":         handlers.DecodeJSONStringArray(job.JobRequirements),
 				"eligibility_criteria": handlers.DecodeJSONMap(job.JobEligibility),
+				"salary_min":           job.JobSalaryMin,
+				"work_mode":            job.JobWorkMode,
 				"hiring_opened_at":     handlers.FormatDateISO(job.OpenedAt),
 			})
 		}
@@ -106,6 +108,8 @@ func LandingData(c *gin.Context) {
 					"description":          activeJob["description"],
 					"requirements":         activeJob["requirements"],
 					"eligibility_criteria": activeJob["eligibility_criteria"],
+					"salary_min":           activeJob["salary_min"],
+					"work_mode":            activeJob["work_mode"],
 					"hiring_opened_at":     activeJob["hiring_opened_at"],
 					"location":             "Divisi " + profile.Name,
 					"type":                 "Full-time",
@@ -130,6 +134,8 @@ func LandingData(c *gin.Context) {
 			"description":          profile.JobDescription,
 			"requirements":         handlers.DecodeJSONStringArray(profile.JobRequirements),
 			"eligibility_criteria": handlers.DecodeJSONMap(profile.JobEligibility),
+			"salary_min":           profile.JobSalaryMin,
+			"work_mode":            profile.JobWorkMode,
 			"hiring_opened_at":     handlers.FormatDateISO(profile.HiringOpenedAt),
 			"location":             "Divisi " + profile.Name,
 			"type":                 "Full-time",

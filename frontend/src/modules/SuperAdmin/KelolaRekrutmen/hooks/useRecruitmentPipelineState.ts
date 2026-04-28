@@ -119,15 +119,13 @@ export function useRecruitmentPipelineState({
     }
 
     const params = new URLSearchParams(window.location.search);
-    const normalizedSearch = searchTerm.trim();
     const from = formatDateQuery(dateRange.from);
     const to = formatDateQuery(dateRange.to);
 
     if (statusFilter === 'all') params.delete('status');
     else params.set('status', statusFilter);
 
-    if (normalizedSearch === '') params.delete('q');
-    else params.set('q', normalizedSearch);
+    params.delete('q');
 
     if (from === '') params.delete('from');
     else params.set('from', from);
@@ -138,7 +136,16 @@ export function useRecruitmentPipelineState({
     const query = params.toString();
     const nextURL = `${window.location.pathname}${query ? `?${query}` : ''}`;
     window.history.replaceState({}, '', nextURL);
+  }, [statusFilter, dateRange, isGlobalFilterHydrated]);
 
+  useEffect(() => {
+    if (!isGlobalFilterHydrated || typeof window === 'undefined') {
+      return;
+    }
+
+    const from = formatDateQuery(dateRange.from);
+    const to = formatDateQuery(dateRange.to);
+    const normalizedSearch = searchTerm.trim();
     window.localStorage.setItem(
       recruitmentFilterStorageKey,
       JSON.stringify({

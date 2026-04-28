@@ -18,6 +18,7 @@ import {
 } from "@/shared/components/ui/alert-dialog";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
+import { getApiOrigin } from "@/shared/lib/api";
 import { Head, useForm } from "@/shared/lib/inertia";
 import {
     normalizeEmail,
@@ -29,7 +30,6 @@ import {
     PASSWORD_POLICY_ERROR_MESSAGE,
     passwordViolatesPolicy,
 } from "@/shared/lib/password-policy";
-import { getApiOrigin } from "@/shared/lib/api";
 
 const logo = "/img/LogoLDP.png";
 const REGISTER_SUCCESS_TOAST_KEY = "auth_register_success_toast";
@@ -37,7 +37,6 @@ const REGISTER_SUCCESS_TOAST_KEY = "auth_register_success_toast";
 function buildGoogleRegisterUrl(): string {
     return `${getApiOrigin()}/api/auth/google/register`;
 }
-
 export default function Register({
     status,
     oauth_error,
@@ -317,10 +316,12 @@ export default function Register({
                                         message={errors.password}
                                         className="text-sm text-red-300"
                                     />
-                                    <PasswordRequirementChecklist
-                                        password={data.password}
-                                        variant="dark"
-                                    />
+                                    {data.password.length > 0 && (
+                                        <PasswordRequirementChecklist
+                                            password={data.password}
+                                            variant="dark"
+                                        />
+                                    )}
                                 </div>
 
                                 <div className="space-y-2">

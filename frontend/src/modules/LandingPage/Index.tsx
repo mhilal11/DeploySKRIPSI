@@ -24,6 +24,8 @@ type CareerJob = {
   location?: string | null;
   type?: string | null;
   description?: string | null;
+  salary_min?: number | null;
+  work_mode?: string | null;
   requirements?: string[];
   eligibility_criteria?: Record<string, unknown> | null;
   hiring_opened_at?: string | null;

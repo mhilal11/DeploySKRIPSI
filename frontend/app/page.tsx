@@ -1,5 +1,4 @@
 import LandingPage from '@/modules/LandingPage/Index';
-import { apiUrl } from '@/shared/lib/api';
 
 type LandingJob = {
   id?: number;
@@ -11,6 +10,8 @@ type LandingJob = {
   title?: string | null;
   location?: string | null;
   type?: string | null;
+  salary_min?: number | null;
+  work_mode?: string | null;
   description?: string | null;
   requirements?: string[];
   eligibility_criteria?: Record<string, unknown> | null;
@@ -35,7 +36,11 @@ async function fetchLandingData(): Promise<LandingData> {
   };
 
   try {
-    const response = await fetch(apiUrl('/public/landing'), {
+    const backendOrigin = process.env.NEXT_PUBLIC_BACKEND_ORIGIN?.replace(/\/$/, '') ?? '';
+    const landingUrl = backendOrigin
+      ? `${backendOrigin}/api/public/landing`
+      : 'http://localhost:8080/api/public/landing';
+    const response = await fetch(landingUrl, {
       next: { revalidate: 60 },
     });
     if (!response.ok) {

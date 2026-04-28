@@ -66,6 +66,13 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 			}
 		}
 	}
+	if req.JobSalaryMin == nil {
+		if raw := strings.TrimSpace(c.PostForm("job_salary_min")); raw != "" {
+			if parsedSalary, ok := parseAnyInt(raw); ok {
+				req.JobSalaryMin = &parsedSalary
+			}
+		}
+	}
 
 	now := time.Now()
 	currentStaff, _ := dbrepo.CountActiveDivisionUsers(db, profile.Name)
@@ -89,6 +96,8 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 		strings.TrimSpace(req.JobTitle) == "" &&
 		strings.TrimSpace(req.JobDescription) == "" &&
 		len(req.JobRequirements) == 0 &&
+		req.JobSalaryMin == nil &&
+		strings.TrimSpace(req.JobWorkMode) == "" &&
 		(req.JobEligibilityCriteria == nil || len(req.JobEligibilityCriteria) == 0)
 
 	if isReopenOnlyRequest {
@@ -125,6 +134,8 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 			map[string]any{
 				"action":             "membuka kembali",
 				"job_title":          existingJob.JobTitle,
+				"job_salary_min":     existingJob.JobSalaryMin,
+				"job_work_mode":      existingJob.JobWorkMode,
 				"job_requirements":   requirementsForAudit,
 				"requirements_count": len(requirementsForAudit),
 				"eligibility":        criteriaForAudit,
@@ -142,6 +153,8 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 				"division_name":       profile.Name,
 				"job_title":           existingJob.JobTitle,
 				"job_description":     existingJob.JobDescription,
+				"job_salary_min":      existingJob.JobSalaryMin,
+				"job_work_mode":       existingJob.JobWorkMode,
 				"job_requirements":    requirementsForAudit,
 				"eligibility":         criteriaForAudit,
 				"available_slots_now": availableSlots,
@@ -160,6 +173,15 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 	}
 	if strings.TrimSpace(req.JobDescription) == "" {
 		validationErrors["job_description"] = "Deskripsi pekerjaan wajib diisi."
+	}
+	if req.JobSalaryMin == nil {
+		validationErrors["job_salary_min"] = "Gaji wajib diisi."
+	} else if *req.JobSalaryMin < 500000 {
+		validationErrors["job_salary_min"] = "Gaji minimal Rp 500.000."
+	}
+	workMode := normalizeJobWorkMode(req.JobWorkMode)
+	if workMode == "" {
+		validationErrors["job_work_mode"] = "Mode kerja wajib dipilih."
 	}
 	handlers.ValidateFieldLength(validationErrors, "job_title", "Judul pekerjaan", req.JobTitle, 180)
 	handlers.ValidateFieldLength(validationErrors, "job_description", "Deskripsi pekerjaan", req.JobDescription, 6000)
@@ -210,6 +232,8 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 			JobDescription:    req.JobDescription,
 			JobRequirements:   string(requirementsBytes),
 			JobEligibility:    string(criteriaBytes),
+			JobSalaryMin:      req.JobSalaryMin,
+			JobWorkMode:       &workMode,
 			Now:               now,
 		})
 		if err != nil {
@@ -236,6 +260,8 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 			JobDescription:    req.JobDescription,
 			JobRequirements:   string(requirementsBytes),
 			JobEligibility:    string(criteriaBytes),
+			JobSalaryMin:      req.JobSalaryMin,
+			JobWorkMode:       &workMode,
 			Now:               now,
 		})
 		if err != nil {
@@ -260,6 +286,8 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 		map[string]any{
 			"action":             actionLabel,
 			"job_title":          req.JobTitle,
+			"job_salary_min":     req.JobSalaryMin,
+			"job_work_mode":      workMode,
 			"job_requirements":   cleaned,
 			"requirements_count": len(cleaned),
 			"eligibility":        criteriaForAudit,
@@ -277,6 +305,8 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 			"division_name":       profile.Name,
 			"job_title":           req.JobTitle,
 			"job_description":     req.JobDescription,
+			"job_salary_min":      req.JobSalaryMin,
+			"job_work_mode":       workMode,
 			"job_requirements":    cleaned,
 			"eligibility":         criteriaForAudit,
 			"available_slots_now": availableSlots,
@@ -294,6 +324,23 @@ func SuperAdminDivisionsOpenJob(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"flash": gin.H{"success": message},
 	})
+}
+
+func normalizeJobWorkMode(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+	normalized = strings.ReplaceAll(normalized, " ", "_")
+
+	switch normalized {
+	case "wfo":
+		return "WFO"
+	case "wfa":
+		return "WFA"
+	case "fleksibel", "flexible", "hybrid", "wfa_wfo", "wfo_wfa":
+		return "Fleksibel"
+	default:
+		return ""
+	}
 }
 
 func SuperAdminDivisionsCloseJob(c *gin.Context) {
@@ -350,6 +397,8 @@ func SuperAdminDivisionsCloseJob(c *gin.Context) {
 			"job_id":                   existing.ID,
 			"job_title":                existing.JobTitle,
 			"job_description":          existing.JobDescription,
+			"job_salary_min":           existing.JobSalaryMin,
+			"job_work_mode":            existing.JobWorkMode,
 			"job_requirements":         handlers.DecodeJSONStringArray(existing.JobRequirements),
 			"job_eligibility_criteria": handlers.DecodeJSONMap(existing.JobEligibility),
 			"is_active":                existing.IsActive,
@@ -360,6 +409,8 @@ func SuperAdminDivisionsCloseJob(c *gin.Context) {
 			"division_name":            profile.Name,
 			"job_title":                profile.JobTitle,
 			"job_description":          profile.JobDescription,
+			"job_salary_min":           profile.JobSalaryMin,
+			"job_work_mode":            profile.JobWorkMode,
 			"job_requirements":         handlers.DecodeJSONStringArray(profile.JobRequirements),
 			"job_eligibility_criteria": handlers.DecodeJSONMap(profile.JobEligibility),
 			"is_hiring":                profile.IsHiring,
@@ -425,6 +476,8 @@ func loadDivisionJobsByDivisionIDs(db *sqlx.DB, divisionIDs []int64) map[int64][
 			"id":                       row.ID,
 			"job_title":                titlePtr,
 			"job_description":          descPtr,
+			"job_salary_min":           row.JobSalaryMin,
+			"job_work_mode":            row.JobWorkMode,
 			"job_requirements":         handlers.DecodeJSONStringArray(row.JobRequirements),
 			"job_eligibility_criteria": handlers.DecodeJSONMap(row.JobEligibility),
 			"is_active":                row.IsActive,
@@ -511,6 +564,16 @@ func loadClosedDivisionJobsFromAuditByDivisionIDs(db *sqlx.DB, divisionIDs []int
 				}
 			}
 		}
+		jobSalaryMin, _ := parseAnyInt(oldValues["job_salary_min"])
+		var jobSalaryMinPtr *int
+		if jobSalaryMin > 0 {
+			jobSalaryMinPtr = &jobSalaryMin
+		}
+		jobWorkMode := strings.TrimSpace(handlers.AnyToString(oldValues["job_work_mode"]))
+		var jobWorkModePtr *string
+		if jobWorkMode != "" {
+			jobWorkModePtr = &jobWorkMode
+		}
 
 		dedupeKey := strings.ToLower(jobTitle + "|" + jobDescription + "|" + strings.Join(requirements, "|"))
 		if _, exists := seenByDivision[divisionID]; !exists {
@@ -536,6 +599,8 @@ func loadClosedDivisionJobsFromAuditByDivisionIDs(db *sqlx.DB, divisionIDs []int
 			"id":                       nil,
 			"job_title":                titlePtr,
 			"job_description":          descriptionPtr,
+			"job_salary_min":           jobSalaryMinPtr,
+			"job_work_mode":            jobWorkModePtr,
 			"job_requirements":         requirements,
 			"job_eligibility_criteria": eligibility,
 			"is_active":                false,
@@ -605,7 +670,9 @@ func buildDivisionJobSignature(job map[string]any) string {
 		return ""
 	}
 
-	return title + "|" + description + "|" + strings.Join(requirements, "|")
+	salary := strings.TrimSpace(handlers.AnyToString(job["job_salary_min"]))
+	workMode := strings.ToLower(strings.TrimSpace(handlers.AnyToString(job["job_work_mode"])))
+	return title + "|" + description + "|" + strings.Join(requirements, "|") + "|" + salary + "|" + workMode
 }
 
 func syncDivisionProfilePrimaryJob(db *sqlx.DB, divisionID int64) {

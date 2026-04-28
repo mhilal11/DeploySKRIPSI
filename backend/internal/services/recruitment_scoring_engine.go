@@ -82,6 +82,7 @@ func EvaluateRecruitmentScoring(input RecruitmentScoringInput) RecruitmentScorin
 		educationScore,
 		educationDetail,
 		educationPass,
+		requiredEducation != "",
 		input.HighestStudyProgram,
 		requiredProgramStudies,
 	)
@@ -224,6 +225,12 @@ func EvaluateRecruitmentScoring(input RecruitmentScoringInput) RecruitmentScorin
 		risks = append(risks, fmt.Sprintf("Skor dikenakan penalti %.1f karena %d kriteria wajib tidak terpenuhi.", penalty, hardFailureCount))
 	}
 
+	minimumEligibleScore := clampEngine(cfg.ConsiderThreshold, 0, 100)
+	if eligible && total < minimumEligibleScore {
+		eligible = false
+		risks = append(risks, fmt.Sprintf("Skor total %.1f berada di bawah ambang minimum %.1f.", total, minimumEligibleScore))
+	}
+
 	total = roundToEngine(total, 2)
 	for i := range breakdown {
 		breakdown[i].Weight = roundToEngine(breakdown[i].Weight*100, 1)
@@ -331,11 +338,11 @@ func recommendationEngine(total float64, eligible bool, cfg RecruitmentScoringCo
 	case total >= cfg.ConsiderThreshold:
 		return "Pertimbangkan"
 	default:
-		return "Perlu Pengayaan Data"
+		return "Belum Memenuhi Skor Minimum"
 	}
 }
 
-func adjustEducationScoreByProgramStudyEngine(score float64, detail string, educationPass bool, candidateProgram string, requiredPrograms []string) (float64, string, string) {
+func adjustEducationScoreByProgramStudyEngine(score float64, detail string, educationPass bool, hasRequiredEducation bool, candidateProgram string, requiredPrograms []string) (float64, string, string) {
 	cleanedPrograms := cleanRequirementListEngine(requiredPrograms)
 	if len(cleanedPrograms) == 0 || !educationPass {
 		return clampEngine(score, 0, 100), detail, ""
@@ -348,11 +355,19 @@ func adjustEducationScoreByProgramStudyEngine(score float64, detail string, educ
 			"Program studi kandidat tidak bisa diverifikasi karena data field of study belum tersedia."
 	}
 	if match := matchingProgramStudyEngine(candidateProgram, cleanedPrograms); match.MatchedProgram != "" {
-		return clampEngine(score, 0, 100),
-			fmt.Sprintf("%s Program studi %s sesuai dengan kriteria (%s).", detail, candidateProgram, match.MatchedProgram),
-			match.Explanation
+		adjustedScore := clampEngine(score, 0, 100)
+		explanation := match.Explanation
+		matchDetail := fmt.Sprintf("%s Program studi %s sesuai dengan kriteria (%s).", detail, candidateProgram, match.MatchedProgram)
+		if !hasRequiredEducation {
+			adjustedScore = 100
+			matchDetail += " Karena lowongan tidak menetapkan minimal jenjang pendidikan, kecocokan program studi dijadikan indikator utama komponen pendidikan."
+			explanation = strings.TrimSpace(explanation + " Komponen pendidikan diberi skor penuh karena lowongan menekankan kecocokan program studi tanpa batas minimal jenjang.")
+		}
+		return adjustedScore,
+			matchDetail,
+			explanation
 	}
-	adjusted := math.Min(score, 75)
+	adjusted := math.Min(score, 60)
 	return clampEngine(adjusted, 0, 100),
 		fmt.Sprintf("%s Program studi %s belum sesuai dengan kriteria (%s).", detail, candidateProgram, strings.Join(cleanedPrograms, ", ")),
 		"Tidak ditemukan kecocokan nama program studi secara langsung maupun pada kata kunci utamanya. Kata umum akademik seperti 'ilmu' dan 'teknik' tidak dipakai sendiri sebagai dasar kecocokan."

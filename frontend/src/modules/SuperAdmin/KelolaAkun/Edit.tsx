@@ -9,6 +9,7 @@ import {
     passwordViolatesPolicy,
 } from '@/shared/lib/password-policy';
 
+const ACCOUNT_TOAST_ID = 'super-admin.accounts.feedback';
 const ACCOUNT_TOAST_STORAGE_KEY = 'super-admin.accounts.toast';
 const DEFAULT_SUCCESS_MESSAGE = 'Akun berhasil diperbarui.';
 
@@ -126,6 +127,10 @@ export default function Edit({
             passwordViolatesPolicy(form.data.password)
         ) {
             form.setError('password', PASSWORD_POLICY_ERROR_MESSAGE);
+            toast.error('Password belum memenuhi kebijakan.', {
+                id: ACCOUNT_TOAST_ID,
+                description: PASSWORD_POLICY_ERROR_MESSAGE,
+            });
             return;
         }
 
@@ -139,7 +144,9 @@ export default function Edit({
 
                 // Show feedback immediately on edit page.
                 // The toaster lives in SuperAdminShell, so it persists across navigation.
-                toast.success(message);
+                toast.success(message, {
+                    id: ACCOUNT_TOAST_ID,
+                });
 
                 // Keep queued toast as fallback in case the destination page
                 // needs to re-show feedback after transition.
@@ -159,6 +166,9 @@ export default function Edit({
                     typeof firstError === 'string'
                         ? firstError
                         : 'Gagal memperbarui akun. Coba lagi.',
+                    {
+                        id: ACCOUNT_TOAST_ID,
+                    },
                 );
             },
         });

@@ -14,12 +14,46 @@ import {
 import { apiUrl, resolveAssetUrl } from '@/shared/lib/api';
 
 import { ApplicantRecord, formatApplicationId } from '../types';
+import { openCvViewer } from './openCvViewer';
 
 
 interface ApplicantDetailDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     applicant: ApplicantRecord | null;
+}
+
+function resolveCvExtension(path: string | null | undefined): string {
+    const value = (path ?? '').trim();
+    if (!value) {
+        return '.pdf';
+    }
+
+    const clean = value.split('?')[0];
+    const dot = clean.lastIndexOf('.');
+    if (dot < 0) {
+        return '.pdf';
+    }
+
+    const ext = clean.slice(dot).toLowerCase();
+    if (/^\.[a-z0-9]{1,8}$/.test(ext)) {
+        return ext;
+    }
+
+    return '.pdf';
+}
+
+function sanitizeCvName(name: string | null | undefined): string {
+    const raw = (name ?? '').trim();
+    if (!raw) {
+        return 'Pelamar';
+    }
+
+    const normalized = raw
+        .replace(/[^\p{L}\p{N}\s_-]+/gu, ' ')
+        .replace(/[\s_-]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    return normalized || 'Pelamar';
 }
 
 function Detail({ label, value }: { label: string; value?: string | null }) {
@@ -38,9 +72,15 @@ export default function ApplicantDetailDialog({
 }: ApplicantDetailDialogProps) {
     
     if (!applicant) return null;
+    const cvDisplayName = applicant.name?.trim() ?? '';
+    const cvSource = applicant.cv_file || applicant.cv_url;
+    const cvDisplayFileName = `CV_${sanitizeCvName(cvDisplayName)}${resolveCvExtension(cvSource)}`;
+    const cvDisplayNameQuery = cvDisplayName
+        ? `?display_name=${encodeURIComponent(cvDisplayName)}`
+        : '';
     const cvUrl =
-        applicant.cv_file || applicant.cv_url
-            ? resolveAssetUrl(apiUrl(`/super-admin/recruitment/${applicant.id}/cv`))
+        cvSource
+            ? resolveAssetUrl(apiUrl(`/super-admin/recruitment/${applicant.id}/cv/${encodeURIComponent(cvDisplayFileName)}${cvDisplayNameQuery}`))
             : null;
 
     // FUNGSI: Melihat dokumen CV
@@ -50,8 +90,8 @@ export default function ApplicantDetailDialog({
             return;
         }
 
-        // Buka dokumen CV di tab baru
-        window.open(cvUrl, '_blank');
+        // Buka dokumen CV di tab baru dengan judul yang lebih deskriptif.
+        openCvViewer(cvUrl, cvDisplayName);
     };
 
     return (

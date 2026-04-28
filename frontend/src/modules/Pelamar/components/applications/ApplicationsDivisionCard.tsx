@@ -2,6 +2,8 @@ import {
     Building2,
     CheckCircle,
     CheckCircle2,
+    Banknote,
+    MapPinned,
     Send,
     XCircle,
 } from 'lucide-react';
@@ -27,6 +29,10 @@ export default function ApplicationsDivisionCard({
             : 0;
     const canApply = division.is_hiring && division.available_slots > 0 && !isApplied;
     const disabled = !canApply;
+    const salaryLabel =
+        typeof division.job_salary_min === 'number' && Number.isFinite(division.job_salary_min)
+            ? `Rp ${new Intl.NumberFormat('id-ID').format(division.job_salary_min)}`
+            : null;
 
     let statusLabel;
     if (isApplied) {
@@ -119,6 +125,22 @@ export default function ApplicationsDivisionCard({
                         <p className="text-xs text-slate-500">
                             {division.available_slots} slot tersedia
                         </p>
+                        {(salaryLabel || division.job_work_mode) && (
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                                {salaryLabel && (
+                                    <span className="inline-flex items-center rounded-full border border-blue-100 bg-white px-2 py-0.5 font-medium text-blue-900">
+                                        <Banknote className="mr-1 h-3 w-3" />
+                                        {salaryLabel}
+                                    </span>
+                                )}
+                                {division.job_work_mode && (
+                                    <span className="inline-flex items-center rounded-full border border-blue-100 bg-white px-2 py-0.5 font-medium text-blue-900">
+                                        <MapPinned className="mr-1 h-3 w-3" />
+                                        {division.job_work_mode}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                         {division.job_requirements.length > 0 && (
                             <ul className="mt-3 space-y-1 text-xs text-slate-600">
                                 {division.job_requirements.map((requirement, index) => (

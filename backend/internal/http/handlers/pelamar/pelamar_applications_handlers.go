@@ -387,6 +387,8 @@ func divisionSummaries(db *sqlx.DB) []map[string]any {
 				"is_hiring":                isHiring,
 				"job_title":                profile.JobTitle,
 				"job_description":          profile.JobDescription,
+				"job_salary_min":           profile.JobSalaryMin,
+				"job_work_mode":            profile.JobWorkMode,
 				"job_requirements":         decodeJSONStringArray(profile.JobRequirements),
 				"job_eligibility_criteria": decodeJSONMap(profile.JobEligibility),
 			})

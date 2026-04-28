@@ -1,8 +1,10 @@
 import {
     AlertCircle,
+    Banknote,
     Briefcase,
     CheckCircle2,
     Edit,
+    MapPinned,
     RotateCcw,
     XCircle,
 } from 'lucide-react';
@@ -48,6 +50,13 @@ type VacancyCardProps = {
     onClose: () => void;
 };
 
+function formatRupiah(value?: number | null) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return null;
+    }
+    return `Rp ${new Intl.NumberFormat('id-ID').format(value)}`;
+}
+
 function VacancyCard({ division, job, onEdit, onClose }: VacancyCardProps) {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const criteria: NonNullable<DivisionJob['job_eligibility_criteria']> =
@@ -69,6 +78,7 @@ function VacancyCard({ division, job, onEdit, onClose }: VacancyCardProps) {
     const cleanPrograms = Array.isArray(criteria.program_studies)
         ? criteria.program_studies.filter((item) => item && item.trim() !== '')
         : [];
+    const salaryLabel = formatRupiah(job.job_salary_min);
 
     return (
         <div className="rounded-xl border border-emerald-200 bg-white p-4">
@@ -80,6 +90,21 @@ function VacancyCard({ division, job, onEdit, onClose }: VacancyCardProps) {
                     <p className="text-xs text-slate-700 md:text-sm">
                         {job.job_description || 'Belum ada deskripsi pekerjaan.'}
                     </p>
+
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-700">
+                        {salaryLabel && (
+                            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-800">
+                                <Banknote className="mr-1.5 h-3.5 w-3.5" />
+                                {salaryLabel}
+                            </span>
+                        )}
+                        {job.job_work_mode && (
+                            <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-800">
+                                <MapPinned className="mr-1.5 h-3.5 w-3.5" />
+                                {job.job_work_mode}
+                            </span>
+                        )}
+                    </div>
 
                     {cleanRequirements.length > 0 && (
                         <ul className="mt-2 space-y-1 text-xs text-slate-700 md:mt-3 md:text-sm">
@@ -206,6 +231,7 @@ function ClosedVacancyCard({ division, job, onReopen }: ClosedVacancyCardProps) 
     const cleanRequirements = (job.job_requirements ?? []).filter(
         (requirement) => requirement && requirement.trim() !== '',
     );
+    const salaryLabel = formatRupiah(job.job_salary_min);
 
     return (
         <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -222,6 +248,21 @@ function ClosedVacancyCard({ division, job, onReopen }: ClosedVacancyCardProps) 
                     <p className="text-xs text-slate-700 md:text-sm">
                         {job.job_description || 'Belum ada deskripsi pekerjaan.'}
                     </p>
+
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-700">
+                        {salaryLabel && (
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-700">
+                                <Banknote className="mr-1.5 h-3.5 w-3.5" />
+                                {salaryLabel}
+                            </span>
+                        )}
+                        {job.job_work_mode && (
+                            <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 font-medium text-slate-700">
+                                <MapPinned className="mr-1.5 h-3.5 w-3.5" />
+                                {job.job_work_mode}
+                            </span>
+                        )}
+                    </div>
 
                     {cleanRequirements.length > 0 && (
                         <ul className="mt-2 space-y-1 text-xs text-slate-700 md:mt-3 md:text-sm">

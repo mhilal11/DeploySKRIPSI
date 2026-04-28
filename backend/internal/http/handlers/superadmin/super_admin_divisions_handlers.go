@@ -66,6 +66,8 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 				"id":                       nil,
 				"job_title":                profile.JobTitle,
 				"job_description":          profile.JobDescription,
+				"job_salary_min":           profile.JobSalaryMin,
+				"job_work_mode":            profile.JobWorkMode,
 				"job_requirements":         handlers.DecodeJSONStringArray(profile.JobRequirements),
 				"job_eligibility_criteria": handlers.DecodeJSONMap(profile.JobEligibility),
 				"is_active":                true,
@@ -83,6 +85,8 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 		staffList, _ := services.StaffForDivision(db, profile.Name)
 		var primaryJobTitle *string
 		var primaryJobDescription *string
+		var primaryJobSalaryMin *int
+		var primaryJobWorkMode *string
 		var primaryJobRequirements []string
 		var primaryJobEligibility map[string]any
 		if len(activeJobs) > 0 {
@@ -91,6 +95,12 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 			}
 			if value, ok := activeJobs[0]["job_description"].(*string); ok {
 				primaryJobDescription = value
+			}
+			if value, ok := activeJobs[0]["job_salary_min"].(*int); ok {
+				primaryJobSalaryMin = value
+			}
+			if value, ok := activeJobs[0]["job_work_mode"].(*string); ok {
+				primaryJobWorkMode = value
 			}
 			if value, ok := activeJobs[0]["job_requirements"].([]string); ok {
 				primaryJobRequirements = value
@@ -104,6 +114,12 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 		}
 		if primaryJobDescription == nil {
 			primaryJobDescription = profile.JobDescription
+		}
+		if primaryJobSalaryMin == nil {
+			primaryJobSalaryMin = profile.JobSalaryMin
+		}
+		if primaryJobWorkMode == nil {
+			primaryJobWorkMode = profile.JobWorkMode
 		}
 		if len(primaryJobRequirements) == 0 {
 			primaryJobRequirements = handlers.DecodeJSONStringArray(profile.JobRequirements)
@@ -123,6 +139,8 @@ func SuperAdminDivisionsIndex(c *gin.Context) {
 			"is_hiring":                isHiring,
 			"job_title":                primaryJobTitle,
 			"job_description":          primaryJobDescription,
+			"job_salary_min":           primaryJobSalaryMin,
+			"job_work_mode":            primaryJobWorkMode,
 			"job_requirements":         primaryJobRequirements,
 			"job_eligibility_criteria": primaryJobEligibility,
 			"jobs":                     jobs,

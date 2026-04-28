@@ -5,10 +5,12 @@ import (
 	"html"
 	"mime"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"hris-backend/internal/http/handlers"
 	"hris-backend/internal/http/middleware"
@@ -159,13 +161,67 @@ func SuperAdminRecruitmentViewCV(c *gin.Context) {
 		return
 	}
 
-	filename := filepath.Base(filepath.FromSlash(normalized))
-	c.Header("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", filename))
-	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(filename)))
+	preferredDisplayName := strings.TrimSpace(c.Query("display_name"))
+	if preferredDisplayName == "" {
+		preferredDisplayName = recruitmentPreferredDisplayNameFromPath(c.Param("display"))
+	}
+	filename := recruitmentCVDisplayFilename(app.FullName, normalized, preferredDisplayName)
+	c.Header("Content-Disposition", fmt.Sprintf("inline; filename=%q; filename*=UTF-8''%s", filename, url.PathEscape(filename)))
+	contentType := mime.TypeByExtension(strings.ToLower(filepath.Ext(filepath.Base(filepath.FromSlash(normalized)))))
 	if contentType == "" {
 		contentType = "application/octet-stream"
 	}
 	c.Data(http.StatusOK, contentType, content)
+}
+
+func recruitmentCVDisplayFilename(applicantName string, storedPath string, preferredDisplayName string) string {
+	name := sanitizeRecruitmentCVApplicantName(preferredDisplayName)
+	if name == "" {
+		name = sanitizeRecruitmentCVApplicantName(applicantName)
+	}
+	if name == "" {
+		name = "Pelamar"
+	}
+
+	ext := strings.ToLower(filepath.Ext(filepath.Base(filepath.FromSlash(storedPath))))
+	return sanitizeFilename("CV_" + name + ext)
+}
+
+func recruitmentPreferredDisplayNameFromPath(displaySegment string) string {
+	segment := strings.TrimSpace(displaySegment)
+	if segment == "" {
+		return ""
+	}
+
+	base := strings.TrimSuffix(segment, filepath.Ext(segment))
+	base = strings.TrimSpace(base)
+	if strings.HasPrefix(strings.ToLower(base), "cv_") {
+		base = base[3:]
+	}
+
+	base = strings.ReplaceAll(base, "_", " ")
+	base = strings.ReplaceAll(base, "-", " ")
+	return strings.TrimSpace(base)
+}
+
+func sanitizeRecruitmentCVApplicantName(name string) string {
+	var builder strings.Builder
+	lastSeparator := false
+
+	for _, char := range strings.TrimSpace(name) {
+		switch {
+		case unicode.IsLetter(char) || unicode.IsDigit(char):
+			builder.WriteRune(char)
+			lastSeparator = false
+		case unicode.IsSpace(char) || char == '_' || char == '-':
+			if builder.Len() > 0 && !lastSeparator {
+				builder.WriteByte('_')
+				lastSeparator = true
+			}
+		}
+	}
+
+	return strings.Trim(builder.String(), "_")
 }
 
 func SuperAdminRecruitmentUpdateStatus(c *gin.Context) {

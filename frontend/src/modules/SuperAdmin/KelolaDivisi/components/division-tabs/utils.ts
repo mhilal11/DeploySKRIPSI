@@ -15,6 +15,8 @@ export function getActiveDivisionJobs(division: DivisionRecord): DivisionJob[] {
                 id: null,
                 job_title: division.job_title,
                 job_description: division.job_description,
+                job_salary_min: division.job_salary_min,
+                job_work_mode: division.job_work_mode,
                 job_requirements: Array.isArray(division.job_requirements)
                     ? division.job_requirements
                     : [],

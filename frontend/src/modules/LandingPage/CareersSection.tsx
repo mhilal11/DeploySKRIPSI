@@ -4,6 +4,8 @@ import {
   Info,
   ListChecks,
   MapPin,
+  Banknote,
+  MapPinned,
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -31,6 +33,8 @@ type CareerJob = {
   location?: string | null;
   type?: string | null;
   description?: string | null;
+  salary_min?: number | null;
+  work_mode?: string | null;
   requirements?: string[];
   eligibility_criteria?: Record<string, unknown> | null;
   hiring_opened_at?: string | null;
@@ -49,6 +53,8 @@ type JobDetailModalState = {
   gender: string | null;
   minEducation: string | null;
   minExperience: number | null;
+  salaryText: string | null;
+  workMode: string | null;
   programStudiesText: string | null;
   additionalCriteriaEntries: Array<[string, unknown]>;
 };
@@ -123,6 +129,11 @@ const formatDateIndo = (value?: string | null): string | null => {
   });
 };
 
+const formatRupiah = (value?: number | null): string | null => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return `Rp ${new Intl.NumberFormat('id-ID').format(value)}`;
+};
+
 export function CareersSection({ jobs }: CareersSectionProps) {
   const [selectedJobDetail, setSelectedJobDetail] =
     useState<JobDetailModalState | null>(null);
@@ -176,6 +187,8 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                 : `Belum ada lowongan di ${job.division}`;
               const location = job.location ?? job.division;
               const type = job.type ?? 'Full-time';
+              const salaryText = formatRupiah(job.salary_min);
+              const workMode = asString(job.work_mode);
               const requirements = Array.isArray(job.requirements)
                 ? job.requirements.filter((req) => req && req.trim() !== '')
                 : [];
@@ -263,6 +276,18 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                           <span className="text-sm">{teamCapacityText}</span>
                         </div>
                       )}
+                      {salaryText && (
+                        <div className="flex items-center gap-2 text-white/80">
+                          <Banknote className="w-4 h-4 text-[#4A90D9]" />
+                          <span className="text-sm">{salaryText}</span>
+                        </div>
+                      )}
+                      {workMode && (
+                        <div className="flex items-center gap-2 text-white/80">
+                          <MapPinned className="w-4 h-4 text-[#4A90D9]" />
+                          <span className="text-sm">{workMode}</span>
+                        </div>
+                      )}
                       {openedAt && (
                         <p className="text-xs text-white/60">Dipublikasikan: {openedAt}</p>
                       )}
@@ -280,6 +305,8 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                             gender,
                             minEducation,
                             minExperience,
+                            salaryText,
+                            workMode,
                             programStudiesText,
                             additionalCriteriaEntries,
                           })
@@ -397,6 +424,16 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                       Min Pengalaman: {selectedJobDetail.minExperience} tahun
                     </span>
                   )}
+                {selectedJobDetail?.salaryText && (
+                  <span className="max-w-full break-words rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/80">
+                    Gaji: {selectedJobDetail.salaryText}
+                  </span>
+                )}
+                {selectedJobDetail?.workMode && (
+                  <span className="max-w-full break-words rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/80">
+                    Mode Kerja: {selectedJobDetail.workMode}
+                  </span>
+                )}
                 {selectedJobDetail?.programStudiesText && (
                   <span className="max-w-full break-words rounded-full border border-[#2F6DB5]/30 bg-[#0F4C81]/10 px-3 py-1.5 text-xs text-[#A9D0FF]">
                     Prodi: {selectedJobDetail.programStudiesText}
@@ -423,6 +460,8 @@ export function CareersSection({ jobs }: CareersSectionProps) {
                 selectedJobDetail.gender === null &&
                 selectedJobDetail.minEducation === null &&
                 selectedJobDetail.minExperience === null &&
+                selectedJobDetail.salaryText === null &&
+                selectedJobDetail.workMode === null &&
                 selectedJobDetail.programStudiesText === null &&
                 selectedJobDetail.additionalCriteriaEntries.length === 0 && (
                   <p className="text-sm text-white/60">

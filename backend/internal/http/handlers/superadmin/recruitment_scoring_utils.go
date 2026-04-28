@@ -417,7 +417,7 @@ func scoreRecommendation(total float64, eligible bool, config recruitmentScoring
 	case total >= config.ConsiderThreshold:
 		return "Pertimbangkan"
 	default:
-		return "Perlu Pengayaan Data"
+		return "Belum Memenuhi Skor Minimum"
 	}
 }
 

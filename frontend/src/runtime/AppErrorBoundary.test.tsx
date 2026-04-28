@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 
 import AppErrorBoundary from './AppErrorBoundary';
 
-function CrashingComponent() {
+function CrashingComponent(): never {
   throw new Error('boom');
 }
 

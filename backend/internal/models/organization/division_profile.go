@@ -16,6 +16,8 @@ type DivisionProfile struct {
 	JobDescription  *string         `db:"job_description" json:"job_description"`
 	JobRequirements modeltypes.JSON `db:"job_requirements" json:"job_requirements"`
 	JobEligibility  modeltypes.JSON `db:"job_eligibility_criteria" json:"job_eligibility_criteria"`
+	JobSalaryMin    *int            `db:"job_salary_min" json:"job_salary_min"`
+	JobWorkMode     *string         `db:"job_work_mode" json:"job_work_mode"`
 	HiringOpenedAt  *time.Time      `db:"hiring_opened_at" json:"hiring_opened_at"`
 	CreatedAt       *time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt       *time.Time      `db:"updated_at" json:"updated_at"`

@@ -12,7 +12,80 @@ import { SummaryCards } from './components/SummaryCards';
 import CreateDivisionDialog, { CreateDivisionFormFields } from './Create';
 import EditDivisionDialog, { EditFormFields } from './Edit';
 import JobDialog, { JobFormFields } from './JobDialog';
-import { DivisionJob, DivisionRecord, KelolaDivisiPageProps, StatsSummary } from './types';
+import {
+    DivisionJob,
+    DivisionRecord,
+    EligibilityCriteria,
+    KelolaDivisiPageProps,
+    StatsSummary,
+} from './types';
+
+const DEFAULT_SCORING_WEIGHTS = {
+    education: 25,
+    experience: 25,
+    certification: 10,
+    profile: 5,
+    ai_screening: 35,
+} as const;
+
+const DEFAULT_SCORING_THRESHOLDS = {
+    priority: 85,
+    recommended: 70,
+    consider: 55,
+} as const;
+
+function normalizeScoreValue(value: unknown, fallback: number): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return fallback;
+    }
+    return Math.max(0, Math.min(100, value));
+}
+
+function normalizeEligibilityCriteria(criteria: EligibilityCriteria | null | undefined): EligibilityCriteria {
+    const source = criteria ?? {};
+    const sourceWeights = source.scoring_weights ?? {};
+    const sourceThresholds = source.scoring_thresholds ?? {};
+
+    return {
+        ...source,
+        scoring_weights: {
+            education: normalizeScoreValue(
+                sourceWeights.education,
+                DEFAULT_SCORING_WEIGHTS.education,
+            ),
+            experience: normalizeScoreValue(
+                sourceWeights.experience,
+                DEFAULT_SCORING_WEIGHTS.experience,
+            ),
+            certification: normalizeScoreValue(
+                sourceWeights.certification,
+                DEFAULT_SCORING_WEIGHTS.certification,
+            ),
+            profile: normalizeScoreValue(
+                sourceWeights.profile,
+                DEFAULT_SCORING_WEIGHTS.profile,
+            ),
+            ai_screening: normalizeScoreValue(
+                sourceWeights.ai_screening,
+                DEFAULT_SCORING_WEIGHTS.ai_screening,
+            ),
+        },
+        scoring_thresholds: {
+            priority: normalizeScoreValue(
+                sourceThresholds.priority,
+                DEFAULT_SCORING_THRESHOLDS.priority,
+            ),
+            recommended: normalizeScoreValue(
+                sourceThresholds.recommended,
+                DEFAULT_SCORING_THRESHOLDS.recommended,
+            ),
+            consider: normalizeScoreValue(
+                sourceThresholds.consider,
+                DEFAULT_SCORING_THRESHOLDS.consider,
+            ),
+        },
+    };
+}
 
 export default function KelolaDivisiIndex({
     divisions: initialDivisions,
@@ -46,6 +119,8 @@ export default function KelolaDivisiIndex({
         job_id: null,
         job_title: '',
         job_description: '',
+        job_salary_min: '',
+        job_work_mode: '',
         job_requirements: [''],
         job_eligibility_criteria: {},
     });
@@ -184,8 +259,10 @@ export default function KelolaDivisiIndex({
             job_id: job?.id ?? null,
             job_title: job?.job_title ?? '',
             job_description: job?.job_description ?? '',
+            job_salary_min: job?.job_salary_min ? String(job.job_salary_min) : '',
+            job_work_mode: job?.job_work_mode ?? '',
             job_requirements: cleanRequirements.length > 0 ? cleanRequirements : [''],
-            job_eligibility_criteria: job?.job_eligibility_criteria ?? {},
+            job_eligibility_criteria: normalizeEligibilityCriteria(job?.job_eligibility_criteria),
         });
     };
 
@@ -260,18 +337,23 @@ export default function KelolaDivisiIndex({
         event.preventDefault();
         if (!jobDivision) return;
 
-        jobForm.transform((data) => ({
-            ...data,
-            job_requirements: data.job_requirements
-                .filter((req) => req && req.trim() !== '')
-                .map((req) => req.trim()),
-            job_eligibility_criteria: {
-                ...(data.job_eligibility_criteria ?? {}),
-                program_studies: (data.job_eligibility_criteria?.program_studies ?? [])
-                    .filter((item) => item && item.trim() !== '')
-                    .map((item) => item.trim()),
-            },
-        }));
+        jobForm.transform((data) => {
+            const normalizedCriteria = normalizeEligibilityCriteria(data.job_eligibility_criteria);
+
+            return {
+                ...data,
+                job_salary_min: Number(String(data.job_salary_min).replace(/\D/g, '')),
+                job_requirements: data.job_requirements
+                    .filter((req) => req && req.trim() !== '')
+                    .map((req) => req.trim()),
+                job_eligibility_criteria: {
+                    ...normalizedCriteria,
+                    program_studies: (normalizedCriteria.program_studies ?? [])
+                        .filter((item) => item && item.trim() !== '')
+                        .map((item) => item.trim()),
+                },
+            };
+        });
 
         jobForm.post(route('super-admin.divisions.open-job', jobDivision.id), {
             preserveScroll: true,
@@ -291,6 +373,8 @@ export default function KelolaDivisiIndex({
                         errors?._form ||
                         errors?.job_title ||
                         errors?.job_description ||
+                        errors?.job_salary_min ||
+                        errors?.job_work_mode ||
                         'Gagal menyimpan lowongan. Periksa kembali data yang diisi.',
                 );
             },

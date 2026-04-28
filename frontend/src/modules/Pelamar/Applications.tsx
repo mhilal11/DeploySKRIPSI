@@ -357,6 +357,8 @@ export default function Applications({
                                         name: formDivision.name,
                                         job_title: formDivision.job_title,
                                         job_description: formDivision.job_description,
+                                        job_salary_min: formDivision.job_salary_min,
+                                        job_work_mode: formDivision.job_work_mode,
                                         job_requirements: formDivision.job_requirements,
                                     }}
                                     data={form.data}

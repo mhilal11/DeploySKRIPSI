@@ -9,6 +9,9 @@ import {
     passwordViolatesPolicy,
 } from '@/shared/lib/password-policy';
 
+const ACCOUNT_TOAST_ID = 'super-admin.accounts.feedback';
+const ACCOUNT_TOAST_STORAGE_KEY = 'super-admin.accounts.toast';
+const DEFAULT_SUCCESS_MESSAGE = 'Akun baru berhasil dibuat.';
 
 interface CreateProps {
     roleOptions: string[];
@@ -32,6 +35,7 @@ export default function Create({
     genderOptions,
     educationLevelOptions,
 }: CreateProps) {
+    const indexURL = route('super-admin.accounts.index');
     const defaultRole = '';
 
     const form = useForm({
@@ -86,6 +90,10 @@ export default function Create({
 
         if (passwordViolatesPolicy(form.data.password)) {
             form.setError('password', PASSWORD_POLICY_ERROR_MESSAGE);
+            toast.error('Password belum memenuhi kebijakan.', {
+                id: ACCOUNT_TOAST_ID,
+                description: PASSWORD_POLICY_ERROR_MESSAGE,
+            });
             return;
         }
 
@@ -95,11 +103,16 @@ export default function Create({
                 const message =
                     typeof responseData?.status === 'string' && responseData.status.length > 0
                         ? responseData.status
-                        : 'Akun baru berhasil dibuat.';
+                        : DEFAULT_SUCCESS_MESSAGE;
+
+                toast.success(message, {
+                    id: ACCOUNT_TOAST_ID,
+                });
+
                 if (typeof window !== 'undefined') {
-                    sessionStorage.setItem('super-admin.accounts.toast', message);
+                    sessionStorage.setItem(ACCOUNT_TOAST_STORAGE_KEY, message);
                 }
-                router.visit(route('super-admin.accounts.index'), { replace: true });
+                router.visit(indexURL, { replace: true });
             },
             onError: (errors) => {
                 const firstError = errors
@@ -111,6 +124,9 @@ export default function Create({
                     typeof firstError === 'string'
                         ? firstError
                         : 'Gagal membuat akun. Coba lagi.',
+                    {
+                        id: ACCOUNT_TOAST_ID,
+                    },
                 );
             },
         });
