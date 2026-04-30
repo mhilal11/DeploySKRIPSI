@@ -126,10 +126,6 @@ func NewRouter(cfg config.Config, db *sqlx.DB) *gin.Engine {
 }
 
 func allowedOrigins(cfg config.Config) []string {
-	if strings.EqualFold(cfg.Env, "production") {
-		return []string{productionFrontendOrigin}
-	}
-
 	seen := map[string]struct{}{}
 	add := func(origin string) {
 		origin = strings.TrimSpace(origin)
@@ -143,8 +139,14 @@ func allowedOrigins(cfg config.Config) []string {
 		add(origin)
 	}
 
-	add("http://localhost:5173")
-	add("http://127.0.0.1:5173")
+	if strings.EqualFold(cfg.Env, "production") {
+		if len(seen) == 0 {
+			add(productionFrontendOrigin)
+		}
+	} else {
+		add("http://localhost:5173")
+		add("http://127.0.0.1:5173")
+	}
 
 	out := make([]string, 0, len(seen))
 	for origin := range seen {

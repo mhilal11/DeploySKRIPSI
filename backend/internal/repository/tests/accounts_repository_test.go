@@ -142,3 +142,84 @@ func TestDeleteUserByID_ErrorWrapped(t *testing.T) {
 		t.Fatalf("expected contextual error, got %v", err)
 	}
 }
+
+func TestUpdateUser_WithoutEmployeeCode_DoesNotTouchEmployeeCode(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	now := time.Date(2026, 4, 30, 8, 0, 0, 0, time.UTC)
+	input := repository.UpdateUserInput{
+		ID:           7,
+		Name:         "Bar",
+		Email:        "bar@example.com",
+		Role:         "Admin",
+		Division:     "HR",
+		Status:       "Active",
+		RegisteredAt: "2026-04-30",
+		Now:          now,
+	}
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET name = ?, email = ?, role = ?, division = ?, status = ?, registered_at = ?, inactive_at = ?, updated_at = ? WHERE id = ?")).
+		WithArgs(
+			input.Name,
+			input.Email,
+			input.Role,
+			input.Division,
+			input.Status,
+			input.RegisteredAt,
+			nil,
+			now,
+			input.ID,
+		).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := repository.UpdateUser(db, input); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestUpdateUser_WithEmployeeCode_UpdatesEmployeeCode(t *testing.T) {
+	db, mock, cleanup := newSQLXMock(t)
+	defer cleanup()
+
+	now := time.Date(2026, 4, 30, 9, 0, 0, 0, time.UTC)
+	employeeCode := "ADM002"
+	inactiveAt := "2026-05-01"
+	input := repository.UpdateUserInput{
+		ID:           9,
+		EmployeeCode: &employeeCode,
+		Name:         "Baz",
+		Email:        "baz@example.com",
+		Role:         "Admin",
+		Division:     "Finance",
+		Status:       "Inactive",
+		RegisteredAt: "2026-04-30",
+		InactiveAt:   &inactiveAt,
+		Now:          now,
+	}
+
+	mock.ExpectExec(regexp.QuoteMeta("UPDATE users SET name = ?, email = ?, role = ?, division = ?, status = ?, registered_at = ?, inactive_at = ?, updated_at = ?, employee_code = ? WHERE id = ?")).
+		WithArgs(
+			input.Name,
+			input.Email,
+			input.Role,
+			input.Division,
+			input.Status,
+			input.RegisteredAt,
+			*input.InactiveAt,
+			now,
+			employeeCode,
+			input.ID,
+		).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	if err := repository.UpdateUser(db, input); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}

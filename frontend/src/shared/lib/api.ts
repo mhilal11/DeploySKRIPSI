@@ -9,6 +9,15 @@ function normalizeApiOrigin(value?: string | null): string {
   return trimmed.replace(/\/api\/?$/i, '').replace(/\/$/, '');
 }
 
+function normalizeBackendOrigin(value?: string | null): string {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  return trimmed.replace(/\/$/, '');
+}
+
 export function getApiOrigin(): string {
   const envOrigin = normalizeApiOrigin(
     process.env.NEXT_PUBLIC_API_URL ?? process.env.VITE_API_URL,
@@ -30,6 +39,13 @@ export function getApiBaseUrl(): string {
 }
 
 export function getBackendBaseUrl(): string {
+  const envOrigin = normalizeBackendOrigin(
+    process.env.NEXT_PUBLIC_BACKEND_ORIGIN ?? process.env.VITE_BACKEND_ORIGIN,
+  );
+  if (envOrigin) {
+    return envOrigin;
+  }
+
   return getApiOrigin();
 }
 

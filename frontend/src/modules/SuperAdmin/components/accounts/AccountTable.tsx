@@ -75,7 +75,7 @@ export default function AccountTable({
                                 </div>
                                 <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                                     <div>
-                                        <p className="text-[10px] text-slate-400">User ID</p>
+                                        <p className="text-[10px] text-slate-400">Kode Akun</p>
                                         <p className="text-[11px] text-slate-700 truncate">{user.employee_code ?? '-'}</p>
                                     </div>
                                     <div>
@@ -170,7 +170,7 @@ export default function AccountTable({
                     <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
                         <tr>
                             <th className="px-4 py-3 w-[50px]">No</th>
-                            <th className="px-4 py-3">User ID</th>
+                            <th className="px-4 py-3">Kode Akun</th>
                             <th className="px-4 py-3">Nama</th>
                             <th className="px-4 py-3">Email</th>
                             <th className="px-4 py-3">Role</th>

@@ -34,6 +34,7 @@ type CreateUserInput struct {
 
 type UpdateUserInput struct {
 	ID           int64
+	EmployeeCode *string
 	Name         string
 	Email        string
 	Role         string
@@ -246,6 +247,10 @@ func UpdateUser(db *sqlx.DB, input UpdateUserInput) error {
 		input.RegisteredAt,
 		nullableStringPtr(input.InactiveAt),
 		input.Now,
+	}
+	if input.EmployeeCode != nil {
+		updateFields = append(updateFields, "employee_code = ?")
+		args = append(args, nullableStringPtr(input.EmployeeCode))
 	}
 	if input.PasswordHash != nil && strings.TrimSpace(*input.PasswordHash) != "" {
 		updateFields = append(updateFields, "password = ?")

@@ -143,7 +143,8 @@ export default function AccountDetailDialog({
 
                         {activeTab === 'akun' && (
                             <div className="space-y-3 py-2 text-sm">
-                                <InfoRow label="User ID" value={displayUser.employee_code} />
+                                <InfoRow label="ID Internal" value={displayUser.id} />
+                                <InfoRow label="Kode Akun" value={displayUser.employee_code ?? '-'} />
                                 <InfoRow label="Nama" value={displayUser.name} />
                                 <InfoRow label="Email" value={displayUser.email} />
                                 <InfoRow

@@ -2,10 +2,12 @@ package services
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	mysql "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -37,6 +39,49 @@ func GenerateEmployeeCode(db *sqlx.DB, role string) (string, error) {
 	fmt.Sscanf(numPart, "%d", &num)
 	num++
 	return fmt.Sprintf("%s%03d", prefix, num), nil
+}
+
+func IsDuplicateEmployeeCodeError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+		return strings.Contains(strings.ToLower(mysqlErr.Message), "employee_code")
+	}
+
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "duplicate") && strings.Contains(message, "employee_code")
+}
+
+func WithGeneratedEmployeeCodeRetry(db *sqlx.DB, role string, operation func(code string) error) (string, error) {
+	if operation == nil {
+		return "", errors.New("employee code operation is required")
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < 5; attempt++ {
+		code, err := GenerateEmployeeCode(db, role)
+		if err != nil {
+			return "", err
+		}
+
+		if err := operation(code); err != nil {
+			if !IsDuplicateEmployeeCodeError(err) {
+				return "", err
+			}
+			lastErr = err
+			continue
+		}
+
+		return code, nil
+	}
+
+	if lastErr == nil {
+		lastErr = errors.New("unknown employee code collision")
+	}
+	return "", fmt.Errorf("generate unique employee code retries exceeded: %w", lastErr)
 }
 
 func GenerateComplaintCode(db *sqlx.DB) (string, error) {

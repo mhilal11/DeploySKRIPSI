@@ -54,7 +54,6 @@ func SuperAdminAccountsStore(c *gin.Context) {
 		return
 	}
 
-	employeeCode, _ := services.GenerateEmployeeCode(db, role)
 	hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	now := time.Now()
 
@@ -65,17 +64,22 @@ func SuperAdminAccountsStore(c *gin.Context) {
 		inactiveAt = now.Format("2006-01-02")
 	}
 
-	createdID, err := dbrepo.CreateUser(db, dbrepo.CreateUserInput{
-		EmployeeCode: employeeCode,
-		Name:         name,
-		Email:        email,
-		Role:         role,
-		Division:     division,
-		Status:       status,
-		RegisteredAt: registeredAt,
-		InactiveAt:   stringPtrOrNil(inactiveAt),
-		PasswordHash: string(hash),
-		Now:          now,
+	var createdID int64
+	employeeCode, err := services.WithGeneratedEmployeeCodeRetry(db, role, func(code string) error {
+		var createErr error
+		createdID, createErr = dbrepo.CreateUser(db, dbrepo.CreateUserInput{
+			EmployeeCode: code,
+			Name:         name,
+			Email:        email,
+			Role:         role,
+			Division:     division,
+			Status:       status,
+			RegisteredAt: registeredAt,
+			InactiveAt:   stringPtrOrNil(inactiveAt),
+			PasswordHash: string(hash),
+			Now:          now,
+		})
+		return createErr
 	})
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuat akun")
@@ -101,6 +105,7 @@ func SuperAdminAccountsStore(c *gin.Context) {
 		Description: "Membuat akun baru.",
 		NewValues: map[string]any{
 			"id":            createdID,
+			"employee_code": employeeCode,
 			"name":          name,
 			"email":         email,
 			"role":          role,
@@ -171,6 +176,10 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		inactiveAt = time.Now().Format("2006-01-02")
 	}
 
+	var employeeCode *string
+	roleChanged := existingUser.Role != role
+	missingEmployeeCode := existingUser.EmployeeCode == nil || strings.TrimSpace(ptrToString(existingUser.EmployeeCode)) == ""
+
 	var passwordHash *string
 	if password != "" {
 		hash, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -178,18 +187,44 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		passwordHash = &hashed
 	}
 
-	err = dbrepo.UpdateUser(db, dbrepo.UpdateUserInput{
-		ID:           id,
-		Name:         name,
-		Email:        email,
-		Role:         role,
-		Division:     division,
-		Status:       status,
-		RegisteredAt: registeredAt,
-		InactiveAt:   stringPtrOrNil(inactiveAt),
-		PasswordHash: passwordHash,
-		Now:          time.Now(),
-	})
+	now := time.Now()
+	if roleChanged || missingEmployeeCode {
+		generatedCode, genErr := services.WithGeneratedEmployeeCodeRetry(db, role, func(code string) error {
+			employeeCode = &code
+			return dbrepo.UpdateUser(db, dbrepo.UpdateUserInput{
+				ID:           id,
+				EmployeeCode: employeeCode,
+				Name:         name,
+				Email:        email,
+				Role:         role,
+				Division:     division,
+				Status:       status,
+				RegisteredAt: registeredAt,
+				InactiveAt:   stringPtrOrNil(inactiveAt),
+				PasswordHash: passwordHash,
+				Now:          now,
+			})
+		})
+		if genErr != nil {
+			handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui akun")
+			return
+		}
+		employeeCode = &generatedCode
+	} else {
+		err = dbrepo.UpdateUser(db, dbrepo.UpdateUserInput{
+			ID:           id,
+			EmployeeCode: employeeCode,
+			Name:         name,
+			Email:        email,
+			Role:         role,
+			Division:     division,
+			Status:       status,
+			RegisteredAt: registeredAt,
+			InactiveAt:   stringPtrOrNil(inactiveAt),
+			PasswordHash: passwordHash,
+			Now:          now,
+		})
+	}
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui akun")
 		return
@@ -210,6 +245,11 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		}
 	}
 
+	finalEmployeeCode := ptrToString(existingUser.EmployeeCode)
+	if employeeCode != nil {
+		finalEmployeeCode = ptrToString(employeeCode)
+	}
+
 	appendAuditLog(c, db, auditLogPayload{
 		Module:      "Accounts",
 		Action:      "UPDATE_ACCOUNT",
@@ -219,6 +259,7 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		OldValues: map[string]any{
 			"name":          existingUser.Name,
 			"email":         existingUser.Email,
+			"employee_code": nullIfBlank(ptrToString(existingUser.EmployeeCode)),
 			"role":          existingUser.Role,
 			"division":      existingUser.Division,
 			"status":        existingUser.Status,
@@ -228,6 +269,7 @@ func SuperAdminAccountsUpdate(c *gin.Context) {
 		NewValues: map[string]any{
 			"name":           name,
 			"email":          email,
+			"employee_code":  nullIfBlank(finalEmployeeCode),
 			"role":           role,
 			"division":       nullIfBlank(division),
 			"status":         status,

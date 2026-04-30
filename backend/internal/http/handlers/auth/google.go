@@ -211,11 +211,6 @@ func createGoogleRegisteredUser(c *gin.Context, claims googleTokenClaims) (*mode
 		return nil, errors.New("Koneksi database tidak tersedia.")
 	}
 
-	employeeCode, err := services.GenerateEmployeeCode(db, models.RolePelamar)
-	if err != nil {
-		return nil, errors.New("Gagal menyiapkan akun baru.")
-	}
-
 	seedPassword, err := utils.RandomToken(32)
 	if err != nil || seedPassword == "" {
 		seedPassword = claims.Sub + strconv.FormatInt(time.Now().UnixNano(), 10)
@@ -240,16 +235,21 @@ func createGoogleRegisteredUser(c *gin.Context, claims googleTokenClaims) (*mode
 	}
 
 	now := time.Now()
-	userID, err := dbrepo.CreatePelamarUserWithProfile(
-		db,
-		employeeCode,
-		displayName,
-		claims.Email,
-		string(hash),
-		now,
-		&now,
-		now,
-	)
+	var userID int64
+	_, err = services.WithGeneratedEmployeeCodeRetry(db, models.RolePelamar, func(code string) error {
+		var createErr error
+		userID, createErr = dbrepo.CreatePelamarUserWithProfile(
+			db,
+			code,
+			displayName,
+			claims.Email,
+			string(hash),
+			now,
+			&now,
+			now,
+		)
+		return createErr
+	})
 	if err != nil {
 		return nil, errors.New("Gagal membuat akun baru.")
 	}

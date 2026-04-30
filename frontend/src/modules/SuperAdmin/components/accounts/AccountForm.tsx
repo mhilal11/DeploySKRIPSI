@@ -88,7 +88,7 @@ export default function AccountForm({
                 {data.employee_code && (
                     <div>
                         <label className="text-sm font-medium text-slate-600">
-                            User ID
+                            Kode Akun
                         </label>
                         <input
                             id="employee_code"
@@ -96,6 +96,9 @@ export default function AccountForm({
                             disabled
                             className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-100 px-4 text-sm text-slate-600"
                         />
+                        <p className="mt-1 text-xs text-slate-500">
+                            Kode akun mengikuti role dan akan dibuat ulang saat role diubah.
+                        </p>
                     </div>
                 )}
                 <div>

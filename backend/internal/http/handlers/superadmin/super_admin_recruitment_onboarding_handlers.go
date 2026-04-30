@@ -195,8 +195,10 @@ func SuperAdminOnboardingConvertToStaff(c *gin.Context) {
 		return
 	}
 
-	employeeCode, _ := services.GenerateEmployeeCode(db, models.RoleStaff)
-	if err := dbrepo.UpdateUserToStaff(db, userModel.ID, employeeCode, app.Division); err != nil {
+	employeeCode, err := services.WithGeneratedEmployeeCodeRetry(db, models.RoleStaff, func(code string) error {
+		return dbrepo.UpdateUserToStaff(db, userModel.ID, code, app.Division)
+	})
+	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal memperbarui role user")
 		return
 	}

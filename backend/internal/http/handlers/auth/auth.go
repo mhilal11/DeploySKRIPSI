@@ -341,12 +341,6 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	employeeCode, err := services.GenerateEmployeeCode(db, models.RolePelamar)
-	if err != nil {
-		handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuat kode karyawan")
-		return
-	}
-
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal menyimpan password")
@@ -354,15 +348,20 @@ func Register(c *gin.Context) {
 	}
 
 	now := time.Now()
-	userID, err := repo.CreatePelamarUserWithProfile(
-		employeeCode,
-		req.Name,
-		req.Email,
-		string(hash),
-		now,
-		nil,
-		now,
-	)
+	var userID int64
+	_, err = services.WithGeneratedEmployeeCodeRetry(db, models.RolePelamar, func(code string) error {
+		var createErr error
+		userID, createErr = repo.CreatePelamarUserWithProfile(
+			code,
+			req.Name,
+			req.Email,
+			string(hash),
+			now,
+			nil,
+			now,
+		)
+		return createErr
+	})
 	if err != nil {
 		handlers.JSONError(c, http.StatusInternalServerError, "Gagal membuat akun")
 		return
