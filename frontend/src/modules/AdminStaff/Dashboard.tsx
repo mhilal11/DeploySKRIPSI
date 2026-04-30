@@ -109,11 +109,11 @@ export default function AdminStaffDashboard() {
 
     return (
         <AdminStaffLayout
-            title="Dashboard Staff"
+            title="Dashboard Admin"
             description="Ringkasan arus surat dan aktivitas divisi Anda"
             breadcrumbs={[{ label: 'Dashboard' }]}
         >
-            <Head title="Dashboard Staff" />
+            <Head title="Dashboard Admin" />
 
             <StatsCards stats={stats} />
 
